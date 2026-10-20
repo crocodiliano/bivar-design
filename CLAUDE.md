@@ -1,0 +1,125 @@
+# CLAUDE.md — Regras permanentes do projeto Bivar
+
+> Leia este arquivo inteiro no início de toda sessão. Se uma tarefa entrar em conflito com algo daqui ou de um ADR em `docs/adr/`, **pare e pergunte** antes de seguir.
+
+## 1. O que é o Bivar
+
+O Bivar é um programa de design open source (GPL-3.0) escrito em Rust. Ele une numa só interface:
+
+- vetor e UI;
+- tipografia;
+- animação;
+- diagramação editorial;
+- foto;
+- áudio;
+- 3D leve.
+
+Cada uma dessas áreas é uma **persona**: uma aba com as suas próprias ferramentas e painéis. Por baixo de todas elas há uma **nodetree**, que é a fonte da verdade do documento. O usuário trabalha com camadas e painéis comuns, que são uma projeção amigável desse grafo.
+
+O plano completo está em `docs/PLANO.md`, e as decisões de arquitetura estão em `docs/adr/`.
+
+## 2. Papéis
+
+- **Dono do produto:** não programa. Ele decide o quê, aprova os seus planos, testa usando o programa e aprova as imagens de referência dos testes visuais. **Explique tudo em português claro, sem jargão desnecessário.**
+- **Você (Claude Code):** implementa tarefas pequenas, sempre com testes, seguindo este arquivo, os ADRs e a especificação da entrega em `docs/fases/`.
+- **Auditor Rust:** valida os ADRs e revisa os módulos críticos. Qualquer mudança em um ADR exige um novo ADR e a aprovação dele.
+
+## 3. Princípios de arquitetura (inegociáveis)
+
+1. **O grafo é a fonte da verdade.** Camadas, painéis e a pilha Traçado/Preenchimento/FX apenas leem e editam o grafo. Nenhum estado de documento vive fora dele. (ADR-0001)
+2. **Tudo é operação.** Toda mudança no documento é uma operação serializável no grafo, venha ela da interface, de um script, de um colega via P2P ou do desfazer. Nunca altere o documento por outro caminho. (ADR-0002)
+3. **Compatível com CRDT desde o dia 1.** Toda operação nova precisa ser mesclável. (ADR-0005)
+4. **Personas são módulos.** O núcleo não conhece personas específicas. Cada persona é um crate que registra seus tipos de nó, ferramentas e painéis pela mesma interface que os plugins usarão. (ADR-0006)
+5. **Nada se perde em silêncio.** Ajustes invalidados, conflitos de junção e grafos que o painel não sabe representar ficam **visíveis** (estado de conflito ou indicador "customizado"), nunca descartados. (ADR-0004)
+6. **O mesmo motor desenha a tela e a exportação.** (ADR-0007)
+7. **Acessibilidade sempre:**
+   - todo controle é acessível por teclado e por leitor de tela (AccessKit);
+   - cor nunca é o único sinal;
+   - respeite "movimento reduzido".
+8. **Offline e privado:** nenhuma conexão de rede sem ação explícita do usuário, e zero telemetria.
+
+## 4. Regras de segurança
+
+- **Leitura de arquivos externos só em Rust.** Isso vale para SVG, fontes, imagens, PDF e qualquer outro formato. Todo leitor novo ganha um alvo de fuzzing. (ADR-0011)
+- **Abrir um arquivo nunca executa código.** Arquivos de projeto não carregam scripts.
+- **`unsafe` só com justificativa:** um comentário `// SAFETY:` explicando por que é correto, mais o registro em `docs/unsafe.md`. (ADR-0012)
+- **Criptografia nunca é caseira.** Só bibliotecas consolidadas, aprovadas em ADR.
+- **Toda operação vinda de script, plugin ou rede é entrada não confiável** e passa pela validação.
+- **Sem acesso a rede em testes,** exceto nos testes de P2P em loopback.
+
+## 5. Dependências
+
+- **Nenhuma dependência nova sem aprovação.** Proponha no plano da tarefa, com nome, licença, manutenção e alternativas.
+- **Só licenças compatíveis com GPL-3.0:** MIT, Apache-2.0, BSD, MPL-2.0, ISC, Zlib, LGPL e OFL (fontes).
+- **Proibido:**
+  - dependências com licença comercial paga;
+  - codecs com royalties (H.264/H.265/AAC na codificação);
+  - bibliotecas Pantone.
+- **Após mudar dependências,** `cargo deny check` e `cargo audit` precisam passar.
+
+## 6. Testes obrigatórios
+
+- Toda função nova vem com testes.
+- O núcleo também recebe testes de propriedades sempre que fizer sentido.
+- **Testes visuais (golden images):** toda mudança que afeta o que aparece na tela ou na exportação precisa de um teste visual em `tests/golden/`. **Nunca atualize uma imagem de referência sem a aprovação explícita do dono.** Mostre a ele a diferença antes.
+- **Antes de dizer "pronto",** estes comandos precisam passar:
+  - `cargo fmt --check`
+  - `cargo clippy --all-targets -- -D warnings`
+  - `cargo test`
+
+## 7. Fluxo de trabalho
+
+1. **Leia** a especificação da entrega em `docs/fases/` e os ADRs relacionados.
+2. **Apresente um plano curto, em português:**
+   - o que vai fazer;
+   - quais arquivos vai tocar;
+   - quais testes vai criar;
+   - riscos e dependências novas.
+   - **Espere a aprovação.**
+3. **Implemente em passos pequenos.** Uma tarefa é uma função, nunca uma aba inteira.
+4. **Rode as checagens da seção 6.**
+5. **Diga ao dono como testar,** citando os critérios de aceite da entrega.
+6. **Faça o commit** depois que o dono aprovar.
+
+**Se algo na especificação estiver ambíguo ou contradizer um ADR, pergunte. Não presuma.**
+
+## 8. Convenções
+
+- **Código, comentários, nomes e mensagens de commit:** em inglês.
+- **Documentação:**
+  - para o usuário: em `docs/` (português e inglês);
+  - para o dono: explicações em português.
+- **Commits** no formato `area: resumo curto` (ex.: `core: add reorder-node operation`), com:
+  - `Signed-off-by:` (DCO);
+  - indicação de uso de IA no corpo.
+- **Formatação e lints:** `rustfmt` padrão e Clippy sem avisos.
+- **Crates:** prefixo `bivar-`.
+
+## 9. Estrutura planejada do repositório (proposta; validar com o auditor)
+
+```
+crates/
+  bivar-core/        grafo, nós, operações, desfazer, validação
+  bivar-doc/         formato de arquivo SQLite, migrações, recuperação
+  bivar-render/      wgpu, compositor, tiles, cache/proxy
+  bivar-text/        composição de texto
+  bivar-color/       gerenciamento de cor
+  bivar-interp/      interpolação (mesclagem, fontes variáveis)
+  bivar-ui/          shell da interface, painéis, temas/tokens, acessibilidade
+  bivar-io-*/        leitores/escritores de formatos (um crate por família)
+  bivar-persona-vetor/ … (uma por persona)
+  bivar-script/      motor JS/TS e API pública
+  bivar-net/         P2P (depois da Fase 2)
+  bivar-cli/         modo sem interface
+  bivar-app/         executável
+docs/  adr/  fases/  PLANO.md
+tests/ golden/  fuzz/
+```
+
+## 10. Nunca
+
+- Alterar o documento fora do sistema de operações.
+- Adicionar dependência, `unsafe` ou acesso a rede sem aprovação.
+- Atualizar imagem de referência sem o dono ver.
+- Fazer tarefas grandes de uma vez ou "aproveitar para refatorar" sem pedir.
+- Implementar recursos fora da entrega atual.

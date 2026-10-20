@@ -1,0 +1,15 @@
+# Fixture proving that cargo-deny rejects an incompatible license.
+# `cargo deny --manifest-path tests/deny-fixture/Cargo.toml --config deny.toml check licenses`
+# must FAIL. It is not part of the main workspace.
+
+[workspace]
+
+[package]
+name = "deny-fixture"
+version = "0.0.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+publish = false
+
+[dev-dependencies]
+proprietary-lib = { path = "proprietary-lib" }

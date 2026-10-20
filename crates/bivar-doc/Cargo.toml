@@ -1,0 +1,10 @@
+[package]
+name = "bivar-doc"
+description = "SQLite project file format, migrations and recovery."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]

@@ -1,0 +1,11 @@
+#!/bin/sh
+# Reject commits without a DCO sign-off (ADR-0016).
+# Enable once per clone with: git config core.hooksPath .githooks
+
+if ! grep -qE '^Signed-off-by: .+ <.+>' "$1"; then
+    cat >&2 <<'EOF'
+ERROR: commit message has no "Signed-off-by:" line (DCO).
+Commit again with: git commit -s
+EOF
+    exit 1
+fi

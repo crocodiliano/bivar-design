@@ -1,0 +1,10 @@
+[package]
+name = "bivar-render"
+description = "wgpu renderer, compositor, tiles and cache/proxy."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]

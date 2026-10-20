@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install toolchain from rust-toolchain.toml
+        run: rustup show
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test
+
+      - name: Install cargo-deny and cargo-audit
+        run: cargo install --locked cargo-deny cargo-audit
+
+      - name: cargo deny
+        run: cargo deny check
+
+      - name: cargo deny rejects incompatible licenses
+        run: |
+          if cargo deny --manifest-path tests/deny-fixture/Cargo.toml --config deny.toml check licenses; then
+            echo "::error::cargo deny accepted a proprietary license"
+            exit 1
+          fi
+
+      - name: cargo audit
+        run: cargo audit
+
+  dco:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Check Signed-off-by on every commit
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          case "$EVENT" in
+            pull_request) range="$BASE..$HEAD" ;;
+            push)
+              if git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+                range="$BEFORE..$SHA"
+              else
+                range="$SHA"
+              fi ;;
+            *) range="HEAD" ;;
+          esac
+          failed=0
+          for c in $(git rev-list --no-merges "$range"); do
+            if ! git log -1 --format=%B "$c" | grep -qE '^Signed-off-by: .+ <.+>'; then
+              echo "::error::Commit $c has no Signed-off-by line (use git commit -s)"
+              failed=1
+            fi
+          done
+          exit $failed
