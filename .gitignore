@@ -1,2 +1,7 @@
 /target
 /tests/deny-fixture/target
+/poc/ui-egui/target
+# Snapshot test leftovers; only approved *.png references are committed.
+*.new.png
+*.diff.png
+*.old.png

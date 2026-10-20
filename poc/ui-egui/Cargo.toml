@@ -1,0 +1,18 @@
+# Disposable UI proof of concept (phase 0.2, ADR-0009).
+# Not part of the workspace and never a code base for the product.
+[package]
+name = "bivar-poc-ui-egui"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.99"
+license = "GPL-3.0-or-later"
+publish = false
+
+[dependencies]
+eframe = { version = "=0.37.0", default-features = false, features = ["accesskit", "wgpu"] }
+
+[dev-dependencies]
+egui_kittest = { version = "=0.37.0", features = ["snapshot", "wgpu"] }
+
+[lints.rust]
+unsafe_code = "forbid"

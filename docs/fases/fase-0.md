@@ -27,14 +27,15 @@
 Construa um programa mínimo, descartável, com **dois painéis e um canvas vazio**, primeiro em **egui**. Se ele falhar em algum item, repita em **Slint**.
 
 **Critérios de aceite (o dono testa cada um):**
-- [ ] **Estilo:** os painéis reproduzem o espírito do mockup: fundo escuro, cantos arredondados, tipografia limpa e roxo como destaque. O dono aprova visualmente.
-- [ ] **Janela separada:** um painel é arrastado para fora da janela principal, vira uma janela própria do Windows e pode ir para um segundo monitor. Depois, volta a se acoplar.
-- [ ] **Leitor de tela:** com o NVDA ligado, navegar pelos painéis com Tab faz o NVDA ler o nome de cada controle.
-- [ ] **Teclado:** todos os controles podem ser alcançados e usados sem mouse, com o foco sempre visível.
-- [ ] **Caneta:** desenhar no canvas com a mesa digitalizadora mostra na tela, em tempo real, a pressão (0–1), a inclinação e se a ponta borracha está em uso.
-- [ ] **Escala:** com a escala do Windows em 150%, a interface fica nítida e proporcional.
+- [x] **Estilo:** os painéis reproduzem o espírito do mockup: fundo escuro, cantos arredondados, tipografia limpa e roxo como destaque. O dono aprova visualmente.
+- [x] **Janela separada:** um painel é arrastado para fora da janela principal, vira uma janela própria do Windows e pode ir para um segundo monitor. Depois, volta a se acoplar.
+- [x] **Leitor de tela:** com o NVDA ligado, navegar pelos painéis com Tab faz o NVDA ler o nome de cada controle.
+- [x] **Teclado:** todos os controles podem ser alcançados e usados sem mouse, com o foco sempre visível.
+- [x] **Caneta (pressão):** desenhar no canvas com a mesa digitalizadora mostra na tela, em tempo real, a pressão (0–1).
+- [ ] **Caneta (inclinação e borracha):** a inclinação e se a ponta borracha está em uso. **Fora da prova por decisão do dono:** exigiriam código `unsafe`, que não foi permitido nesta prova. Veja a limitação 1 do [ADR-0017](../adr/0017.md).
+- [x] **Escala:** com a escala do Windows em 150%, a interface fica nítida e proporcional.
 
-**Resultado esperado:** o ADR-0009 é atualizado com o framework escolhido e as limitações encontradas, e o auditor o aprova.
+**Resultado esperado:** o framework escolhido e as limitações encontradas são registrados no [ADR-0017](../adr/0017.md), e o auditor o aprova. O ADR-0009 fica como está.
 
 ### 0.3 Prova de conceito do renderizador (ADR-0007)
 
@@ -45,12 +46,13 @@ Um programa mínimo que desenha com **Vello sobre wgpu** na GTX 1660.
 - [ ] Renderiza texto com uma fonte OTF em vários tamanhos, nítido no zoom.
 - [ ] A mesma cena exportada como PNG é idêntica pixel a pixel ao que aparece na tela, no mesmo zoom (primeiro teste visual).
 - [ ] A mesma cena renderiza também **sem GPU**, no modo CPU, para PNG.
+- [ ] O Vello funciona com a mesma versão do wgpu usada pelo eframe 0.37 (wgpu 30). Se não for compatível, o dono é avisado antes de seguir, e isso fica registrado no relatório.
 
 **Resultado esperado:** o ADR-0007 é confirmado ou ajustado.
 
 ### 0.4 Validação dos ADRs
 
-- [ ] O auditor revisa os ADRs 0001 a 0016 e marca cada um como Aceito ou pede alterações.
+- [ ] O auditor revisa os ADRs 0001 a 0017 e marca cada um como Aceito ou pede alterações.
 - [ ] O auditor recomenda as bibliotecas pendentes: motor JS, gerenciamento de cor e CRDT (com benchmark da Loro).
 
 ## Fora do escopo da Fase 0

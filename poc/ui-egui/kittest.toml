@@ -1,0 +1,3 @@
+# Visual tests (golden images). Never update an image without the owner's
+# explicit approval (CLAUDE.md, section 6).
+output_path = "tests/golden"

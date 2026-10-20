@@ -20,3 +20,4 @@ Cada ADR registra uma decisão, o contexto e as alternativas descartadas. **Stat
 | [0014](0014.md) | Segurança do P2P | Proposto |
 | [0015](0015.md) | Módulo de interpolação compartilhado | Proposto |
 | [0016](0016.md) | Licença GPL-3.0, DCO e contribuições com IA | Proposto |
+| [0017](0017.md) | Interface em egui (resultado da prova de conceito do ADR-0009) | Proposto |

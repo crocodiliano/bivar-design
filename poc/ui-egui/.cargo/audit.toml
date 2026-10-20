@@ -1,0 +1,4 @@
+# cargo-audit exceptions for the disposable UI proof of concept only.
+# zbus family, unmaintained, Linux-only (AccessKit). Approved by the owner.
+[advisories]
+ignore = ["RUSTSEC-2026-0370", "RUSTSEC-2026-0371", "RUSTSEC-2026-0372"]

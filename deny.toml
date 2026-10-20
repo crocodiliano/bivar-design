@@ -25,6 +25,7 @@ allow = [
     "LGPL-3.0-only",
     "LGPL-3.0-or-later",
     "OFL-1.1",
+    "Unicode-3.0",
 ]
 
 [licenses.private]
