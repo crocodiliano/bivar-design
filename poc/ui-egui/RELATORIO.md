@@ -57,7 +57,7 @@ Os detalhes estão no ADR-0017.
 3. **Movimento reduzido:** as animações estão sempre desligadas. A preferência do Windows não é lida, porque isso exigiria `unsafe`. O produto terá uma opção própria nas configurações do Bivar.
 4. **Testes visuais em paralelo derrubam o processo** dentro de uma dependência de GPU. Por isso eles rodam um de cada vez, com uma trava.
    - **Ambiente:** GeForce GTX 1660, driver NVIDIA **617.14**, conferido com `nvidia-smi` em 2026-10-20.
-   - **Pendência:** repetir os testes em paralelo, sem a trava, depois de atualizar o driver.
+   - **Depois de atualizar o driver para a versão 617.42 (2026-10-20):** sem a trava, ainda houve 7 quedas em 10 rodadas. Com a trava, foram 10 de 10 sem falha. A trava continua necessária.
 5. **Exceções de dependência só nesta pasta:** avisos de "sem manutenção" do zbus, usado só no Linux (`deny.toml` e `.cargo/audit.toml` locais).
 
 ## Dependências
