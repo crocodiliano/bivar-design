@@ -42,17 +42,17 @@ Construa um programa mínimo, descartável, com **dois painéis e um canvas vazi
 Um programa mínimo que desenha com **Vello sobre wgpu** na GTX 1660.
 
 **Critérios de aceite:**
-- [ ] Renderiza 10.000 retângulos com cantos arredondados, traçado e degradê, com navegação (zoom e pan) fluida, sem travadas perceptíveis.
-- [ ] Renderiza texto com uma fonte OTF em vários tamanhos, nítido no zoom.
-- [ ] A mesma cena exportada como PNG é idêntica pixel a pixel ao que aparece na tela, no mesmo zoom (primeiro teste visual).
-- [ ] A mesma cena renderiza também **sem GPU**, no modo CPU, para PNG.
-- [ ] O Vello funciona com a mesma versão do wgpu usada pelo eframe 0.37 (wgpu 30). Se não for compatível, o dono é avisado antes de seguir, e isso fica registrado no relatório.
+- [x] Renderiza 10.000 retângulos com cantos arredondados, traçado e degradê, com navegação (zoom e pan) fluida, sem travadas perceptíveis. **Com ressalva, aceita pelo dono:** a 144 Hz, passa com 256 degradês diferentes, mas não com um degradê diferente por retângulo. Veja a limitação 1 do [ADR-0018](../adr/0018.md).
+- [x] Renderiza texto com uma fonte OTF em vários tamanhos, nítido no zoom.
+- [x] A mesma cena exportada como PNG é idêntica pixel a pixel ao que aparece na tela, no mesmo zoom (primeiro teste visual). **Com tolerância, aceita pelo dono:** raramente 1 a 3 pixels diferem em 1 nível de 255. Veja a limitação 3 do [ADR-0018](../adr/0018.md).
+- [x] A mesma cena renderiza também **sem GPU**, no modo CPU, para PNG.
+- [x] O Vello funciona com a mesma versão do wgpu usada pelo eframe 0.37 (wgpu 30).
 
-**Resultado esperado:** o ADR-0007 é confirmado ou ajustado.
+**Resultado esperado:** o resultado é registrado no [ADR-0018](../adr/0018.md), que confirma o ADR-0007 com ressalvas, e o auditor o aprova. O ADR-0007 fica como está.
 
 ### 0.4 Validação dos ADRs
 
-- [ ] O auditor revisa os ADRs 0001 a 0017 e marca cada um como Aceito ou pede alterações.
+- [ ] O auditor revisa os ADRs 0001 a 0018 e marca cada um como Aceito ou pede alterações.
 - [ ] O auditor recomenda as bibliotecas pendentes: motor JS, gerenciamento de cor e CRDT (com benchmark da Loro).
 
 ## Fora do escopo da Fase 0

@@ -44,6 +44,10 @@
 **Critérios de aceite:**
 - [ ] Um teste visual falha quando um pixel muda e mostra a imagem de diferença.
 - [ ] Mexer num objeto redesenha só os tiles afetados (verificado por contador).
+- [ ] **Muitos degradês, velocidade** (limitação 1 do [ADR-0018](../adr/0018.md); pré-requisito da Fase 1a). Na GTX 1660, com a cena de 10.000 retângulos, cada um com degradê próprio, durante zoom e pan:
+  - **obrigatório:** 99% dos quadros abaixo de 16,7 ms (60 Hz);
+  - **desejável:** 99% dos quadros abaixo de 6,9 ms (144 Hz).
+- [ ] **Muitos degradês, estabilidade** (limitação 2 do [ADR-0018](../adr/0018.md); pré-requisito da Fase 1a). Obrigatório: um arquivo com 50.000 degradês diferentes abre sem derrubar o programa. Ele pode ficar lento, mas não pode cair.
 
 ### N.4 Texto, cor e interpolação
 

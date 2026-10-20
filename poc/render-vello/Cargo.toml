@@ -1,0 +1,27 @@
+# Disposable renderer proof of concept (phase 0.3, ADR-0007).
+# Not part of the workspace and never a code base for the product.
+[package]
+name = "bivar-poc-render-vello"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.99"
+license = "GPL-3.0-or-later"
+publish = false
+
+[dependencies]
+eframe = { version = "=0.37.0", default-features = false, features = ["accesskit", "wgpu"] }
+vello = "=0.11.0"
+vello_cpu = "=0.3.0"
+# Already used by vello and vello_cpu; named here to read the font's charmap.
+skrifa = "=0.44.0"
+png = "0.18"
+pollster = "0.4"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3

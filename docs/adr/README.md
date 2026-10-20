@@ -21,3 +21,4 @@ Cada ADR registra uma decisão, o contexto e as alternativas descartadas. **Stat
 | [0015](0015.md) | Módulo de interpolação compartilhado | Proposto |
 | [0016](0016.md) | Licença GPL-3.0, DCO e contribuições com IA | Proposto |
 | [0017](0017.md) | Interface em egui (resultado da prova de conceito do ADR-0009) | Proposto |
+| [0018](0018.md) | Vello sobre wgpu confirmado, com ressalvas (resultado da prova de conceito do ADR-0007) | Proposto |

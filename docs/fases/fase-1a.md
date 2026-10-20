@@ -4,6 +4,8 @@
 
 **Referências de uso:** Affinity Designer, Illustrator, Figma (parte de desenho).
 
+**Pré-requisito:** as limitações 1 e 2 do [ADR-0018](../adr/0018.md) estão resolvidas, ou seja, os critérios de degradês da entrega N.3 do [Núcleo](nucleo.md) passaram. A Fase 1a não começa sem isso.
+
 ## Escopo
 
 - **Canvas e organização:**
