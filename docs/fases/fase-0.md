@@ -77,11 +77,89 @@ A prova de conceito da 0.3 desenhou texto letra por letra, sem *shaping* (a mont
 - [ ] **Ligaduras:** com uma fonte que as tem, "fi" e "fl" viram o desenho único da ligadura. Elas podem ser desligadas, e então as letras voltam a aparecer separadas.
 - [ ] **Formatos de fonte:** funciona com uma fonte OTF (contornos CFF) e com uma TTF, as duas com licença OFL.
 - [ ] **Testes visuais:** o dono aprova as imagens de referência dos quatro critérios acima, desenhadas pelo Vello na placa de vídeo e pelo vello_cpu.
+- [ ] **Mesma imagem no PC do dono e no GitHub:** as imagens sem placa de vídeo (vello_cpu) saem idênticas, pixel a pixel, no PC do dono (Windows) e na compilação automática do GitHub (Linux). Veja "Testes visuais: onde rodam", abaixo. Se não saírem, o Claude Code para e mostra a diferença ao dono, que decide o que fazer.
 - [ ] **Registro:** o resultado e a biblioteca escolhida ficam num ADR novo, revisado pelo agente auditor.
 
-### 0.6 Escolha das bibliotecas pendentes
+### 0.6 Armazenamento e sincronização
 
-Três escolhas que o Núcleo precisa. Cada uma fica registrada num **ADR próprio**, com as alternativas comparadas em licença, manutenção, quantidade de código `unsafe` ou em C, tamanho e segurança. Os testes de cada item são provas de conceito **descartáveis**.
+Como o documento é guardado no disco e como duas cópias se juntam. Segue as decisões do [ADR-0019](../adr/0019.md): arquivo único com os arquivos grandes dentro, em pedaços; um único histórico de operações, o do CRDT; e "Salvar cópia para enviar", sem histórico. Trata os achados C1, A1, A5 e A6 da [auditoria da Fase 0](../auditoria/2026-10-28-fase-0.md).
+
+As escolhas ficam registradas em **ADRs novos**, com as alternativas comparadas em licença, manutenção, quantidade de código `unsafe` ou em C, tamanho e segurança. Os testes são provas de conceito **descartáveis**.
+
+**Critérios de aceite:**
+- [ ] **Formato por dentro do arquivo (achado C1):** um ADR escolhe entre:
+  - (a) SQLite com proteções obrigatórias: modo defensivo, `trusted_schema` desligado, verificação das células, carregamento de extensões desligado, limites de tamanho, `quick_check` ao abrir, recusa de tabelas, gatilhos e visões fora da especificação, e validação de todo o conteúdo como se viesse da rede;
+  - (b) SQLite aberto num processo isolado, para arquivos de terceiros;
+  - (c) um formato próprio com leitor 100% em Rust.
+
+  Na prova: um arquivo com um gatilho ou uma visão injetada é recusado com uma mensagem clara, e o carregador ganha um alvo de fuzzing (ADR-0011).
+- [ ] **Onde mora a verdade do documento (achado A1):** o ADR do CRDT diz:
+  - se o documento vive na biblioteca CRDT ou no `bivar-core`, e como os dois ficam iguais;
+  - como cada nó é identificado de forma única entre computadores;
+  - como cada tipo de operação vira estrutura CRDT: árvore para a hierarquia, lista para a pilha, mapa para os parâmetros, e as conexões entre nós, que não formam árvore;
+  - a versão do formato das operações.
+
+  Um protótipo modela a cadeia Forma → Traçado → Preenchimento → Saída, com as conexões.
+- [ ] **Sistema de operações independente da biblioteca CRDT** (ADR-0019, plano de contingência): no protótipo, só uma camada pequena fala com a biblioteca. O resto usa as operações do ADR-0002, sem tipos da biblioteca.
+- [ ] **Comparação Loro × Automerge.** As duas rodam a mesma prova, na máquina de referência, e o ADR registra os números e escolhe uma:
+  - **escrita simultânea:** duas cópias mudam o mesmo parâmetro ao mesmo tempo. Depois da junção, o programa sabe que houve escrita simultânea e conhece os dois valores, para avisar e registrar no histórico (ADR-0019). Se a biblioteca não oferecer isso pronto, o ADR mede o custo de fazer por fora;
+  - **desfazer em colaboração:** A muda um objeto, B muda outro, e A desfaz. Só a mudança de A some. O ADR registra também o que acontece quando A desfaz algo que B já editou por cima;
+  - **carregamento:** tempo e memória para abrir um documento com 1 milhão de operações no histórico. O ADR diz também se dá para carregar só a parte de uma persona;
+  - **remoção do histórico:** depois de "Salvar cópia para enviar", um texto apagado antes de salvar não aparece em nenhum byte do arquivo (achado A5);
+  - **velocidade:** 100.000 operações num documento de teste, e a junção de duas cópias que receberam 10.000 operações diferentes cada uma, ao mesmo tempo. São medidos o tempo, a memória e o tamanho salvo, e as duas cópias terminam idênticas.
+- [ ] **Arquivos grandes em pedaços** (ADR-0019; achado A6): um arquivo de teste de 2 GB, maior que o limite de 1 GB por valor do SQLite, é guardado em pedaços, salvo, reaberto e sai idêntico (mesmo hash). Mudar um parâmetro e salvar não regrava nenhum pedaço.
+- [ ] **Riscos de armazenamento (achado A6).** O ADR de armazenamento trata de cada um, e a prova testa:
+  - **arquivo único de verdade:** copiar o arquivo com o programa aberto gera uma cópia completa, ou o ADR explica como isso é evitado (por exemplo, os arquivos `-wal` e `-shm` do SQLite);
+  - **mesmo arquivo aberto duas vezes:** a segunda abertura é recusada ou abre só para leitura, com uma mensagem clara;
+  - **queda no meio da gravação:** o processo é morto durante o salvamento, e o arquivo reabre com a última versão salva;
+  - **arquivo corrompido ou cortado:** abre o que for possível ou mostra uma mensagem clara. O programa nunca cai;
+  - **migração de versão:** guarda uma cópia antes; uma falha no meio não estraga o original; um arquivo de versão mais nova é recusado com mensagem, nunca "consertado";
+  - **pastas sincronizadas** (OneDrive, unidades de rede): o ADR diz o que o programa faz, por exemplo um aviso ao abrir;
+  - **criptografia opcional:** o ADR diz como será feita sem biblioteca paga (CLAUDE.md §5), ou adia a decisão com justificativa;
+  - **especificação aberta:** o ADR diz como a especificação em `docs/formato/` fica legível sem depender do formato interno da biblioteca CRDT, ou registra essa dependência.
+- [ ] **Revisão:** os ADRs novos estão com status "Revisado por IA".
+- [ ] **Licenças:** `cargo deny check` e `cargo audit` passam nas provas.
+
+### 0.7 Especificação do modelo de dados, com protótipo
+
+O Núcleo vai implementar o grafo na entrega N.1. Antes disso, as regras do modelo de dados precisam estar escritas e testadas num protótipo **descartável**, construído sobre o resultado da 0.6. Trata os achados A2, A3, A4, A10, A11 (só identidade e autoria), A12, a tradução camadas ↔ grafo e o modelo de recálculo apontados pelo DeepSeek, e o painel de conflitos do ADR-0019.
+
+A especificação fica num documento em `docs/` (o nome é proposto no plano da entrega). As decisões ficam em ADRs novos.
+
+**Critérios de aceite:**
+- [ ] **Validação em duas camadas (achado A2):**
+  - a validação local (interface, script, plugin) pode rejeitar uma operação;
+  - a validação depois da junção nunca rejeita: ela só marca conflito;
+  - o conflito é calculado a partir do estado juntado, e dá o mesmo resultado em todas as cópias, qualquer que seja a ordem de chegada das operações.
+
+  **Teste:** uma pessoa liga A em B, outra liga B em A. Depois da junção, as duas cópias mostram o mesmo ciclo em estado de conflito. A Loro impede ciclos só na árvore, não nas conexões entre nós (veja a [comparação das revisões](../auditoria/2026-10-28-comparacao.md)), então o teste vale qualquer que seja a biblioteca.
+- [ ] **Ajustes manuais (achado A3):** a especificação diz como um ajuste aponta para o resultado do nó (identificadores estáveis dos pontos ou uma "assinatura" da forma) e o que é "invalidar". **Teste:** na estrela que passa de 5 para 7 pontas, e de 7 para 5, o ajuste nunca é reaplicado no vértice errado. Ou continua no ponto certo, ou entra em estado de conflito.
+- [ ] **Dono e referência (achado A4):** a especificação define:
+  - o que acontece quando o dono de um nó compartilhado é removido;
+  - onde ficam os nós criados no nível do documento, como uma cor-variável;
+  - o que acontece quando uma pessoa desvincula e outra edita o original ao mesmo tempo;
+  - se "desvincular" copia também os nós que alimentam aquele nó;
+  - quando se usa referência e quando se usa componente/instância;
+  - se um nó referenciado é calculado no contexto do dono ou de quem o referencia (DeepSeek).
+
+  Cada regra tem um teste de junção que dá o mesmo resultado em todas as cópias.
+- [ ] **Tipos de nó desconhecidos (achado A10):** um nó cujo tipo o programa não conhece (plugin ausente, persona dormindo, colega com versão mais nova) é preservado intacto e marcado. A validação de cada tipo é descrita como dados e roda sem acordar a persona. **Teste:** um arquivo com um nó de um plugin ausente abre, salva e reabre sem perder o nó.
+- [ ] **Identidade e autoria nas operações (achado A11, só esta parte):** um ADR diz como o autor de cada operação é ligado à chave pública dele, quanto custa assinar cada operação (medido no protótipo) e o que acontece com a operação de um editor malicioso sobre a qual outros já trabalharam. Transporte e criptografia ficam para a Fase 2.
+- [ ] **Testes de junção que protegem de verdade (achado A12):**
+  - teste de propriedades: as mesmas operações, entregues em qualquer ordem, chegam ao mesmo estado;
+  - nenhuma edição simultânea some sem aparecer como conflito, ou como aviso e registro no histórico (ADR-0019);
+  - os casos difíceis, um teste cada: mover A para dentro de B enquanto outro move B para dentro de A; remover um nó enquanto outro o edita; reordenar a pilha ao mesmo tempo; o mesmo parâmetro editado por duas pessoas.
+- [ ] **Tradução camadas ↔ grafo (DeepSeek):** a especificação diz como cada painel (camadas, pilha Traçado/Preenchimento/FX) lê o grafo e como cada edição no painel vira operações. **Testes:**
+  - mover um efeito para cima de outro na pilha gera exatamente as operações esperadas no grafo;
+  - um grafo que o painel não sabe representar ganha o indicador "customizado" e não é alterado só por abrir o painel;
+  - ler o grafo no painel e gravar de volta sem mudar nada deixa o grafo idêntico.
+- [ ] **Recálculo do grafo (DeepSeek):** a especificação diz como uma mudança se propaga e como o cache evita recalcular o que não mudou, incluindo os nós de ajuste do ADR-0004. **Teste:** mudar um parâmetro recalcula só os nós que dependem dele (verificado por contador).
+- [ ] **Painel de conflitos (ADR-0019):** a especificação define os tipos de conflito e de aviso, a gravidade de cada um e as ações próprias de cada tipo (não só "reaplicar/assar/descartar"). O painel é acessível por teclado e leitor de tela, e cor nunca é o único sinal. No protótipo, a lista de conflitos é calculada do estado e sai igual em todas as cópias. A interface do painel é construída no Núcleo.
+- [ ] **Revisão:** os ADRs novos estão com status "Revisado por IA".
+
+### 0.8 Cor, scripts e papel do Vello
+
+Duas bibliotecas que o Núcleo precisa e a decisão sobre o que o Vello faz. Cada escolha fica registrada num **ADR próprio**, com as alternativas comparadas em licença, manutenção, quantidade de código `unsafe` ou em C, tamanho e segurança. Os testes de cada item são provas de conceito **descartáveis**.
 
 **Critérios de aceite:**
 - [ ] **Motor JS para scripts (ADR-0013):**
@@ -100,18 +178,39 @@ Três escolhas que o Núcleo precisa. Cada uma fica registrada num **ADR própri
     - **ida e volta (sRGB → CMYK → sRGB):** ΔE00 ≤ 2,0 para cada cor dentro da gama do perfil;
   - **exceção esperada:** cores fora da gama de impressão do perfil CMYK (por exemplo, verdes e azuis muito saturados de tela) não voltam iguais, porque a impressora não consegue reproduzi-las. Para essas cores não vale a tolerância de ida e volta. Elas precisam ser convertidas sempre do mesmo jeito, sem erro, e a prova lista quais saíram da gama e com que ΔE00;
   - a leitura de perfis ICC respeita o ADR-0011 (leitura de arquivos externos só em Rust) ou registra uma exceção justificada.
-- [ ] **CRDT (ADR-0005), com o teste de velocidade da Loro:**
-  - um ADR compara a Loro com pelo menos uma alternativa e escolhe uma;
-  - o teste de velocidade aplica 100.000 operações num documento de teste e junta duas cópias que receberam 10.000 operações diferentes cada uma, ao mesmo tempo;
-  - são medidos o tempo, a memória e o tamanho salvo, na máquina de referência;
-  - as duas cópias terminam idênticas depois da junção;
-  - os números ficam registrados no ADR.
+- [ ] **Papel do Vello (achado A8; ADR-0019):** um ADR diz o que o Vello faz (a tela e a exportação PNG/JPG em 8 bits) e qual caminho cuida de CMYK, 16/32 bits, cores especiais, sobreimpressão, prova de impressão na tela e PDF/X, com as alternativas comparadas. Ele diz também como exportar imagens maiores que o limite de textura da placa (16.384 px na GTX 1660). A escolha conversa com a biblioteca de cor acima.
 - [ ] **Revisão:** os três ADRs novos estão com status "Revisado por IA".
 - [ ] **Licenças:** `cargo deny check` e `cargo audit` passam nas provas.
 
+### 0.9 Prova de degradês
+
+O Vello 0.11 fica lento com muitos degradês diferentes e cai acima de 16.384 (limitações 1 e 2 do [ADR-0018](../adr/0018.md)). Recursos centrais do Bivar, como a mesclagem, geram muitos degradês. Por isso a solução é provada aqui, numa prova **descartável**, antes do Núcleo e da entrega N.3. O caminho, entre as opções do ADR-0018 (reaproveitar e limitar, blocos, memória configurável no Vello ou versão nova do Vello), é proposto no plano da entrega, revisado pelo agente auditor e decidido pelo dono.
+
+**Regra da prova:** nenhum `unsafe` no nosso código.
+
+**Critérios de aceite:**
+- [ ] **Velocidade:** na GTX 1660, com a cena de 10.000 retângulos, cada um com degradê próprio, durante zoom e pan:
+  - **obrigatório:** 99% dos quadros abaixo de 16,7 ms (60 Hz);
+  - **desejável:** 99% dos quadros abaixo de 6,9 ms (144 Hz).
+- [ ] **Estabilidade:** uma cena com 50.000 degradês diferentes abre sem derrubar o programa e **desenha corretamente, ou mostra um aviso visível**. Ela pode ficar lenta. Não pode cair, nem trocar degradês por cor sólida (ou por qualquer simplificação) em silêncio. Nenhum arquivo é recusado por esse limite (ADR-0019).
+- [ ] **Imagem correta:** a imagem da solução é comparada com a do vello_cpu da mesma cena, por regiões, para provar que nenhum degradê sumiu ou foi trocado.
+- [ ] **Medição registrada:** o relatório diz como cada número foi medido, e o código que mede fica na prova.
+- [ ] **Registro:** a solução escolhida fica num ADR novo, revisado pelo agente auditor. A implementação no produto continua sendo critério da N.3.
+
+## Testes visuais: onde rodam
+
+| Tipo de teste visual | No GitHub (Linux, sem placa de vídeo) | No PC do dono (GTX 1660) |
+| --- | --- | --- |
+| **Sem placa de vídeo** (vello_cpu) | Roda a cada envio, com **comparação exata**: qualquer pixel diferente faz o teste falhar. | Roda também, com a mesma comparação exata. |
+| **Com placa de vídeo** (Vello) | **Não roda:** o GitHub não tem placa de vídeo. | Roda, com a folga medida do [ADR-0018](../adr/0018.md): até 3 pixels, com diferença de no máximo 1 em 255. |
+
+- **Antes de um commit que muda o que aparece na tela,** o dono roda os testes com placa no PC dele. O plano da 0.5 diz qual comando faz isso.
+- **As imagens sem placa precisam sair iguais nos dois lugares.** A 0.5 confere isso com as primeiras imagens de referência. Se o PC e o GitHub não concordarem, o Claude Code para e o dono decide.
+- **Nenhuma imagem de referência muda sem a aprovação do dono** (CLAUDE.md §6).
+
 ## Antes do Núcleo
 
-**O Núcleo só começa quando as entregas 0.4, 0.5 e 0.6 estiverem concluídas e revisadas pelo agente auditor.**
+**O Núcleo só começa quando as entregas 0.4, 0.5, 0.6, 0.7, 0.8 e 0.9 estiverem concluídas e revisadas pelo agente auditor.**
 
 ## Fora do escopo da Fase 0
 

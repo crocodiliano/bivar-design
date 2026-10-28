@@ -4,7 +4,7 @@
 
 **ADRs:** 0001, 0002, 0003, 0004, 0005, 0006, 0007, 0008, 0010, 0011, 0012, 0015.
 
-**Pré-requisito:** as entregas 0.4, 0.5 e 0.6 da [Fase 0](fase-0.md) estão concluídas e revisadas pelo agente auditor. O Núcleo não começa sem isso.
+**Pré-requisito:** as entregas 0.4 a 0.9 da [Fase 0](fase-0.md) estão concluídas e revisadas pelo agente auditor. O Núcleo não começa sem isso.
 
 ## Entregas
 
@@ -29,7 +29,7 @@
 ### N.2 Formato de arquivo (`bivar-doc`)
 
 - Arquivo SQLite, versão do formato, migração de exemplo.
-- Salvamento incremental, diário de operações e recuperação de queda.
+- Salvamento incremental e recuperação de queda pelo histórico do CRDT, o único histórico de operações (ADR-0019).
 - Armazenamento de blobs por hash.
 - Rascunho da especificação em `docs/formato/`.
 
@@ -51,7 +51,7 @@
 - [ ] **Tela × exportação, automático** (achado B11 da auditoria da Fase 0). Um teste automático compara a imagem que vai para a tela com a exportação PNG da mesma vista, dentro da folga da placa de vídeo. Na prova da 0.3, essa comparação era manual (botão "Capturar a tela e comparar").
 - [ ] **Computador sem DirectX 12 nem Vulkan** (achado B10 da auditoria da Fase 0). Quando a placa de vídeo não oferece nenhum dos dois, o programa não cai e mostra uma mensagem clara, que diz o que falta. Um teste simula a falta de placa compatível.
 - [ ] **Medição de tempo completa** (achado M4 da auditoria da Fase 0). Os números de desempenho de cada quadro trazem, separados: o tempo no processador, o tempo de trabalho da placa de vídeo (medido pela própria placa) e o momento em que a imagem é apresentada na tela. O plano da entrega diz como cada um é medido, e o código que mede fica no repositório.
-- [ ] **Muitos degradês, velocidade** (limitação 1 do [ADR-0018](../adr/0018.md); pré-requisito da Fase 1a). Na GTX 1660, com a cena de 10.000 retângulos, cada um com degradê próprio, durante zoom e pan:
+- [ ] **Muitos degradês, velocidade** (limitação 1 do [ADR-0018](../adr/0018.md); pré-requisito da Fase 1a). A solução é provada antes na entrega 0.9 da [Fase 0](fase-0.md); aqui ela entra no produto. Na GTX 1660, com a cena de 10.000 retângulos, cada um com degradê próprio, durante zoom e pan:
   - **obrigatório:** 99% dos quadros abaixo de 16,7 ms (60 Hz);
   - **desejável:** 99% dos quadros abaixo de 6,9 ms (144 Hz).
 - [ ] **Muitos degradês, estabilidade** (limitação 2 do [ADR-0018](../adr/0018.md); pré-requisito da Fase 1a). Obrigatório: um arquivo com 50.000 degradês diferentes abre sem derrubar o programa e **desenha corretamente, ou mostra um aviso visível**. Ele pode ficar lento. Não pode cair, nem trocar degradês por cor sólida (ou por qualquer simplificação) em silêncio.

@@ -104,7 +104,7 @@ O plano completo está em `docs/PLANO.md`, que é a versão oficial do plano. As
 
 **Se algo na especificação estiver ambíguo ou contradizer um ADR, pergunte. Não presuma.**
 
-**Ordem das fases:** o Núcleo só começa quando as entregas 0.4, 0.5 e 0.6 da Fase 0 estiverem concluídas e revisadas pelo agente auditor.
+**Ordem das fases:** o Núcleo só começa quando as entregas 0.4 a 0.9 da Fase 0 estiverem concluídas e revisadas pelo agente auditor.
 
 **Antes de fechar uma entrega, do Núcleo em diante:** o dono dispara manualmente no GitHub o workflow de testes de mutação (`mutants.yml`), e os resultados são analisados.
 

@@ -99,7 +99,7 @@ O projeto usa Rust em toda parte. O framework de interface é decidido por uma p
 - **Arquivo único em SQLite:**
   - salvamento atômico e incremental;
   - carregamento parcial por persona;
-  - recuperação de queda pelo diário de operações;
+  - recuperação de queda pelo histórico do CRDT, o único histórico de operações (ADR-0019);
   - versões com migração.
 - **Especificação aberta e documentada.**
 - **Importação e exportação só de formatos abertos ou publicamente documentados, sem engenharia reversa:**
@@ -153,7 +153,7 @@ Colaboração, scripts e plugins são três fontes de operações no mesmo grafo
 
 ### Scripts e automação (ponto 7)
 
-- **Linguagem:** JS/TS, com o motor escolhido na entrega 0.6 da Fase 0.
+- **Linguagem:** JS/TS, com o motor escolhido na entrega 0.8 da Fase 0.
 - **Execução:** um script desfaz com um único Ctrl+Z, sincroniza via P2P e passa pela mesma validação das outras operações.
 - **Gravador de macros:** prioridade. Grava ações e gera um script JS editável. Escrever scripts do zero também é suportado.
 - **Modo sem interface:** pelo terminal do Windows, para trabalho em lote.
@@ -437,9 +437,12 @@ Os registros de decisão (ADRs) passam pela revisão por IA (entrega 0.4 da Fase
 - [x] Busca manual do nome "Bivar" no INPI, classes 9 e 42 (feita em 20/10/2026, sem conflitos)
 - [ ] Se o formato .riv do Rive é documentado o bastante para importar ou exportar
 - [ ] Prova de conceito do motor de texto: shaping, kerning, ligaduras e acentos (entrega 0.5)
-- [ ] Motor JS para scripts (entrega 0.6)
-- [ ] Biblioteca de gerenciamento de cor (entrega 0.6)
-- [ ] CRDT, com o teste de velocidade da Loro (entrega 0.6)
+- [ ] Motor JS para scripts (entrega 0.8)
+- [ ] Biblioteca de gerenciamento de cor (entrega 0.8)
+- [ ] Armazenamento e sincronização: formato por dentro do arquivo e CRDT, com a comparação Loro × Automerge (entrega 0.6)
+- [ ] Especificação do modelo de dados, com protótipo, e painel de conflitos (entrega 0.7)
+- [ ] Papel do Vello diante de CMYK, 16/32 bits e PDF/X (entrega 0.8)
+- [ ] Prova de degradês: 10.000 a 60 Hz, e 50.000 desenhados corretamente ou com aviso, sem cair (entrega 0.9)
 - [ ] Biblioteca de leitura de RAW: Rust ou C++ (antes da persona Foto: proposta no plano da entrega, revisada pelo agente auditor e decidida pelo dono)
 - [ ] Ferramenta de hinting automático e como isolá-la, se for em C
 - [ ] O que acontece num computador sem DirectX 12 nem Vulkan: no mínimo, uma mensagem clara em vez de queda (critério da entrega N.3). Se haverá um modo de reserva, por exemplo com o vello_cpu, fica para o plano da N.3
