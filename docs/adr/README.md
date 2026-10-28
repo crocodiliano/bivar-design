@@ -36,4 +36,4 @@ A prioridade indica o quanto custaria mudar a decisão depois. Os ADRs de priori
 | [0016](0016.md) | Licença GPL-3.0, DCO e contribuições com IA | Baixa | Proposto |
 | [0017](0017.md) | Interface em egui (resultado da prova de conceito do ADR-0009) | Alta | Proposto |
 | [0018](0018.md) | Vello sobre wgpu confirmado, com ressalvas (resultado da prova de conceito do ADR-0007) | Alta | Proposto |
-| [0019](0019.md) | Decisões do dono após a auditoria da Fase 0 | Alta | Proposto |
+| [0019](0019.md) | Decisões do dono após a auditoria da Fase 0 | Alta | Revisado por IA |

@@ -63,7 +63,7 @@ Revisão por IA dos ADRs 0001 a 0019, com três partes:
 **Critérios de aceite:**
 - [ ] O relatório do agente auditor está salvo em `docs/auditoria/`.
 - [ ] Todo achado de gravidade Crítica ou Alta foi tratado: ou corrigido, ou com justificativa registrada.
-- [ ] Os ADRs de prioridade Alta estão com status "Revisado por IA": 0001, 0002, 0003, 0004, 0005, 0007, 0008, 0009, 0010, 0011, 0014, 0017, 0018 e 0019. A prioridade de cada um está no [índice dos ADRs](../adr/README.md).
+- [ ] Os ADRs de prioridade Alta estão com status "Revisado por IA": 0001, 0002, 0003, 0004, 0005, 0007, 0008, 0009, 0010, 0011, 0014, 0017, 0018 e 0019. A prioridade de cada um está no [índice dos ADRs](../adr/README.md). O ADR-0019 chegou a "Revisado por IA" em 2026-10-28.
 - [ ] **ADR-0014 dividido em dois** (achado A11): a parte de identidade e autoria passa para o ADR novo da 0.7. O ADR-0014 fica só com transporte e criptografia, que esperam a Fase 2, e registra essa justificativa. Com isso ele pode chegar a "Revisado por IA" sem resolver agora o que é da Fase 2.
 
 **A 0.4 é a última entrega a fechar.** Vários ADRs da lista acima só deixam de estar travados com os resultados da 0.5 à 0.9 (veja o [registro de tratamento](../auditoria/2026-10-28-fase-0-tratamento.md)). Por isso a 0.4 fecha depois da 0.9.
