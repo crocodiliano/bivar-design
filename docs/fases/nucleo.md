@@ -52,7 +52,7 @@
 - [ ] **Muitos degradês, velocidade** (limitação 1 do [ADR-0018](../adr/0018.md); pré-requisito da Fase 1a). Na GTX 1660, com a cena de 10.000 retângulos, cada um com degradê próprio, durante zoom e pan:
   - **obrigatório:** 99% dos quadros abaixo de 16,7 ms (60 Hz);
   - **desejável:** 99% dos quadros abaixo de 6,9 ms (144 Hz).
-- [ ] **Muitos degradês, estabilidade** (limitação 2 do [ADR-0018](../adr/0018.md); pré-requisito da Fase 1a). Obrigatório: um arquivo com 50.000 degradês diferentes abre sem derrubar o programa. Ele pode ficar lento, mas não pode cair.
+- [ ] **Muitos degradês, estabilidade** (limitação 2 do [ADR-0018](../adr/0018.md); pré-requisito da Fase 1a). Obrigatório: um arquivo com 50.000 degradês diferentes abre sem derrubar o programa e **desenha corretamente, ou mostra um aviso visível**. Ele pode ficar lento. Não pode cair, nem trocar degradês por cor sólida (ou por qualquer simplificação) em silêncio.
 
 ### N.4 Texto, cor e interpolação
 
