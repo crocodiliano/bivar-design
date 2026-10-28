@@ -40,9 +40,9 @@ O projeto é de longo prazo, com a arquitetura pensada para as 7 personas e a im
 
 **Referências de mercado que calibram o plano:**
 
-- **[Graphite](https://lwn.net/Articles/1051242):** a referência técnica mais próxima. Também é Rust com um grafo de nós procedural. Começou em 2021, já teve mais de 170 contribuidores e ainda está em alpha.
+- **[Graphite](https://lwn.net/Articles/1051242):** a referência técnica mais próxima. Também é Rust com um grafo de nós procedural. Começou em 2021, já teve mais de 170 contribuidores e ainda está em alpha. Ele já tem grafos aninhados (subgrafos) e um painel de camadas que é uma vista equivalente do grafo ([recursos](https://graphite.art/features/), [redes e nós](https://graphite.art/volunteer/guide/graphene/networks-and-nodes/), conferido em 2026-10-28).
 - **[Affinity gratuito e unificado](https://www.footagesecrets.com/news/affinity-by-canva/):** mostra que existe demanda por um app único, e também que esse espaço já tem um concorrente grátis.
-- **O diferencial do Bivar:** não é só ser não destrutivo. É a camada funcionar como interface amigável de um grafo editável, unificado entre as personas.
+- **O diferencial do Bivar:** camadas como vista de um grafo não destrutivo já existem no Graphite. O diferencial é **um mesmo grafo para todas as personas** (vetor, tipografia, editorial, animação, foto, áudio e 3D leve, numa só interface) e a pilha Traçado/Preenchimento/FX do painel direito como projeção amigável dos nós de cada objeto.
 
 Enquanto o Bivar cresce, o dono usa alternativas gratuitas: Affinity, Penpot, Krita, darktable, Fontra/FontForge e Blender.
 
