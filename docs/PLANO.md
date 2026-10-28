@@ -13,7 +13,7 @@ Bivar é um programa de design open source (GPL-3.0) que une, numa só interface
 - **O grafo é a fonte da verdade.** Camadas e painéis são uma projeção amigável dele.
 - **Tudo é operação.** Cliques, scripts, colegas via P2P e o desfazer passam pelo mesmo sistema de operações no grafo.
 - **Personas são módulos.** O núcleo é uma plataforma, e cada aba é um módulo, inclusive as que a comunidade criar.
-- **Nada se perde em silêncio.** Conflitos e edições que quebram o procedural ficam visíveis e são resolvidos pelo usuário.
+- **Nada se perde sem registro e aviso.** Conflitos e edições que quebram o procedural ficam visíveis e são resolvidos pelo usuário. Quando duas pessoas mudam o mesmo valor, fica a última mudança, mas com aviso e registro no histórico (ADR-0019).
 - **Local, offline e privado.** Zero telemetria e nenhum servidor obrigatório.
 - **Acessível sempre.** Leitor de tela, teclado completo e cor nunca como único sinal.
 - **Ciência com honestidade.** Recursos de ergonomia são "baseados em estudos", com referências, nunca "comprovados".
