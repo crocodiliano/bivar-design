@@ -148,7 +148,8 @@ A especificação fica num documento em `docs/` (o nome é proposto no plano da 
 - [ ] **Testes de junção que protegem de verdade (achado A12):**
   - teste de propriedades: as mesmas operações, entregues em qualquer ordem, chegam ao mesmo estado;
   - nenhuma edição simultânea some sem aparecer como conflito, ou como aviso e registro no histórico (ADR-0019);
-  - os casos difíceis, um teste cada: mover A para dentro de B enquanto outro move B para dentro de A; remover um nó enquanto outro o edita; reordenar a pilha ao mesmo tempo; o mesmo parâmetro editado por duas pessoas.
+  - os casos difíceis, um teste cada: mover A para dentro de B enquanto outro move B para dentro de A; remover um nó enquanto outro o edita; reordenar a pilha ao mesmo tempo; o mesmo parâmetro editado por duas pessoas;
+  - nos movimentos e reordenações simultâneos, vence um, e o teste confere que todas as cópias mostram o mesmo aviso, o mesmo registro no painel de conflitos e o mesmo movimento perdido no histórico (ADR-0019, decisão 3).
 - [ ] **Tradução camadas ↔ grafo (DeepSeek):** a especificação diz como cada painel (camadas, pilha Traçado/Preenchimento/FX) lê o grafo e como cada edição no painel vira operações. **Testes:**
   - mover um efeito para cima de outro na pilha gera exatamente as operações esperadas no grafo;
   - um grafo que o painel não sabe representar ganha o indicador "customizado" e não é alterado só por abrir o painel;
