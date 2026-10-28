@@ -59,6 +59,13 @@ Nas 3 rodadas, 64 ficou melhor que 256. A primeira medição de 64 foi um ponto 
 | 256 | 0,7 ms | 4,1 ms | 2,6 ms |
 | 64 | 0,8 ms | 2,6 ms | 3,0 ms |
 
+**Como esses números foram obtidos (registro de 2026-10-28, achado M4 da auditoria):**
+
+- **O que o código da prova mede:** um único tempo por quadro, no processador (`last_render_ms`, em `src/app.rs`, função `render_canvas`). Ele começa antes de montar a vista e termina quando a chamada `render` do Vello retorna. Essa chamada só entrega o trabalho à placa: ela não espera a placa terminar.
+- **O que o código não mede:** a separação entre "montar a vista" e "chamada do Vello", e o "trabalho da placa de vídeo". O método usado para essas duas colunas não foi registrado, e o código do repositório não as reproduz. Elas devem ser lidas como **estimativas não verificadas**. A conclusão sobre a causa (o custo cresce dentro do Vello, no processador) continua apoiada no tempo total medido e no código do `ramp_cache.rs`.
+- **Intervalo entre quadros:** as tabelas de fluidez medem o intervalo entre duas chamadas da atualização da janela, no processador (`update_tour`, em `src/app.rs`). Não é a hora em que a imagem aparece na tela. Isso explica os intervalos de ~5 ms com sincronismo vertical ligado (veja a observação abaixo).
+- **No produto:** a entrega N.3 mede o tempo da placa de vídeo e o tempo de apresentação na tela.
+
 **Causa:** a placa de vídeo desenha os 10.000 retângulos em menos de 3 ms. O gargalo está no processador, dentro do Vello: em `vello_encoding/src/ramp_cache.rs`, a memória de degradês guarda **só 64** entre um quadro e outro (`RETAINED_COUNT = 64`, valor fixo). Acima disso, a tabela de cores de cada degradê é recalculada a cada quadro, e cada degradê novo percorre a lista inteira. O custo cresce muito mais rápido que o número de degradês.
 
 **Otimização feita na prova:** a cena é montada uma vez só. A cada quadro, só se aplica o zoom e o pan (`Scene::append` com transformação). Isso reduziu a montagem de 12 ms para 0,7 ms.
