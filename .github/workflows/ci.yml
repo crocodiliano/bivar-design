@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   checks:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
 
@@ -44,7 +44,7 @@ jobs:
 
   # Report only: shows which lines the tests run. No minimum yet.
   coverage:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
 
@@ -75,7 +75,7 @@ jobs:
           retention-days: 30
 
   dco:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
         with:
