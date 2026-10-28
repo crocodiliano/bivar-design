@@ -36,7 +36,7 @@ O plano completo está em `docs/PLANO.md`, que é a versão oficial do plano. As
 3. **Compatível com CRDT desde o dia 1.** Toda operação nova precisa ser mesclável. (ADR-0005)
 4. **Personas são módulos.** O núcleo não conhece personas específicas. Cada persona é um crate que registra seus tipos de nó, ferramentas e painéis pela mesma interface que os plugins usarão. (ADR-0006)
 5. **Nada se perde em silêncio.** Ajustes invalidados, conflitos de junção e grafos que o painel não sabe representar ficam **visíveis** (estado de conflito ou indicador "customizado"), nunca descartados. (ADR-0004)
-6. **O mesmo motor desenha a tela e a exportação.** A exportação normal usa o Vello na placa de vídeo, igual à tela. O modo sem placa de vídeo (vello_cpu) é para scripts e exportação em lote; ele difere da tela só em pequenos detalhes nas bordas suavizadas, como documentado no ADR-0018. (ADR-0007, ADR-0018)
+6. **O mesmo motor desenha a tela e a exportação.** A exportação normal usa o Vello na placa de vídeo, igual à tela. O modo sem placa de vídeo (vello_cpu) é para scripts e exportação em lote; ele difere da tela nas bordas suavizadas. Na cena de teste da prova, 30 a 35% dos pixels diferem, com diferença máxima de 45 a 91 em 255 e média de cerca de 1,2 em 255, como documentado no ADR-0018. Por isso o modo sem placa tem imagens de referência próprias. (ADR-0007, ADR-0018)
 7. **Acessibilidade sempre:**
    - todo controle é acessível por teclado e por leitor de tela (AccessKit);
    - cor nunca é o único sinal;
