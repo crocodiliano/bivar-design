@@ -82,11 +82,12 @@ pub struct Diff {
 
 /// Vello on the GPU is not bit-for-bit repeatable on the reference machine:
 /// measured over 99 repeated renders of the same scene, up to 3 pixels in
-/// 1,024,000 changed by 1 level (of 255). This is the allowed difference
-/// between two GPU renders of the same view.
+/// 1,024,000 changed by 1 level (of 255) on DirectX 12, and up to 1 pixel on
+/// Vulkan. This is the allowed difference between two GPU renders of the
+/// same view.
 pub const GPU_REPEAT_TOLERANCE: Tolerance = Tolerance {
     max_channel_delta: 1,
-    max_differing_pixels: 16,
+    max_differing_pixels: 3,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

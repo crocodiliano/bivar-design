@@ -89,7 +89,8 @@ A janela tem o botão **"Capturar a tela e comparar"**. Ele tira uma foto da jan
 
 A causa provável é a ordem em que a placa soma números em paralelo. O egui não altera nada: a prova desliga o "dithering" (pontilhado) dele, que mexeria nas cores.
 
-- **Nos testes automáticos:** as imagens da placa aceitam até 16 pixels com variação de no máximo 1 (`GPU_REPEAT_TOLERANCE`, em `src/image.rs`). As do modo sem placa são comparadas de forma exata.
+- **Nos testes automáticos:** as imagens da placa aceitam até 3 pixels com variação de no máximo 1 (`GPU_REPEAT_TOLERANCE`, em `src/image.rs`), o pior caso medido acima. As do modo sem placa são comparadas de forma exata.
+  - **Correção de 2026-10-28:** a folga era de 16 pixels, número que vinha das repetições ("até 16 de 99 desenhos mudaram"), não dos pixels. Ao baixá-la para 3, o teste que compara duas montagens da mesma cena (vista aplicada ao juntar a cena × vista dentro de cada objeto) falhou: na cena inteira, 5 pixels diferem sempre, em 1 nível, por arredondamento. Esse teste ganhou uma folga própria, de 5 + 3 pixels (`REENCODE_TOLERANCE`, em `tests/render.rs`).
 
 ### 5. Renderização sem placa de vídeo
 

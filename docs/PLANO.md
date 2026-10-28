@@ -358,7 +358,7 @@ Você conduz o projeto por documentos, critérios de aceite e testes visuais, se
 
 **Testes que protegem o projeto:**
 
-- **Testes visuais (golden images):** um arquivo de exemplo é renderizado e comparado com uma imagem de referência que você aprovou. Se um pixel mudar, o teste avisa.
+- **Testes visuais (golden images):** um arquivo de exemplo é renderizado e comparado com uma imagem de referência que você aprovou. Sem placa de vídeo, se um pixel mudar, o teste avisa. Com a placa, que não repete o desenho bit a bit, o teste aceita só a variação medida no ADR-0018: até 3 pixels, em 1 nível de 255.
 - **Testes de unidade e de propriedades** no núcleo.
 - **Fuzzing** em todo leitor de formato externo.
 - **Scripts JS** usados para testar o programa de ponta a ponta, a partir da Fase 1a.

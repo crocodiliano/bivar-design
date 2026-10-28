@@ -96,6 +96,15 @@ const EXACT: Tolerance = Tolerance {
     max_differing_pixels: 0,
 };
 
+/// Applying the view at append time and baking it into every item round
+/// floats differently. Measured on the reference machine (Vulkan, 10 runs):
+/// the whole scene always differs in 5 pixels by 1 level, the text zoom in
+/// none. On top of that, GPU repeat noise adds up to 3 pixels.
+const REENCODE_TOLERANCE: Tolerance = Tolerance {
+    max_channel_delta: 1,
+    max_differing_pixels: 5 + GPU_REPEAT_TOLERANCE.max_differing_pixels,
+};
+
 fn check_golden(name: &str, image: &Rgba, tolerance: Tolerance) {
     let reference = golden_dir().join(format!("{name}.png"));
     let candidate = golden_dir().join(format!("{name}.new.png"));
@@ -178,7 +187,11 @@ fn reusing_the_world_scene_draws_the_same_picture() {
             },
         );
         let diff = compare(&reused, &direct).unwrap();
-        assert!(diff.within(GPU_REPEAT_TOLERANCE), "{diff:?}");
+        println!(
+            "{} differing pixels, max {} per channel (0-255)",
+            diff.differing_pixels, diff.max_channel_delta
+        );
+        assert!(diff.within(REENCODE_TOLERANCE), "{diff:?}");
     }
 }
 

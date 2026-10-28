@@ -44,7 +44,9 @@
 - Infraestrutura de testes visuais em `tests/golden/`.
 
 **Critérios de aceite:**
-- [ ] Um teste visual falha quando um pixel muda e mostra a imagem de diferença.
+- [ ] **Testes visuais com folga medida** (decisão do [ADR-0018](../adr/0018.md)). O teste mostra a imagem de diferença quando falha, e:
+  - **sem placa de vídeo (vello_cpu):** falha quando qualquer pixel muda;
+  - **com a placa de vídeo:** falha quando mais de 3 pixels mudam, ou quando algum pixel muda mais de 1 nível em 255. Qualquer outra folga precisa vir de uma medição registrada no plano da entrega.
 - [ ] Mexer num objeto redesenha só os tiles afetados (verificado por contador).
 - [ ] **Muitos degradês, velocidade** (limitação 1 do [ADR-0018](../adr/0018.md); pré-requisito da Fase 1a). Na GTX 1660, com a cena de 10.000 retângulos, cada um com degradê próprio, durante zoom e pan:
   - **obrigatório:** 99% dos quadros abaixo de 16,7 ms (60 Hz);
