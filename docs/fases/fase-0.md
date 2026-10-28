@@ -81,7 +81,7 @@ A prova de conceito da 0.3 desenhou texto letra por letra, sem *shaping* (a mont
 - [ ] **Formatos de fonte:** funciona com uma fonte OTF (contornos CFF) e com uma TTF, as duas com licença OFL.
 - [ ] **Testes visuais:** o dono aprova as imagens de referência dos quatro critérios acima, desenhadas pelo Vello na placa de vídeo e pelo vello_cpu.
 - [ ] **Mesma imagem no PC do dono e no GitHub:** as imagens sem placa de vídeo (vello_cpu) saem idênticas, pixel a pixel, no PC do dono (Windows) e na compilação automática do GitHub (Linux). Veja "Testes visuais: onde rodam", abaixo. Se não saírem, o Claude Code para e mostra a diferença ao dono, que decide o que fazer.
-- [ ] **Registro:** o resultado e a biblioteca escolhida ficam num ADR novo, revisado pelo agente auditor.
+- [ ] **Registro:** o resultado e a biblioteca escolhida ficam num ADR novo, com status "Revisado por IA".
 
 ### 0.6 Armazenamento e sincronização
 
@@ -235,7 +235,7 @@ O Vello 0.11 fica lento com muitos degradês diferentes e cai acima de 16.384 (l
 - [ ] **Limites fixos de memória do Vello (achado A9):** o Vello 0.11 usa áreas de memória de tamanho fixo e só avisa da falha num contador interno. Um teste de estresse passa desses limites de propósito (por exemplo, uma página muito densa ou uma exportação grande) e compara o resultado com o vello_cpu. O programa detecta a falha e repete com mais memória ou divide em blocos. Nunca entrega uma imagem incompleta em silêncio.
 - [ ] **Testes de placa em paralelo (achado M13):** a prova usa um único dispositivo de vídeo compartilhado entre a tela e a exportação, como a prova do renderizador já faz. A queda dos testes em paralelo (limitação 4 do [ADR-0017](../adr/0017.md)) vira um exemplo mínimo reportado ao wgpu, com o link registrado no ADR. A trava dos testes continua até o problema ser resolvido.
 - [ ] **Medição registrada:** o relatório diz como cada número foi medido, e o código que mede fica na prova.
-- [ ] **Registro:** a solução escolhida fica num ADR novo, revisado pelo agente auditor. A implementação no produto continua sendo critério da N.3.
+- [ ] **Registro:** a solução escolhida fica num ADR novo, com status "Revisado por IA". A implementação no produto continua sendo critério da N.3.
 
 ## Testes visuais: onde rodam
 
