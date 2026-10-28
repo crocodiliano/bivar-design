@@ -428,6 +428,7 @@ Os registros de decisão (ADRs) passam pela revisão por IA (entrega 0.4 da Fase
 | 0016 | Licença GPL-3.0, DCO e política de contribuições com IA | Baixa |
 | 0017 | Interface em egui (resultado da prova de conceito do ADR-0009) | Alta |
 | 0018 | Vello sobre wgpu confirmado, com ressalvas (resultado da prova de conceito do ADR-0007) | Alta |
+| 0019 | Decisões do dono após a auditoria da Fase 0: arquivo único, um só histórico, conflitos, papel do Vello | Alta |
 
 **Pontos a verificar:**
 
