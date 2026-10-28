@@ -163,7 +163,7 @@ A especificação fica num documento em `docs/` (o nome é proposto no plano da 
 - [ ] **Tipos de nó desconhecidos (achado A10):** um nó cujo tipo o programa não conhece (plugin ausente, persona dormindo, colega com versão mais nova) é preservado intacto e marcado. A validação de cada tipo é descrita como dados e roda sem acordar a persona. **Teste:** um arquivo com um nó de um plugin ausente abre, salva e reabre sem perder o nó.
 - [ ] **Identidade e autoria nas operações (achado A11, só esta parte):** um ADR novo, que substitui a parte de identidade e autoria do ADR-0014 (veja a 0.4), diz:
   - (a) como o autor de cada operação é ligado à chave pública dele;
-  - (b) quanto custa assinar cada operação (medido no protótipo);
+  - (b) quanto custa assinar cada operação (medido no protótipo). A biblioteca de assinatura usada na medição passa pelo processo de dependências (CLAUDE.md §5) e, como é criptografia, precisa de aprovação em ADR (CLAUDE.md §4) antes de entrar na prova;
   - (c) o que acontece com a operação de um editor malicioso sobre a qual outros já trabalharam;
   - (d) como o papel de comentarista é imposto, já que a biblioteca CRDT não faz isso;
   - (e) o que acontece quando o acesso de alguém é revogado enquanto ele edita, com o mesmo resultado em todas as cópias;
@@ -174,14 +174,14 @@ A especificação fica num documento em `docs/` (o nome é proposto no plano da 
 - [ ] **Testes de junção que protegem de verdade (achado A12):**
   - teste de propriedades: as mesmas operações, entregues em qualquer ordem, chegam ao mesmo estado;
   - nenhuma edição simultânea some sem aparecer como conflito, ou como aviso e registro no histórico (ADR-0019);
-  - os casos difíceis, um teste cada: mover A para dentro de B enquanto outro move B para dentro de A; remover um nó enquanto outro o edita; reordenar a pilha ao mesmo tempo; o mesmo parâmetro editado por duas pessoas;
+  - os casos difíceis, um teste cada: mover A para dentro de B enquanto outro move B para dentro de A; remover um nó enquanto outro o edita; reordenar a pilha ao mesmo tempo; o mesmo parâmetro editado por duas pessoas; duas pessoas pintam no mesmo bloco de raster (fica a última pincelada, com aviso e registro, mesmo com os blocos guardados pelo hash, fora do CRDT);
   - nos movimentos e reordenações simultâneos, vence um, e o teste confere que todas as cópias mostram o mesmo aviso, o mesmo registro no painel de conflitos e o mesmo movimento perdido no histórico (ADR-0019, decisão 3).
 - [ ] **Tradução camadas ↔ grafo (DeepSeek):** a especificação diz como cada painel (camadas, pilha Traçado/Preenchimento/FX) lê o grafo e como cada edição no painel vira operações. **Testes:**
   - mover um efeito para cima de outro na pilha gera exatamente as operações esperadas no grafo;
   - um grafo que o painel não sabe representar ganha o indicador "customizado" e não é alterado só por abrir o painel;
   - ler o grafo no painel e gravar de volta sem mudar nada deixa o grafo idêntico.
 - [ ] **Recálculo do grafo (DeepSeek):** a especificação diz como uma mudança se propaga e como o cache evita recalcular o que não mudou, incluindo os nós de ajuste do ADR-0004. **Teste:** mudar um parâmetro recalcula só os nós que dependem dele (verificado por contador).
-- [ ] **Painel de conflitos (ADR-0019):** a especificação define os tipos de conflito e de aviso, a gravidade de cada um e as ações próprias de cada tipo (não só "reaplicar/assar/descartar"). O painel é acessível por teclado e leitor de tela, e cor nunca é o único sinal. No protótipo, a lista de conflitos é calculada do estado e sai igual em todas as cópias. A interface do painel é construída no Núcleo.
+- [ ] **Painel de conflitos (ADR-0019):** a especificação define os tipos de conflito e de aviso, a gravidade de cada um e as ações próprias de cada tipo (não só "reaplicar/assar/descartar"). A especificação diz também como o painel é usado por teclado e leitor de tela e como cada tipo é sinalizado sem depender só de cor. No protótipo, a lista de conflitos é calculada do estado e sai igual em todas as cópias. A interface do painel, e o teste de acessibilidade dela, ficam para o Núcleo (entrega N.5).
 - [ ] **Revisão:** os ADRs novos estão com status "Revisado por IA".
 
 ### 0.8 Cor, scripts e papel do Vello
@@ -205,7 +205,12 @@ Duas bibliotecas que o Núcleo precisa, a decisão sobre o que o Vello faz e a p
     - **ida e volta (sRGB → CMYK → sRGB):** ΔE00 ≤ 2,0 para cada cor dentro da gama do perfil;
   - **exceção esperada:** cores fora da gama de impressão do perfil CMYK (por exemplo, verdes e azuis muito saturados de tela) não voltam iguais, porque a impressora não consegue reproduzi-las. Para essas cores não vale a tolerância de ida e volta. Elas precisam ser convertidas sempre do mesmo jeito, sem erro, e a prova lista quais saíram da gama e com que ΔE00;
   - a leitura de perfis ICC respeita o ADR-0011 (leitura de arquivos externos só em Rust) ou registra uma exceção justificada.
-- [ ] **Papel do Vello (achado A8; ADR-0019):** um ADR diz o que o Vello faz (a tela e a exportação PNG/JPG em 8 bits) e qual caminho cuida de CMYK, 16/32 bits, cores especiais, sobreimpressão, prova de impressão na tela e PDF/X, com as alternativas comparadas. Ele diz também como exportar imagens maiores que o limite de textura da placa (16.384 px na GTX 1660). A escolha conversa com a biblioteca de cor acima.
+- [ ] **Papel do Vello (achado A8; ADR-0019):** um ADR diz o que o Vello faz (a tela e a exportação PNG/JPG em 8 bits) e qual caminho cuida de CMYK, 16/32 bits, cores especiais, sobreimpressão, prova de impressão na tela e PDF/X, com as alternativas comparadas. Ele diz também:
+  - como exportar imagens maiores que o limite de textura da placa (16.384 px na GTX 1660);
+  - como a tela faz as misturas de cor em luz linear ou em sRGB, como o ADR-0008 exige (escolha documentada e, quando relevante, configurável), já que o Vello converte cores e degradês para sRGB em 8 bits;
+  - como a tela respeita o perfil de cor do monitor (gerenciamento de cor da tela).
+
+  A escolha conversa com a biblioteca de cor acima.
 - [ ] **Política de dependências (achado M8):** um ADR novo completa o ADR-0012 antes de o Núcleo começar a somar dependências. Ele define:
   - o que são "poucas" dependências, com um critério verificável;
   - como olhar o código `unsafe` e em C dentro de cada dependência;
@@ -226,7 +231,7 @@ O Vello 0.11 fica lento com muitos degradês diferentes e cai acima de 16.384 (l
   - **obrigatório:** 99% dos quadros abaixo de 16,7 ms (60 Hz);
   - **desejável:** 99% dos quadros abaixo de 6,9 ms (144 Hz).
 - [ ] **Estabilidade:** uma cena com 50.000 degradês diferentes abre sem derrubar o programa e **desenha corretamente, ou mostra um aviso visível**. Ela pode ficar lenta. Não pode cair, nem trocar degradês por cor sólida (ou por qualquer simplificação) em silêncio. Nenhum arquivo é recusado por esse limite (ADR-0019).
-- [ ] **Imagem correta:** a imagem da solução é comparada com a do vello_cpu da mesma cena, por regiões, para provar que nenhum degradê sumiu ou foi trocado.
+- [ ] **Imagem correta:** a imagem da solução é comparada com a do vello_cpu da mesma cena, por regiões, para provar que nenhum degradê sumiu ou foi trocado. Como o vello_cpu difere da placa em 30 a 35% dos pixels nas bordas (ADR-0018), o tamanho das regiões e a folga de cada uma são fixados no plano da entrega, a partir de uma medição registrada, e aprovados pelo dono.
 - [ ] **Limites fixos de memória do Vello (achado A9):** o Vello 0.11 usa áreas de memória de tamanho fixo e só avisa da falha num contador interno. Um teste de estresse passa desses limites de propósito (por exemplo, uma página muito densa ou uma exportação grande) e compara o resultado com o vello_cpu. O programa detecta a falha e repete com mais memória ou divide em blocos. Nunca entrega uma imagem incompleta em silêncio.
 - [ ] **Testes de placa em paralelo (achado M13):** a prova usa um único dispositivo de vídeo compartilhado entre a tela e a exportação, como a prova do renderizador já faz. A queda dos testes em paralelo (limitação 4 do [ADR-0017](../adr/0017.md)) vira um exemplo mínimo reportado ao wgpu, com o link registrado no ADR. A trava dos testes continua até o problema ser resolvido.
 - [ ] **Medição registrada:** o relatório diz como cada número foi medido, e o código que mede fica na prova.
