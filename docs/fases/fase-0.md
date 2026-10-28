@@ -135,6 +135,7 @@ As escolhas ficam registradas em **ADRs novos**, com as alternativas comparadas 
   - **pastas sincronizadas** (OneDrive, unidades de rede): o ADR diz o que o programa faz, por exemplo um aviso ao abrir;
   - **criptografia opcional:** o ADR diz como será feita sem biblioteca paga (CLAUDE.md §5), ou adia a decisão com justificativa;
   - **especificação aberta:** o ADR diz como a especificação em `docs/formato/` fica legível sem depender do formato interno da biblioteca CRDT, ou registra essa dependência.
+- [ ] **Contingência avaliada** (ADR-0019, decisão 7): com o resultado da 0.6 em mãos, o dono decide se dispara a versão de uma pessoa só. A decisão fica registrada.
 - [ ] **Revisão:** os ADRs novos estão com status "Revisado por IA".
 - [ ] **Licenças:** `cargo deny check` e `cargo audit` passam nas provas.
 
