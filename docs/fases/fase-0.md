@@ -91,7 +91,10 @@ Três escolhas que o Núcleo precisa. Cada uma fica registrada num **ADR própri
   - um script não consegue abrir arquivos nem acessar a rede, a não ser pelo que o Bivar oferecer.
 - [ ] **Gerenciamento de cor (ADR-0008):**
   - um ADR compara as opções e escolhe uma;
-  - numa prova mínima, uma cor é convertida de sRGB para CMYK com um perfil ICC e de volta, e o resultado bate com valores de referência dentro de uma tolerância definida no ADR;
+  - numa prova mínima, um conjunto de cores é convertido de sRGB para CMYK com um perfil ICC e de volta. A diferença é medida em **Delta E 2000** (ΔE00), a medida padrão de diferença de cor percebida pelo olho: ΔE00 = 1 é mais ou menos a menor diferença que uma pessoa atenta consegue notar. Tolerâncias:
+    - **conversão contra valores de referência:** ΔE00 ≤ 1,0 para cada cor. As referências são geradas por outro programa de gerenciamento de cor, com o mesmo perfil e a mesma intenção de renderização, e o ADR registra qual programa foi usado;
+    - **ida e volta (sRGB → CMYK → sRGB):** ΔE00 ≤ 2,0 para cada cor dentro da gama do perfil;
+  - **exceção esperada:** cores fora da gama de impressão do perfil CMYK (por exemplo, verdes e azuis muito saturados de tela) não voltam iguais, porque a impressora não consegue reproduzi-las. Para essas cores não vale a tolerância de ida e volta. Elas precisam ser convertidas sempre do mesmo jeito, sem erro, e a prova lista quais saíram da gama e com que ΔE00;
   - a leitura de perfis ICC respeita o ADR-0011 (leitura de arquivos externos só em Rust) ou registra uma exceção justificada.
 - [ ] **CRDT (ADR-0005), com o teste de velocidade da Loro:**
   - um ADR compara a Loro com pelo menos uma alternativa e escolhe uma;
