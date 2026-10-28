@@ -10,7 +10,9 @@ version = 2
 version = 2
 confidence-threshold = 0.93
 unused-allowed-license = "allow"
-# Only GPL-3.0-compatible licenses. Adding one here requires owner approval.
+# Only GPL-3.0-compatible licenses for code. Adding one here requires owner
+# approval. OFL-1.1 (fonts) and CC0-1.0 (data files) are not listed on
+# purpose: they apply to files that are not crates (CLAUDE.md section 5).
 allow = [
     "GPL-3.0-or-later",
     "MIT",
@@ -24,7 +26,6 @@ allow = [
     "LGPL-2.1-or-later",
     "LGPL-3.0-only",
     "LGPL-3.0-or-later",
-    "OFL-1.1",
     "Unicode-3.0",
 ]
 

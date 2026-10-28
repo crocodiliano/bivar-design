@@ -57,14 +57,16 @@ O plano completo está em `docs/PLANO.md`, que é a versão oficial do plano. As
 ## 5. Dependências
 
 - **Nenhuma dependência nova sem aprovação.** Proponha no plano da tarefa, com nome, licença, manutenção e alternativas.
-- **Só licenças compatíveis com GPL-3.0.** A lista abaixo é idêntica à do `deny.toml`; mude as duas juntas.
+- **Só licenças compatíveis com GPL-3.0.** A lista de licenças de código abaixo é idêntica à do `deny.toml`; mude as duas juntas.
   - GPL-3.0-or-later (a licença do próprio projeto);
   - MIT e Apache-2.0;
   - BSD-2-Clause e BSD-3-Clause;
   - MPL-2.0, ISC e Zlib;
   - LGPL-2.1-only, LGPL-2.1-or-later, LGPL-3.0-only e LGPL-3.0-or-later;
-  - OFL-1.1, **só para fontes**: o `cargo deny` não verifica isso, então quem revisa precisa conferir;
   - Unicode-3.0.
+- **Arquivos que não são código** (fora do `deny.toml` de propósito, para que nenhuma biblioteca de código entre com estas licenças). O `cargo deny` não verifica esses arquivos, então quem revisa precisa conferir:
+  - OFL-1.1, **só para fontes**;
+  - CC0-1.0, **só para arquivos de dados**, como HDRI. Nunca para código.
 - **Proibido:**
   - dependências com licença comercial paga;
   - codecs com royalties (H.264/H.265/AAC na codificação);
