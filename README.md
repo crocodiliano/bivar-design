@@ -37,7 +37,8 @@ cargo test
 - **Assinatura obrigatória:** todo commit precisa da linha `Signed-off-by` (o [DCO](https://developercertificate.org/)). Com ela, você declara que tem o direito de enviar aquele código. Para incluí-la, faça o commit com `git commit -s`.
 - **Uso de IA:** contribuições feitas com auxílio de IA são bem-vindas, desde que:
   - o uso seja declarado no corpo da mensagem do commit;
-  - uma pessoa tenha revisado o código.
+  - uma pessoa tenha testado o comportamento, e o código passe pela revisão por IA e pelas ferramentas automáticas.
+  - Nos commits do próprio projeto, a declaração diz: "comportamento testado pelo dono; código revisado por IA e por ferramentas automáticas". O dono não programa e não revisa o código linha a linha.
 - **Revisão:** o projeto **ainda não passou por auditoria humana**. As decisões e o código foram revisados apenas por IA e por ferramentas automáticas. Revisões da comunidade, sobretudo de quem tem experiência em Rust, são muito bem-vindas: os relatórios ficam em [`docs/auditoria/`](docs/auditoria/).
 
 ## Licença
@@ -81,7 +82,8 @@ cargo test
 - **Sign-off required:** every commit needs a `Signed-off-by` line (the [DCO](https://developercertificate.org/)). It certifies that you have the right to submit the code. To add it, commit with `git commit -s`.
 - **AI use:** AI-assisted contributions are welcome, as long as:
   - the AI use is declared in the commit message body;
-  - a human has reviewed the code.
+  - a human has tested the behavior, and the code goes through AI review and the automated tools.
+  - The project's own commits say: "behavior tested by the owner; code reviewed by AI and automated tools". The owner does not program and does not review the code line by line.
 - **Review:** the project **has not had a human audit yet**. Decisions and code have been reviewed only by AI and automated tools. Community reviews, especially from experienced Rust developers, are very welcome: reports live in [`docs/auditoria/`](docs/auditoria/).
 
 ### License

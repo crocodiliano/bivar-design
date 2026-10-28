@@ -388,7 +388,7 @@ O projeto usa GPL-3.0, inclusive para plugins, e tem o código aberto desde a Fa
   - quem modificar e distribuir o programa tem que distribuir o código.
 - **Compatibilidade:** as licenças das bibliotecas discutidas (MIT, Apache-2.0, MPL-2.0, Slint, VST3 e OFL) são compatíveis.
 - **Contribuições:** pelo DCO (Developer Certificate of Origin), sem CLA.
-- **Contribuições feitas com IA:** aceitas, com declaração de uso e revisão humana. O aviso "feito com auxílio de IA" fica na interface e no README.
+- **Contribuições feitas com IA:** aceitas, com declaração de uso, comportamento testado por uma pessoa e código revisado por IA e por ferramentas automáticas. O aviso "feito com auxílio de IA" fica na interface e no README.
 - **Direito autoral:** em algumas jurisdições, a proteção de código gerado majoritariamente por IA é incerta. Por isso, os ADRs registram o papel humano nas decisões. Isto não é aconselhamento jurídico.
 
 ### Verificação do nome "Bivar" (feita em 20/10/2026)

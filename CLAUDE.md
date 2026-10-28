@@ -111,7 +111,7 @@ O plano completo está em `docs/PLANO.md`, que é a versão oficial do plano. As
   - para o dono: explicações em português.
 - **Commits** no formato `area: resumo curto` (ex.: `core: add reorder-node operation`), com:
   - `Signed-off-by:` (DCO);
-  - indicação de uso de IA no corpo.
+  - indicação de uso de IA no corpo, nesta forma: `AI-assisted: written with Claude Code (<modelo>); behavior tested by the owner; code reviewed by AI and automated tools.` Nunca escreva "reviewed by the project owner": o dono testa o comportamento, mas não revisa o código.
 - **Formatação e lints:** `rustfmt` padrão e Clippy sem avisos.
 - **Crates:** prefixo `bivar-`.
 
