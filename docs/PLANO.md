@@ -23,7 +23,7 @@ Bivar é um programa de design open source (GPL-3.0) que une, numa só interface
 - **Custo zero na construção:** só bibliotecas, fontes, ícones e formatos livres, com hospedagem e compilação automática gratuitas. O plano do Claude fica fora dessa conta. Por falta de orçamento, não há auditor humano pago por enquanto.
 - **Plataforma:** Windows primeiro, com base multiplataforma. A máquina de referência é um Ryzen 7 5700X com 16 GB de RAM e uma GTX 1660 de 6 GB.
 - **Linguagem:** Rust em todo o projeto. Código em inglês, documentação em português e inglês.
-- **Equipe:** o dono do projeto (que não programa) trabalha com o Claude Code. A revisão é feita por IA (o agente auditor), por ferramentas automáticas e por voluntários da comunidade, até que haja uma auditoria humana. Depois da Fase 1a, a comunidade também entra contribuindo com código.
+- **Equipe:** o dono do projeto (que não programa) trabalha com o Claude Code. A revisão é feita por IA (o agente auditor), por ferramentas automáticas e por voluntários da comunidade, até que haja uma auditoria humana. O repositório é público no GitHub desde a Fase 0, de forma definitiva: qualquer pessoa pode ler e revisar. Depois da Fase 1a, a comunidade também entra contribuindo com código.
 
 ## Escopo, equipe e papéis
 
@@ -331,7 +331,7 @@ Cada persona tem um escopo de v1 completo, dividido em entregas menores que já 
 
 ## Roadmap
 
-O projeto tem 11 etapas: fundações, núcleo, as sete personas na ordem de uso real e um bloco futuro. O código abre ao fim da Fase 1a. Não há datas: cada etapa termina quando os critérios de aceite das suas entregas passam.
+O projeto tem 11 etapas: fundações, núcleo, as sete personas na ordem de uso real e um bloco futuro. O código é aberto desde a Fase 0, e a comunidade passa a contribuir com código ao fim da Fase 1a. Não há datas: cada etapa termina quando os critérios de aceite das suas entregas passam.
 
 *(Diagrama do roadmap: ver `fases/README.md`.)*
 
@@ -363,10 +363,10 @@ Você conduz o projeto por documentos, critérios de aceite e testes visuais, se
 - **Fuzzing** em todo leitor de formato externo.
 - **Scripts JS** usados para testar o programa de ponta a ponta, a partir da Fase 1a.
 
-**Enquanto o repositório for privado** (até o fim da Fase 1a):
+**Onde os testes rodam** (o repositório é público, e repositórios públicos não gastam cota de minutos do GitHub):
 
 - os testes rodam no seu PC;
-- a compilação automática roda só em Linux, em momentos-chave, para economizar a cota gratuita do GitHub;
+- a compilação automática roda em Linux a cada envio e a cada pedido de junção (*pull request*);
 - as compilações para Windows e Mac são feitas sob demanda.
 
 **O que você aprende, em nível de leitura:**
@@ -377,7 +377,7 @@ Você conduz o projeto por documentos, critérios de aceite e testes visuais, se
 
 ## Open source, licença e nome
 
-O projeto usa GPL-3.0, inclusive para plugins, e abre o código ao fim da Fase 1a. O nome "Bivar" está livre no registro de pacotes do Rust. Porém, o usuário "bivar" do GitHub já é de outra pessoa, e existe uma empresa de informática com esse nome no Rio de Janeiro. A busca no INPI e na WIPO, feita em 20/10/2026, não encontrou nenhuma marca ativa nas classes 9 e 42. O nome está liberado, com risco baixo.
+O projeto usa GPL-3.0, inclusive para plugins, e tem o código aberto desde a Fase 0, num repositório público no GitHub. O nome "Bivar" está livre no registro de pacotes do Rust. Porém, o usuário "bivar" do GitHub já é de outra pessoa, e existe uma empresa de informática com esse nome no Rio de Janeiro. A busca no INPI e na WIPO, feita em 20/10/2026, não encontrou nenhuma marca ativa nas classes 9 e 42. O nome está liberado, com risco baixo.
 
 ### Licença e contribuição
 
@@ -395,7 +395,7 @@ O projeto usa GPL-3.0, inclusive para plugins, e abre o código ao fim da Fase 1
 
 | Onde | Resultado | O que fazer |
 | --- | --- | --- |
-| crates.io (pacotes Rust) | Livre: o pacote "bivar" não existe | Reservar o nome publicando um pacote vazio quando o repositório abrir |
+| crates.io (pacotes Rust) | Livre: o pacote "bivar" não existe | Reservar o nome publicando um pacote vazio (o repositório já é público) |
 | GitHub, usuário "bivar" | Ocupado por uma conta pessoal ([github.com/bivar](https://github.com/bivar)), de ciência de dados, sem relação com design | Usar uma organização como "bivar-app" ou "bivar-editor". A busca de repositórios não pôde ser automatizada; conferir manualmente |
 | Empresas no Brasil | Existe a [Bivar Serviços de Informática Ltda](https://www.oficinadanet.com.br/empresas/bivar-servicos-de-informatica-ltda), no Rio de Janeiro, da área de TI. Não se sabe se tem marca registrada | Verificar no INPI se ela registrou "Bivar" na classe 42 |
 | INPI (marcas) | Busca manual, exata e aproximada, nas classes 9 e 42: nenhum resultado | Nada a fazer. Repetir antes de cada lançamento importante em [busca.inpi.gov.br](https://busca.inpi.gov.br/pePI/): "Marca" → pesquisa por radical "bivar", classes 9 e 42 |

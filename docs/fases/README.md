@@ -19,8 +19,8 @@
 
 | Quando | O que entra |
 | --- | --- |
-| Desde o início | Acessibilidade, tokens de tema, segurança (fuzzing, auditoria de dependências), modelo compatível com CRDT |
-| Fim da 1a | **O código abre ao público.** Entram scripts JS, gravador de macros e modo terminal |
+| Desde o início | Código aberto, em repositório público no GitHub. Acessibilidade, tokens de tema, segurança (fuzzing, auditoria de dependências), modelo compatível com CRDT |
+| Fim da 1a | **A comunidade passa a contribuir com código.** Entram scripts JS, gravador de macros e modo terminal |
 | Fim da 1b | Comentários e tarefas, wiki do projeto, receitas de efeito |
 | Fim da Fase 2 | Colaboração P2P na rede local |
 | Fim da Fase 3 | API pública de plugins em WebAssembly |

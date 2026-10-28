@@ -1,6 +1,6 @@
 # Fase 1a — Vetor: ilustração
 
-**Objetivo:** ilustração vetorial completa e não destrutiva. Este é o primeiro marco em que o Bivar é útil sozinho, e ao fim dele **o código abre ao público**.
+**Objetivo:** ilustração vetorial completa e não destrutiva. Este é o primeiro marco em que o Bivar é útil sozinho, e ao fim dele **a comunidade passa a contribuir com código**. O repositório já é público desde a Fase 0.
 
 **Referências de uso:** Affinity Designer, Illustrator, Figma (parte de desenho).
 
@@ -62,4 +62,4 @@
 ## Ao concluir
 
 - Scripts JS, gravador de macros e modo terminal (próxima entrega transversal).
-- Checklist de abertura do repositório: nome verificado no INPI, README em português e inglês, CONTRIBUTING com DCO e política de IA, e documentação traduzida.
+- Checklist de abertura às contribuições da comunidade: nome verificado no INPI, README em português e inglês, CONTRIBUTING com DCO e política de IA, e documentação traduzida.
