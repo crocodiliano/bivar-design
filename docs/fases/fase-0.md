@@ -54,7 +54,7 @@ Um programa mínimo que desenha com **Vello sobre wgpu** na GTX 1660.
 
 ### 0.4 Revisão por IA dos ADRs
 
-Revisão por IA dos ADRs 0001 a 0018, com três partes:
+Revisão por IA dos ADRs 0001 a 0019, com três partes:
 
 - **o agente auditor** (`.claude/agents/auditor.md`) revisa todos os ADRs;
 - **uma segunda opinião** de uma IA de outra empresa, para reduzir os pontos cegos de IAs parecidas;
@@ -63,7 +63,10 @@ Revisão por IA dos ADRs 0001 a 0018, com três partes:
 **Critérios de aceite:**
 - [ ] O relatório do agente auditor está salvo em `docs/auditoria/`.
 - [ ] Todo achado de gravidade Crítica ou Alta foi tratado: ou corrigido, ou com justificativa registrada.
-- [ ] Os ADRs de prioridade Alta estão com status "Revisado por IA": 0001, 0002, 0003, 0004, 0005, 0007, 0008, 0009, 0010, 0011, 0014, 0017 e 0018. A prioridade de cada um está no [índice dos ADRs](../adr/README.md).
+- [ ] Os ADRs de prioridade Alta estão com status "Revisado por IA": 0001, 0002, 0003, 0004, 0005, 0007, 0008, 0009, 0010, 0011, 0014, 0017, 0018 e 0019. A prioridade de cada um está no [índice dos ADRs](../adr/README.md).
+- [ ] **ADR-0014 dividido em dois** (achado A11): a parte de identidade e autoria passa para o ADR novo da 0.7. O ADR-0014 fica só com transporte e criptografia, que esperam a Fase 2, e registra essa justificativa. Com isso ele pode chegar a "Revisado por IA" sem resolver agora o que é da Fase 2.
+
+**A 0.4 é a última entrega a fechar.** Vários ADRs da lista acima só deixam de estar travados com os resultados da 0.5 à 0.9 (veja o [registro de tratamento](../auditoria/2026-10-28-fase-0-tratamento.md)). Por isso a 0.4 fecha depois da 0.9.
 
 ### 0.5 Prova de conceito do motor de texto
 
@@ -82,7 +85,7 @@ A prova de conceito da 0.3 desenhou texto letra por letra, sem *shaping* (a mont
 
 ### 0.6 Armazenamento e sincronização
 
-Como o documento é guardado no disco e como duas cópias se juntam. Segue as decisões do [ADR-0019](../adr/0019.md): arquivo único com os arquivos grandes dentro, em pedaços; um único histórico de operações, o do CRDT; e "Salvar cópia para enviar", sem histórico. Trata os achados C1, A1, A5 e A6 da [auditoria da Fase 0](../auditoria/2026-10-28-fase-0.md).
+Como o documento é guardado no disco e como duas cópias se juntam. Segue as decisões do [ADR-0019](../adr/0019.md): arquivo único com os arquivos grandes dentro, em pedaços; um único histórico de operações, o do CRDT; e "Salvar cópia para enviar", sem histórico. Trata os achados C1, A1, A5, A6 e A7 da [auditoria da Fase 0](../auditoria/2026-10-28-fase-0.md).
 
 As escolhas ficam registradas em **ADRs novos**, com as alternativas comparadas em licença, manutenção, quantidade de código `unsafe` ou em C, tamanho e segurança. Os testes são provas de conceito **descartáveis**.
 
@@ -93,6 +96,13 @@ As escolhas ficam registradas em **ADRs novos**, com as alternativas comparadas 
   - (c) um formato próprio com leitor 100% em Rust.
 
   Na prova: um arquivo com um gatilho ou uma visão injetada é recusado com uma mensagem clara, e o carregador ganha um alvo de fuzzing (ADR-0011).
+- [ ] **Toda entrada externa (achado A7):** um ADR novo completa o ADR-0011 para toda entrada externa, não só arquivos: área de transferência, arrastar e soltar, fontes instaladas no sistema, perfis de cor embutidos em imagens, dados recebidos por P2P e o próprio `.bivar`. Ele define:
+  - limites obrigatórios de tamanho, recursão, memória e tempo, contra arquivos feitos para esgotar recursos ("bombas");
+  - um critério de estresse para cada leitor;
+  - um inventário do código `unsafe` e em C de cada biblioteca de leitura, feito ao aprová-la;
+  - a ferramenta de fuzzing e onde ela roda: um caminho só (`tests/fuzz/` ou `fuzz/`), como lidar com a exigência da versão *nightly* do Rust e se há um job na compilação automática.
+
+  Na prova: o leitor do `.bivar` é o primeiro a seguir esse ADR. Um arquivo feito para esgotar memória ou tempo é recusado com uma mensagem clara, sem derrubar o programa.
 - [ ] **Onde mora a verdade do documento (achado A1):** o ADR do CRDT diz:
   - se o documento vive na biblioteca CRDT ou no `bivar-core`, e como os dois ficam iguais. Em qualquer caso, o grafo é o modelo lógico do documento e o CRDT é onde ele é armazenado e sincronizado (ADR-0019, decisão 2), para o princípio 1 continuar valendo;
   - como cada nó é identificado de forma única entre computadores;
@@ -122,7 +132,7 @@ As escolhas ficam registradas em **ADRs novos**, com as alternativas comparadas 
 
 ### 0.7 Especificação do modelo de dados, com protótipo
 
-O Núcleo vai implementar o grafo na entrega N.1. Antes disso, as regras do modelo de dados precisam estar escritas e testadas num protótipo **descartável**, construído sobre o resultado da 0.6. Trata os achados A2, A3, A4, A10, A11 (só identidade e autoria), A12, a tradução camadas ↔ grafo e o modelo de recálculo apontados pelo DeepSeek, e o painel de conflitos do ADR-0019.
+O Núcleo vai implementar o grafo na entrega N.1. Antes disso, as regras do modelo de dados precisam estar escritas e testadas num protótipo **descartável**, construído sobre o resultado da 0.6. Trata os achados A2, A3, A4, A10, A11 (só identidade e autoria), A12, M15, a tradução camadas ↔ grafo e o modelo de recálculo apontados pelo DeepSeek, e o painel de conflitos do ADR-0019.
 
 A especificação fica num documento em `docs/` (o nome é proposto no plano da entrega). As decisões ficam em ADRs novos.
 
@@ -144,7 +154,16 @@ A especificação fica num documento em `docs/` (o nome é proposto no plano da 
 
   Cada regra tem um teste de junção que dá o mesmo resultado em todas as cópias.
 - [ ] **Tipos de nó desconhecidos (achado A10):** um nó cujo tipo o programa não conhece (plugin ausente, persona dormindo, colega com versão mais nova) é preservado intacto e marcado. A validação de cada tipo é descrita como dados e roda sem acordar a persona. **Teste:** um arquivo com um nó de um plugin ausente abre, salva e reabre sem perder o nó.
-- [ ] **Identidade e autoria nas operações (achado A11, só esta parte):** um ADR diz como o autor de cada operação é ligado à chave pública dele, quanto custa assinar cada operação (medido no protótipo) e o que acontece com a operação de um editor malicioso sobre a qual outros já trabalharam. Transporte e criptografia ficam para a Fase 2.
+- [ ] **Identidade e autoria nas operações (achado A11, só esta parte):** um ADR novo, que substitui a parte de identidade e autoria do ADR-0014 (veja a 0.4), diz:
+  - (a) como o autor de cada operação é ligado à chave pública dele;
+  - (b) quanto custa assinar cada operação (medido no protótipo);
+  - (c) o que acontece com a operação de um editor malicioso sobre a qual outros já trabalharam;
+  - (d) como o papel de comentarista é imposto, já que a biblioteca CRDT não faz isso;
+  - (e) o que acontece quando o acesso de alguém é revogado enquanto ele edita, com o mesmo resultado em todas as cópias;
+  - (f) o que acontece com a lista de acesso se o dono do documento perder a chave.
+
+  Transporte e criptografia, o item (g), ficam para a Fase 2, no ADR-0014.
+- [ ] **Imagem guardada de personas dormindo (achado M15):** a especificação trata a imagem guardada (cache/proxy) de uma persona que não está carregada como **dado não confiável**: ela é recalculada quando a persona acorda, é invalidada quando chega uma operação que a afeta (inclusive da rede), e a tela indica de forma visível quando a imagem vem do cache. **Teste:** um arquivo cuja imagem guardada não bate com o conteúdo mostra o conteúdo real depois que a persona acorda, e a exportação nunca usa a imagem guardada no lugar do conteúdo.
 - [ ] **Testes de junção que protegem de verdade (achado A12):**
   - teste de propriedades: as mesmas operações, entregues em qualquer ordem, chegam ao mesmo estado;
   - nenhuma edição simultânea some sem aparecer como conflito, ou como aviso e registro no histórico (ADR-0019);
@@ -160,7 +179,7 @@ A especificação fica num documento em `docs/` (o nome é proposto no plano da 
 
 ### 0.8 Cor, scripts e papel do Vello
 
-Duas bibliotecas que o Núcleo precisa e a decisão sobre o que o Vello faz. Cada escolha fica registrada num **ADR próprio**, com as alternativas comparadas em licença, manutenção, quantidade de código `unsafe` ou em C, tamanho e segurança. Os testes de cada item são provas de conceito **descartáveis**.
+Duas bibliotecas que o Núcleo precisa, a decisão sobre o que o Vello faz e a política de dependências (achado M8). Cada escolha fica registrada num **ADR próprio**, com as alternativas comparadas em licença, manutenção, quantidade de código `unsafe` ou em C, tamanho e segurança. Os testes de cada item são provas de conceito **descartáveis**.
 
 **Critérios de aceite:**
 - [ ] **Motor JS para scripts (ADR-0013):**
@@ -180,12 +199,18 @@ Duas bibliotecas que o Núcleo precisa e a decisão sobre o que o Vello faz. Cad
   - **exceção esperada:** cores fora da gama de impressão do perfil CMYK (por exemplo, verdes e azuis muito saturados de tela) não voltam iguais, porque a impressora não consegue reproduzi-las. Para essas cores não vale a tolerância de ida e volta. Elas precisam ser convertidas sempre do mesmo jeito, sem erro, e a prova lista quais saíram da gama e com que ΔE00;
   - a leitura de perfis ICC respeita o ADR-0011 (leitura de arquivos externos só em Rust) ou registra uma exceção justificada.
 - [ ] **Papel do Vello (achado A8; ADR-0019):** um ADR diz o que o Vello faz (a tela e a exportação PNG/JPG em 8 bits) e qual caminho cuida de CMYK, 16/32 bits, cores especiais, sobreimpressão, prova de impressão na tela e PDF/X, com as alternativas comparadas. Ele diz também como exportar imagens maiores que o limite de textura da placa (16.384 px na GTX 1660). A escolha conversa com a biblioteca de cor acima.
-- [ ] **Revisão:** os três ADRs novos estão com status "Revisado por IA".
+- [ ] **Política de dependências (achado M8):** um ADR novo completa o ADR-0012 antes de o Núcleo começar a somar dependências. Ele define:
+  - o que são "poucas" dependências, com um critério verificável;
+  - como olhar o código `unsafe` e em C dentro de cada dependência;
+  - como tratar os scripts de compilação (`build.rs`) e as macros, que rodam código na máquina durante a compilação;
+  - versões fixas para as ferramentas da compilação automática e ações do GitHub fixadas por hash, não por etiqueta;
+  - se o projeto adota um registro de quem revisou cada dependência (por exemplo, o cargo-vet), com as alternativas comparadas.
+- [ ] **Revisão:** os quatro ADRs novos estão com status "Revisado por IA".
 - [ ] **Licenças:** `cargo deny check` e `cargo audit` passam nas provas.
 
 ### 0.9 Prova de degradês
 
-O Vello 0.11 fica lento com muitos degradês diferentes e cai acima de 16.384 (limitações 1 e 2 do [ADR-0018](../adr/0018.md)). Recursos centrais do Bivar, como a mesclagem, geram muitos degradês. Por isso a solução é provada aqui, numa prova **descartável**, antes do Núcleo e da entrega N.3. O caminho, entre as opções do ADR-0018 (reaproveitar e limitar, blocos, memória configurável no Vello ou versão nova do Vello), é proposto no plano da entrega, revisado pelo agente auditor e decidido pelo dono.
+O Vello 0.11 fica lento com muitos degradês diferentes e cai acima de 16.384 (limitações 1 e 2 do [ADR-0018](../adr/0018.md)). Recursos centrais do Bivar, como a mesclagem, geram muitos degradês. Por isso a solução é provada aqui, numa prova **descartável**, antes do Núcleo e da entrega N.3. O caminho, entre as opções do ADR-0018 (reaproveitar e limitar, blocos, memória configurável no Vello ou versão nova do Vello), é proposto no plano da entrega, revisado pelo agente auditor e decidido pelo dono. A prova trata também os achados A9 e M13 da [auditoria da Fase 0](../auditoria/2026-10-28-fase-0.md).
 
 **Regra da prova:** nenhum `unsafe` no nosso código.
 
@@ -195,6 +220,8 @@ O Vello 0.11 fica lento com muitos degradês diferentes e cai acima de 16.384 (l
   - **desejável:** 99% dos quadros abaixo de 6,9 ms (144 Hz).
 - [ ] **Estabilidade:** uma cena com 50.000 degradês diferentes abre sem derrubar o programa e **desenha corretamente, ou mostra um aviso visível**. Ela pode ficar lenta. Não pode cair, nem trocar degradês por cor sólida (ou por qualquer simplificação) em silêncio. Nenhum arquivo é recusado por esse limite (ADR-0019).
 - [ ] **Imagem correta:** a imagem da solução é comparada com a do vello_cpu da mesma cena, por regiões, para provar que nenhum degradê sumiu ou foi trocado.
+- [ ] **Limites fixos de memória do Vello (achado A9):** o Vello 0.11 usa áreas de memória de tamanho fixo e só avisa da falha num contador interno. Um teste de estresse passa desses limites de propósito (por exemplo, uma página muito densa ou uma exportação grande) e compara o resultado com o vello_cpu. O programa detecta a falha e repete com mais memória ou divide em blocos. Nunca entrega uma imagem incompleta em silêncio.
+- [ ] **Testes de placa em paralelo (achado M13):** a prova usa um único dispositivo de vídeo compartilhado entre a tela e a exportação, como a prova do renderizador já faz. A queda dos testes em paralelo (limitação 4 do [ADR-0017](../adr/0017.md)) vira um exemplo mínimo reportado ao wgpu, com o link registrado no ADR. A trava dos testes continua até o problema ser resolvido.
 - [ ] **Medição registrada:** o relatório diz como cada número foi medido, e o código que mede fica na prova.
 - [ ] **Registro:** a solução escolhida fica num ADR novo, revisado pelo agente auditor. A implementação no produto continua sendo critério da N.3.
 
@@ -211,7 +238,7 @@ O Vello 0.11 fica lento com muitos degradês diferentes e cai acima de 16.384 (l
 
 ## Antes do Núcleo
 
-**O Núcleo só começa quando as entregas 0.4, 0.5, 0.6, 0.7, 0.8 e 0.9 estiverem concluídas e revisadas pelo agente auditor.**
+**O Núcleo só começa quando as entregas 0.4, 0.5, 0.6, 0.7, 0.8 e 0.9 estiverem concluídas e revisadas pelo agente auditor.** A 0.4 fecha por último, depois da 0.9.
 
 ## Fora do escopo da Fase 0
 

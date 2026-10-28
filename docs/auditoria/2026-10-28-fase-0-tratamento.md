@@ -2,7 +2,7 @@
 
 Acompanha o relatório [`2026-10-28-fase-0.md`](2026-10-28-fase-0.md), que fica como foi escrito. Esta página diz o que foi feito com cada achado e em qual commit.
 
-**Situação em 2026-10-28:** foram tratados os achados que não exigem decisão de arquitetura. Depois, o dono decidiu os pontos de arquitetura no [ADR-0019](../adr/0019.md) e distribuiu os achados restantes pelas entregas 0.6 a 0.9 da [Fase 0](../fases/fase-0.md) (veja "Encaminhados para entregas"). A7, A9, M8, M13 e M15 ainda não têm entrega definida.
+**Situação em 2026-10-28:** foram tratados os achados que não exigem decisão de arquitetura. Depois, o dono decidiu os pontos de arquitetura no [ADR-0019](../adr/0019.md) e distribuiu os achados restantes pelas entregas 0.6 a 0.9 da [Fase 0](../fases/fase-0.md) (veja "Encaminhados para entregas"). Depois da [revisão do ADR-0019](2026-10-28-revisao-adr-0019.md), A7, A9, M8, M13, M15 e o resto do A11 também ganharam entrega, e nenhum achado ficou sem destino.
 
 ## Tratados
 
@@ -57,17 +57,16 @@ A Fase 0 foi reorganizada no commit `367ad5e`. O Núcleo só começa depois de 0
 | A5 | 0.6: critério "um texto apagado não aparece em nenhum byte da cópia". |
 | A6 | 0.6: arquivos grandes em pedaços, cópia com o programa aberto, arquivo aberto duas vezes, queda, arquivo cortado, migração, pastas sincronizadas, criptografia e especificação aberta. |
 | A2, A3, A4, A10, A12 | 0.7: especificação do modelo de dados, com protótipo. |
-| A11, em parte | 0.7: identidade e autoria nas operações. Transporte e criptografia ficam para a Fase 2. |
+| A11 | Dividido em dois. 0.7: identidade e autoria nas operações, itens (a) a (f), num ADR novo que tira essa parte do ADR-0014. 0.4: o ADR-0014 fica só com transporte e criptografia, o item (g), que esperam a Fase 2, com a justificativa registrada nele. |
+| A7 | 0.6: ADR para toda entrada externa, com limites de tamanho, recursão, memória e tempo, estresse por leitor, inventário de `unsafe`/C e infraestrutura de fuzzing. O leitor do `.bivar` é o primeiro a segui-lo. |
+| M15 | 0.7: a imagem guardada de personas dormindo é dado não confiável, recalculada ao acordar e indicada na tela. |
 | A8 | 0.8: ADR do papel do Vello. |
+| M8 | 0.8: ADR novo de política de dependências, completando o ADR-0012. |
+| A9 | 0.9: teste de estresse que passa dos limites fixos de memória do Vello, comparado com o vello_cpu. |
+| M13 | 0.9: um único dispositivo de vídeo compartilhado e um exemplo mínimo da queda reportado ao wgpu. |
 
 ## Em aberto
 
-| Achado | Por quê |
-| --- | --- |
-| A7 | Pede um ADR para "toda entrada externa", com limites de memória e tempo e a infraestrutura de fuzzing. Ainda não tem entrega. |
-| A9 | Pede um teste de estresse do Vello comparado com o vello_cpu, para detectar imagem incompleta. A 0.9 compara a cena de degradês com o vello_cpu, mas não cobre os buffers de tamanho fixo. Ainda não tem entrega. |
-| M8 | Pede um ADR novo sobre dependências (cargo-vet, `build.rs`, versões fixas na compilação automática). |
-| M13 | Pede investigar a queda dos testes de placa em paralelo e reportá-la ao wgpu. |
-| M15 | Pede uma regra sobre a confiança na imagem guardada (cache/proxy) das personas. |
+Nenhum achado ficou sem entrega. A 0.4 é a última entrega a fechar, depois da 0.9, porque vários ADRs só deixam de estar travados com os resultados da 0.5 à 0.9.
 
 **Status dos ADRs:** nenhum mudou. Subir um ADR para "Revisado por IA" exige que todos os achados que o bloqueiam estejam tratados e que o dono aprove (veja a tabela "Status recomendado dos ADRs" no relatório).
