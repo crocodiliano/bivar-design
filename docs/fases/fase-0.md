@@ -18,9 +18,9 @@
 - **Compilação automática só em Linux,** a cada envio e a cada pedido de junção (*pull request*). Repositórios públicos não gastam cota de minutos.
 
 **Critérios de aceite:**
-- [ ] O dono consegue clonar o repositório e rodar `cargo test` no PC dele, com uma mensagem de sucesso.
-- [ ] Um commit sem `Signed-off-by` é sinalizado.
-- [ ] Adicionar uma dependência de teste com licença incompatível faz o `cargo deny` falhar.
+- [x] O dono consegue clonar o repositório e rodar `cargo test` no PC dele, com uma mensagem de sucesso.
+- [x] Um commit sem `Signed-off-by` é sinalizado.
+- [x] Adicionar uma dependência de teste com licença incompatível faz o `cargo deny` falhar.
 
 ### 0.2 Prova de conceito da interface (ADR-0009)
 

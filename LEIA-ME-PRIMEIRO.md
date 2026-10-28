@@ -1,6 +1,6 @@
 # Como começar com estes arquivos
 
-Este pacote é o ponto de partida do repositório do Bivar. Ainda não há código nele: só as regras e o plano que o Claude Code vai seguir.
+Este pacote foi o ponto de partida do repositório do Bivar, com as regras e o plano que o Claude Code segue. Hoje o repositório já tem o workspace Cargo (com os crates ainda vazios) e as provas de conceito das entregas 0.2 e 0.3, em `poc/`.
 
 ## Conteúdo
 
