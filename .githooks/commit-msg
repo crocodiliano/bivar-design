@@ -9,3 +9,17 @@ Commit again with: git commit -s
 EOF
     exit 1
 fi
+
+# Golden images change only with the owner's recorded approval
+# (CLAUDE.md section 6). CI runs the same check.
+OWNER_EMAIL='344064416+crocodiliano@users.noreply.github.com'
+if git diff --cached --name-only | grep -qE '(^|/)tests/golden/'; then
+    if ! grep -E '^Golden-Approved-By: .+ <[^>]+>$' "$1" | grep -qF "<$OWNER_EMAIL>"; then
+        cat >&2 <<EOF
+ERROR: this commit changes tests/golden/ but has no owner approval line.
+Add, after the owner has seen the image diff and approved it:
+Golden-Approved-By: <owner name> <$OWNER_EMAIL>
+EOF
+        exit 1
+    fi
+fi

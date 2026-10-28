@@ -81,7 +81,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check Signed-off-by on every commit
+      - name: Find the commits to check
+        id: range
         env:
           EVENT: ${{ github.event_name }}
           BASE: ${{ github.event.pull_request.base.sha }}
@@ -99,11 +100,36 @@ jobs:
               fi ;;
             *) range="HEAD" ;;
           esac
+          echo "range=$range" >> "$GITHUB_OUTPUT"
+
+      - name: Check Signed-off-by on every commit
+        env:
+          RANGE: ${{ steps.range.outputs.range }}
+        run: |
           failed=0
-          for c in $(git rev-list --no-merges "$range"); do
+          for c in $(git rev-list --no-merges "$RANGE"); do
             if ! git log -1 --format=%B "$c" | grep -qE '^Signed-off-by: .+ <.+>'; then
               echo "::error::Commit $c has no Signed-off-by line (use git commit -s)"
               failed=1
+            fi
+          done
+          exit $failed
+
+      # Golden images change only with the owner's recorded approval
+      # (CLAUDE.md section 6). Commits up to GOLDEN_BASELINE predate the rule.
+      - name: Check owner approval for golden image changes
+        env:
+          RANGE: ${{ steps.range.outputs.range }}
+          GOLDEN_BASELINE: 523c87b371e6475b95c72a4dfcfcd9216b8aeb01
+          OWNER_EMAIL: 344064416+crocodiliano@users.noreply.github.com
+        run: |
+          failed=0
+          for c in $(git rev-list --no-merges "$RANGE" --not "$GOLDEN_BASELINE"); do
+            if git diff-tree --no-commit-id --name-only -r --root "$c" | grep -qE '(^|/)tests/golden/'; then
+              if ! git log -1 --format=%B "$c" | grep -E '^Golden-Approved-By: .+ <[^>]+>$' | grep -qF "<$OWNER_EMAIL>"; then
+                echo "::error::Commit $c changes tests/golden/ without a Golden-Approved-By line from the owner <$OWNER_EMAIL>"
+                failed=1
+              fi
             fi
           done
           exit $failed

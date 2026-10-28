@@ -75,6 +75,8 @@ O plano completo está em `docs/PLANO.md`, que é a versão oficial do plano. As
 - Toda função nova vem com testes.
 - O núcleo também recebe testes de propriedades sempre que fizer sentido.
 - **Testes visuais (golden images):** toda mudança que afeta o que aparece na tela ou na exportação precisa de um teste visual em `tests/golden/`. **Nunca atualize uma imagem de referência sem a aprovação explícita do dono.** Mostre a ele a diferença antes.
+  - **Registro da aprovação:** todo commit que mexe em qualquer pasta `tests/golden/` leva a linha `Golden-Approved-By: Puã <344064416+crocodiliano@users.noreply.github.com>` na mensagem. Escreva essa linha só depois de o dono ver a diferença e escrever que aprova na conversa.
+  - **Checagem:** o gancho `.githooks/commit-msg` e a compilação automática do GitHub recusam o commit sem essa linha. É um registro, não uma prova: quem tem acesso de escrita ao repositório poderia digitá-la.
 - **Antes de dizer "pronto",** estes comandos precisam passar:
   - `cargo fmt --check`
   - `cargo clippy --all-targets -- -D warnings`
