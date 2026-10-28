@@ -15,7 +15,7 @@ vello_cpu = "=0.3.0"
 # Already used by vello and vello_cpu; named here to read the font's charmap.
 skrifa = "=0.44.0"
 png = "0.18"
-pollster = "0.4"
+pollster = "1.0"
 
 [lints.rust]
 unsafe_code = "forbid"
