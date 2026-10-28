@@ -2,7 +2,7 @@
 
 Acompanha o relatório [`2026-10-28-fase-0.md`](2026-10-28-fase-0.md), que fica como foi escrito. Esta página diz o que foi feito com cada achado e em qual commit.
 
-**Situação em 2026-10-28:** foram tratados os achados que não exigem decisão de arquitetura. Os achados C1, C2 e A1 a A12 esperam decisões do dono. M8, M13 e M15 também seguem em aberto.
+**Situação em 2026-10-28:** foram tratados os achados que não exigem decisão de arquitetura. Depois, o dono decidiu os pontos de arquitetura no [ADR-0019](../adr/0019.md) e distribuiu os achados restantes pelas entregas 0.6 a 0.9 da [Fase 0](../fases/fase-0.md) (veja "Encaminhados para entregas"). A7, A9, M8, M13 e M15 ainda não têm entrega definida.
 
 ## Tratados
 
@@ -35,11 +35,37 @@ Acompanha o relatório [`2026-10-28-fase-0.md`](2026-10-28-fase-0.md), que fica 
 | B10 | Critério novo na N.3: sem DirectX 12 nem Vulkan, o programa mostra uma mensagem clara em vez de cair. | `7427553` |
 | B11 | Critério novo na N.3: teste automático da tela contra a exportação. | `7427553` |
 
+## Decididos pelo dono (ADR-0019)
+
+O [ADR-0019](../adr/0019.md) (status Proposto, commit `7c67c05`) responde aos pontos de arquitetura. Os critérios que provam cada decisão estão nas entregas abaixo.
+
+| Achado | Decisão |
+| --- | --- |
+| C2 | Conflitos estruturais viram estado de conflito, num painel central. O mesmo parâmetro (e o mesmo bloco de raster) fica com "a última escrita vence", com aviso visível e registro no histórico. O princípio 5 passou a ser "nada se perde sem registro e aviso" (commit `8cd6c80`). |
+| A5 | "Salvar cópia para enviar", sem histórico. |
+| A6, em parte | Arquivo único, com os arquivos grandes dentro, em pedaços. Um único histórico de operações, o do CRDT. |
+| A8, em parte | O Vello cuida da tela e de PNG/JPG em 8 bits. O resto segue por um caminho de cor separado, escolhido na 0.8. O princípio 6 foi ajustado (commit `8cd6c80`). |
+
+## Encaminhados para entregas
+
+A Fase 0 foi reorganizada no commit `367ad5e`. O Núcleo só começa depois de 0.4 a 0.9 concluídas e revisadas pelo agente auditor.
+
+| Achado | Entrega |
+| --- | --- |
+| C1 | 0.6: formato por dentro do arquivo (SQLite com proteções, processo isolado ou formato próprio em Rust). |
+| A1 | 0.6: onde mora a verdade do documento, identidade dos nós e versão das operações. |
+| A5 | 0.6: critério "um texto apagado não aparece em nenhum byte da cópia". |
+| A6 | 0.6: arquivos grandes em pedaços, cópia com o programa aberto, arquivo aberto duas vezes, queda, arquivo cortado, migração, pastas sincronizadas, criptografia e especificação aberta. |
+| A2, A3, A4, A10, A12 | 0.7: especificação do modelo de dados, com protótipo. |
+| A11, em parte | 0.7: identidade e autoria nas operações. Transporte e criptografia ficam para a Fase 2. |
+| A8 | 0.8: ADR do papel do Vello. |
+
 ## Em aberto
 
 | Achado | Por quê |
 | --- | --- |
-| C1, C2, A1 a A12 | Dependem de decisões de arquitetura do dono. |
+| A7 | Pede um ADR para "toda entrada externa", com limites de memória e tempo e a infraestrutura de fuzzing. Ainda não tem entrega. |
+| A9 | Pede um teste de estresse do Vello comparado com o vello_cpu, para detectar imagem incompleta. A 0.9 compara a cena de degradês com o vello_cpu, mas não cobre os buffers de tamanho fixo. Ainda não tem entrega. |
 | M8 | Pede um ADR novo sobre dependências (cargo-vet, `build.rs`, versões fixas na compilação automática). |
 | M13 | Pede investigar a queda dos testes de placa em paralelo e reportá-la ao wgpu. |
 | M15 | Pede uma regra sobre a confiança na imagem guardada (cache/proxy) das personas. |
