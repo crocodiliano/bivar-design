@@ -1,0 +1,55 @@
+name: Mutation testing
+
+# Started by hand from the Actions tab before closing each delivery, from
+# the core phase on. cargo-mutants changes the code on purpose (for example
+# `+` to `-`) and checks that some test fails; a mutant that survives points
+# to a gap in the tests.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mutants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install toolchain from rust-toolchain.toml
+        run: rustup show
+
+      - name: Install cargo-mutants
+        run: cargo install --locked cargo-mutants
+
+      - name: Run cargo-mutants
+        run: cargo mutants --workspace --no-shuffle
+
+      - name: Summary of surviving mutants
+        if: always()
+        run: |
+          {
+            echo "## Mutation testing"
+            for kind in caught missed timeout unviable; do
+              file="mutants.out/$kind.txt"
+              count=0
+              [ -f "$file" ] && count=$(wc -l < "$file")
+              echo "- $kind: $count"
+            done
+            if [ -s mutants.out/missed.txt ]; then
+              echo
+              echo "### Missed (no test noticed these changes)"
+              echo '```'
+              cat mutants.out/missed.txt
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the full report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mutants-out
+          path: mutants.out
+          retention-days: 30

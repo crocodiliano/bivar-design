@@ -42,6 +42,38 @@ jobs:
       - name: cargo audit
         run: cargo audit
 
+  # Report only: shows which lines the tests run. No minimum yet.
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install toolchain from rust-toolchain.toml
+        run: rustup show
+
+      - name: Install llvm-tools and cargo-llvm-cov
+        run: |
+          rustup component add llvm-tools-preview
+          cargo install --locked cargo-llvm-cov
+
+      - name: Measure coverage
+        run: |
+          cargo llvm-cov --workspace --summary-only | tee coverage-summary.txt
+          cargo llvm-cov report --html
+          {
+            echo "## Test coverage (report only)"
+            echo '```'
+            cat coverage-summary.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the HTML report
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-html
+          path: target/llvm-cov/html
+          retention-days: 30
+
   dco:
     runs-on: ubuntu-latest
     steps:
