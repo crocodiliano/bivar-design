@@ -2,20 +2,20 @@
 
 Acompanha o relatório [`2026-10-28-revisao-adr-0019.md`](2026-10-28-revisao-adr-0019.md), que fica como foi escrito. Esta página diz o que foi feito com cada achado e em qual commit.
 
-**Situação em 2026-10-28:** os 20 achados e a suspeita 5 foram tratados. Nos achados 2, 3 e 4 e na suspeita 5, o tratamento segue as decisões do dono. Nos demais, segue a recomendação do próprio auditor. Nenhum status de ADR mudou: o ADR-0019 continua "Proposto" até uma nova revisão do agente auditor e a aprovação do dono.
+**Situação em 2026-10-28:** os 20 achados e a suspeita 5 foram tratados; os achados 2 e 8, só em parte (corrigido depois da [auditoria das correções](2026-10-28-revisao-correcoes-adr-0019.md), achado N4). Nos achados 2, 3 e 4 e na suspeita 5, o tratamento segue as decisões do dono. Nos demais, segue a recomendação do próprio auditor. Nenhum status de ADR mudou: o ADR-0019 continua "Proposto" até uma nova revisão do agente auditor e a aprovação do dono.
 
 ## Tratados
 
 | Achado | O que foi feito | Commit |
 | --- | --- | --- |
 | 1 | Todo achado em aberto ganhou entrega: A7 na 0.6; A11 dividido (identidade e autoria, itens a–f, num ADR novo na 0.7; transporte e criptografia, item g, no ADR-0014, para a Fase 2); M15 na 0.7; M8 na 0.8; A9 e M13 na 0.9. A `fase-0.md` diz que a 0.4 é a última entrega a fechar, depois da 0.9. O registro de tratamento da Fase 0 foi atualizado. | `36dbd79` |
-| 2 | Decisão do dono, opção (a): a versão de uma pessoa só usa a mesma biblioteca CRDT, sem rede. A contingência adia apenas rede, assinaturas, permissões, presença e interface de colaboração. Gatilho: se nem Loro nem Automerge passarem na 0.6, a decisão 2 é reaberta com um ADR novo. | `c99b1f9` |
+| 2 (em parte) | Decisão do dono, opção (a): a versão de uma pessoa só usa a mesma biblioteca CRDT, sem rede. A contingência adia apenas rede, assinaturas, permissões, presença e interface de colaboração. Gatilho: se nem Loro nem Automerge passarem na 0.6, a decisão 2 é reaberta com um ADR novo. **Faltou** dizer quem dispara a contingência e quando; isso foi resolvido na rodada seguinte ([tratamento](2026-10-28-revisao-correcoes-adr-0019-tratamento.md)). | `c99b1f9` |
 | 3 | Decisão do dono: movimentos e reordenações simultâneos seguem a regra do mesmo parâmetro. Vence um, com aviso visível, registro no histórico e registro no painel de conflitos. Está no ADR-0019, no princípio 5 e nos testes da 0.7. | `beac26d` |
 | 4 | Decisão do dono: "Salvar como" num arquivo com histórico mostra um aviso discreto sugerindo "Salvar cópia para enviar"; o salvamento normal não muda. A cópia começa um histórico novo e não se junta mais com o original. O teste usa um marcador único, descomprime antes da busca e confere que nenhum pedaço nem o hash de uma imagem apagada fica na cópia. | `e56af35` |
 | 5 | 0.6: N edições sem salvar voltam depois de matar o processo, e o ADR diz o que é forçado ao disco e quando. | `caca8c4` |
 | 6 | O Núcleo lista o ADR-0019, troca "Arquivo SQLite" por "formato escolhido na 0.6" e ganha critérios na N.1 (aviso da última escrita, movimentos simultâneos), na N.2 (edições desde o último salvamento, pedaços, arquivo adulterado, cópia para enviar, aviso no "Salvar como") e na N.5 (painel de conflitos). | `a1e8ca5` |
 | 7 | O ADR-0019 ganhou a tabela "O que muda em cada ADR", cobrindo 0002, 0004, 0005, 0007, 0008, 0010, 0013 e 0018. Os ADRs 0008 e 0013 foram marcados, e a linha "Relação" do ADR-0018 deixou de se contradizer. | `b247588` |
-| 8 | As linhas "Relação" passaram a dizer "proposta de substituição em parte", até o ADR-0019 chegar a "Revisado por IA". O ADR-0019 entrou na lista da 0.4. | `b247588`, `36dbd79` |
+| 8 (em parte) | As linhas "Relação" passaram a dizer "proposta de substituição em parte", até o ADR-0019 chegar a "Revisado por IA". O ADR-0019 entrou na lista da 0.4. **Faltou** a parte sobre os princípios 5 e 6 do `CLAUDE.md`, que mandavam seguir um ADR ainda "Proposto"; ela se resolveu com a subida do ADR-0019 para "Revisado por IA" na rodada seguinte. | `b247588`, `36dbd79` |
 | 9 | 0.8: o ADR do papel do Vello trata as misturas em luz linear e o perfil de cor do monitor. | `a4c59cb` |
 | 10 | 0.6: o ADR diz como as operações antigas do histórico são lidas depois de uma migração e o que acontece numa junção entre versões diferentes. | `caca8c4` |
 | 11 | 0.6: tempo de salvamento medido com a interface aberta, com limite numérico fixado no plano da entrega; o ADR diz quando um arquivo grande sem uso pode ser apagado. | `caca8c4` |
