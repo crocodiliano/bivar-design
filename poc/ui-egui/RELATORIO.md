@@ -67,4 +67,8 @@ Os detalhes estão no ADR-0017.
 | `eframe` 0.37.0 (com `accesskit` e `wgpu`) | Janela, interface e acessibilidade | MIT OR Apache-2.0 |
 | `egui_kittest` 0.37.0 (só testes; `snapshot` e `wgpu`) | Testes visuais e de acessibilidade | MIT OR Apache-2.0 |
 
-`cargo deny` e `cargo audit` passam com a configuração local.
+`cargo deny` e `cargo audit`, com a configuração local:
+
+- **2026-10-20:** passavam.
+- **2026-10-21:** saiu o aviso RUSTSEC-2026-0384 (condição de corrida no `tokio::time::Interval`, tokio 1.54.0), e os dois passaram a falhar. O tokio entra só na versão WebAssembly, não no programa do Windows.
+- **2026-10-28:** o tokio foi atualizado para 1.54.1 (`cargo update -p tokio`, com aprovação do dono), e os dois voltaram a passar.

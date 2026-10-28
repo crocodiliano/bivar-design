@@ -151,7 +151,10 @@ As diferenças ficam nas bordas: dá para ver nas máscaras que o teste `cpu_is_
 
 - Aprovadas pelo dono para esta prova: `vello`, `vello_cpu`, `png` e `pollster`.
 - `skrifa` já vinha com o Vello. Foi citado no `Cargo.toml` na mesma versão, para ler o mapa de caracteres da fonte.
-- `cargo deny check` e `cargo audit` passam. Valem as mesmas exceções da 0.2: os avisos da família zbus, só no Linux.
+- `cargo deny check` e `cargo audit`, com as mesmas exceções da 0.2 (os avisos da família zbus, só no Linux):
+  - **2026-10-20:** passavam;
+  - **2026-10-21:** saiu o aviso RUSTSEC-2026-0384 (tokio 1.54.0), e os dois passaram a falhar. O tokio entra só na versão WebAssembly, não no programa do Windows;
+  - **2026-10-28:** o tokio foi atualizado para 1.54.1 (`cargo update -p tokio`, com aprovação do dono), e os dois voltaram a passar.
 - **Duplicação:** o egui 0.37 usa por dentro o **vello_cpu 0.2** para desenhar o texto da interface, e a prova usa o 0.3. As duas versões ficam no programa.
 
 ## Pontos para o auditor
