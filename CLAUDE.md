@@ -126,7 +126,7 @@ O plano completo está em `docs/PLANO.md`, que é a versão oficial do plano. As
 ```
 crates/
   bivar-core/        grafo, nós, operações, desfazer, validação
-  bivar-doc/         formato de arquivo SQLite, migrações, recuperação
+  bivar-doc/         formato de arquivo (escolhido na 0.6), migrações, recuperação
   bivar-render/      wgpu, compositor, tiles, cache/proxy
   bivar-text/        composição de texto
   bivar-color/       gerenciamento de cor

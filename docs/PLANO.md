@@ -82,7 +82,7 @@ O documento é um grafo de nós hierárquico, e toda mudança nele é uma opera�
 
 ## Stack, formato de arquivo e segurança
 
-O projeto usa Rust em toda parte. O framework de interface é decidido por uma prova de conceito na Fase 0, e o arquivo de projeto é um SQLite com especificação aberta.
+O projeto usa Rust em toda parte. O framework de interface é decidido por uma prova de conceito na Fase 0, e o arquivo de projeto é um arquivo único com especificação aberta, no formato escolhido na entrega 0.6.
 
 ### Stack (ponto 4)
 
@@ -96,7 +96,7 @@ O projeto usa Rust em toda parte. O framework de interface é decidido por uma p
 
 ### Formato de arquivo (ponto 5)
 
-- **Arquivo único em SQLite:**
+- **Arquivo único, no formato escolhido na 0.6:**
   - salvamento atômico e incremental;
   - carregamento parcial por persona;
   - recuperação de queda pelo histórico do CRDT, o único histórico de operações (ADR-0019);
