@@ -10,7 +10,7 @@ Todo ADR passa por três níveis, nesta ordem:
 2. **Revisado por IA:** o agente auditor (`.claude/agents/auditor.md`) revisou, os achados foram tratados e o dono aprovou.
 3. **Aceito:** reservado para quando houver revisão humana de alguém experiente em Rust.
 
-Por enquanto o projeto não tem auditor humano. Para mudar uma decisão, crie um novo ADR que a substitua. Ele passa pela revisão do agente auditor e pela aprovação do dono, e só vira "Aceito" depois de revisão humana.
+Por enquanto o projeto não tem auditor humano. Um ADR "Proposto" pode ser editado diretamente, com a aprovação do dono. Para mudar um ADR "Revisado por IA" ou "Aceito", crie um novo ADR que o substitua. Ele passa pela revisão do agente auditor e pela aprovação do dono, e só vira "Aceito" depois de revisão humana.
 
 ## Índice
 

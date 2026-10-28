@@ -27,7 +27,8 @@ O plano completo está em `docs/PLANO.md`, que é a versão oficial do plano. As
     1. **Proposto:** escrito, ainda sem revisão.
     2. **Revisado por IA:** o agente auditor revisou, os achados foram tratados e o dono aprovou.
     3. **Aceito:** só depois de revisão humana de alguém experiente em Rust.
-  - **Mudar um ADR** exige um novo ADR, revisão pelo agente auditor e aprovação do dono, com status "Revisado por IA". O status "Aceito" só vem depois de revisão humana.
+  - **ADR "Proposto"** pode ser editado diretamente, com a aprovação do dono, enquanto não sobe de status.
+  - **Mudar um ADR "Revisado por IA" ou "Aceito"** exige um novo ADR, revisão pelo agente auditor e aprovação do dono, com status "Revisado por IA". O status "Aceito" só vem depois de revisão humana.
 
 ## 3. Princípios de arquitetura (inegociáveis)
 
