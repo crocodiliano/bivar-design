@@ -2,7 +2,7 @@
 
 **Objetivo:** a plataforma sobre a qual todas as personas são construídas. Ela não tem nenhuma ferramenta de persona, mas tem tudo de que elas dependem.
 
-**ADRs:** 0001, 0002, 0003, 0004, 0005, 0006, 0007, 0008, 0010, 0011, 0012, 0015.
+**ADRs:** 0001, 0002, 0003, 0004, 0005, 0006, 0007, 0008, 0010, 0011, 0012, 0015, 0019, e os ADRs novos das entregas 0.5 a 0.9.
 
 **Pré-requisito:** as entregas 0.4 a 0.9 da [Fase 0](fase-0.md) estão concluídas e revisadas pelo agente auditor. O Núcleo não começa sem isso.
 
@@ -25,10 +25,14 @@
 - [ ] Tentar criar um ciclo é rejeitado com uma mensagem clara.
 - [ ] Testes de propriedades: qualquer sequência aleatória de operações válidas seguida de "desfazer tudo" volta ao estado inicial.
 - [ ] Duas cópias do documento recebem operações concorrentes em ordens diferentes e terminam idênticas (prova de compatibilidade com CRDT, ADR-0005).
+- [ ] **"A última escrita vence", com aviso** (ADR-0019, decisão 3): duas cópias mudam o mesmo parâmetro ao mesmo tempo. Depois da junção, as duas mostram o mesmo valor, o mesmo aviso, e o histórico guarda o valor que perdeu.
+- [ ] **Movimentos e reordenações simultâneos** (ADR-0019, decisão 3): duas cópias movem o mesmo nó para lugares diferentes, e outro teste move A para dentro de B enquanto outra cópia move B para dentro de A. Vence um, e todas as cópias mostram o mesmo aviso, o mesmo registro no painel de conflitos e o movimento que perdeu no histórico.
 
 ### N.2 Formato de arquivo (`bivar-doc`)
 
-- Arquivo SQLite, versão do formato, migração de exemplo.
+- Arquivo único, no formato escolhido na 0.6, com versão do formato e migração de exemplo.
+- Arquivos grandes dentro do arquivo, em pedaços (ADR-0019, decisão 1).
+- "Salvar cópia para enviar", sem histórico (ADR-0019, decisão 5).
 - Salvamento incremental e recuperação de queda pelo histórico do CRDT, o único histórico de operações (ADR-0019).
 - Armazenamento de blobs por hash.
 - Rascunho da especificação em `docs/formato/`.
@@ -37,6 +41,11 @@
 - [ ] O dono fecha o programa à força (Gerenciador de Tarefas) no meio de uma edição, reabre, e o documento volta com a última operação salva.
 - [ ] Salvar após mudar um parâmetro não regrava blobs grandes (verificado por teste).
 - [ ] Um arquivo da "versão 1" de teste abre após uma migração para a "versão 2".
+- [ ] **Edições desde o último salvamento:** fazer N edições sem salvar, fechar o programa à força e reabrir: as N edições voltam, na forma definida pelo ADR de armazenamento da 0.6.
+- [ ] **Arquivos grandes em pedaços:** um arquivo de 2 GB é guardado em pedaços, salvo, reaberto e sai idêntico (mesmo hash).
+- [ ] **Arquivo adulterado recusado:** um arquivo com conteúdo fora da especificação (por exemplo, um gatilho ou uma visão injetada, se o formato for SQLite) é recusado com uma mensagem clara, e o leitor tem um alvo de fuzzing (ADR-0011).
+- [ ] **"Salvar cópia para enviar":** um texto com um marcador único e uma imagem são apagados antes de salvar a cópia. Com o arquivo descomprimido, o marcador não aparece em nenhum byte, e nenhum pedaço nem o hash da imagem apagada está na cópia. A cópia começa um histórico novo.
+- [ ] **Aviso ao compartilhar:** "Salvar como" num arquivo com histórico mostra um aviso discreto sugerindo "Salvar cópia para enviar". O salvamento normal não mostra aviso.
 
 ### N.3 Renderização (`bivar-render`)
 
@@ -82,3 +91,4 @@
 - [ ] Ctrl+K encontra e executa a ação "Trocar para tema Conforto".
 - [ ] O tema nunca altera a cor do canvas (teste visual).
 - [ ] O NVDA lê o painel de camadas da persona de exemplo.
+- [ ] **Painel de conflitos** (ADR-0019; especificado na 0.7): mostra os conflitos e os avisos de "última escrita vence" de um documento de teste, com as ações de cada tipo. Ele é usado inteiro só pelo teclado, o NVDA lê cada item e o tipo dele, e cor nunca é o único sinal.
