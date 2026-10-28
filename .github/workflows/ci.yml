@@ -26,6 +26,16 @@ jobs:
       - name: Test
         run: cargo test
 
+      # The document core must not depend on the UI or GPU stack
+      # (ADR-0009: "o núcleo não depende do framework de interface").
+      - name: Core and doc crates stay free of UI and GPU dependencies
+        run: |
+          if cargo tree -p bivar-core -p bivar-doc -e normal,build --prefix none \
+              | grep -E '^(egui|eframe|epaint|winit|wgpu|vello|accesskit)'; then
+            echo "::error::bivar-core or bivar-doc depends on a UI or GPU crate"
+            exit 1
+          fi
+
       - name: Install cargo-deny and cargo-audit
         run: cargo install --locked cargo-deny cargo-audit
 
