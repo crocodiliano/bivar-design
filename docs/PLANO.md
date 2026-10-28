@@ -439,7 +439,7 @@ Os registros de decisão (ADRs) passam pela revisão por IA (entrega 0.4 da Fase
 - [ ] Motor JS para scripts (entrega 0.6)
 - [ ] Biblioteca de gerenciamento de cor (entrega 0.6)
 - [ ] CRDT, com o teste de velocidade da Loro (entrega 0.6)
-- [ ] Biblioteca de leitura de RAW: Rust ou C++ (a decidir antes da persona Foto, com revisão do agente auditor)
+- [ ] Biblioteca de leitura de RAW: Rust ou C++ (antes da persona Foto: proposta no plano da entrega, revisada pelo agente auditor e decidida pelo dono)
 - [ ] Ferramenta de hinting automático e como isolá-la, se for em C
 - [ ] Revisão por IA dos ADRs, segunda opinião e pedido de revisão à comunidade Rust (entrega 0.4)
 - [ ] Revisão humana dos ADRs de prioridade Alta, quando houver um revisor com experiência em Rust
