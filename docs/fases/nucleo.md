@@ -48,6 +48,8 @@
   - **sem placa de vídeo (vello_cpu):** falha quando qualquer pixel muda;
   - **com a placa de vídeo:** falha quando mais de 3 pixels mudam, ou quando algum pixel muda mais de 1 nível em 255. Qualquer outra folga precisa vir de uma medição registrada no plano da entrega.
 - [ ] Mexer num objeto redesenha só os tiles afetados (verificado por contador).
+- [ ] **Tela × exportação, automático** (achado B11 da auditoria da Fase 0). Um teste automático compara a imagem que vai para a tela com a exportação PNG da mesma vista, dentro da folga da placa de vídeo. Na prova da 0.3, essa comparação era manual (botão "Capturar a tela e comparar").
+- [ ] **Computador sem DirectX 12 nem Vulkan** (achado B10 da auditoria da Fase 0). Quando a placa de vídeo não oferece nenhum dos dois, o programa não cai e mostra uma mensagem clara, que diz o que falta. Um teste simula a falta de placa compatível.
 - [ ] **Medição de tempo completa** (achado M4 da auditoria da Fase 0). Os números de desempenho de cada quadro trazem, separados: o tempo no processador, o tempo de trabalho da placa de vídeo (medido pela própria placa) e o momento em que a imagem é apresentada na tela. O plano da entrega diz como cada um é medido, e o código que mede fica no repositório.
 - [ ] **Muitos degradês, velocidade** (limitação 1 do [ADR-0018](../adr/0018.md); pré-requisito da Fase 1a). Na GTX 1660, com a cena de 10.000 retângulos, cada um com degradê próprio, durante zoom e pan:
   - **obrigatório:** 99% dos quadros abaixo de 16,7 ms (60 Hz);

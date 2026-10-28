@@ -56,7 +56,7 @@
 - [ ] **Desfazer:** cada ação acima se desfaz com Ctrl+Z, na ordem certa.
 - [ ] **Queda:** fechar o programa à força no meio da edição e reabrir. O trabalho está lá.
 - [ ] **Acessibilidade:** com o NVDA, o dono navega pelas camadas e ouve nome, tipo e estado (oculta, bloqueada, em conflito) de cada uma. Todas as ferramentas acessíveis por teclado.
-- [ ] **Desempenho:** um documento com 5.000 objetos navega com fluidez na máquina de referência.
+- [ ] **Desempenho:** um documento com 5.000 objetos navega com fluidez na máquina de referência: durante zoom e pan, 99% dos quadros ficam abaixo de 16,7 ms (60 Hz), o mesmo critério do [ADR-0018](../adr/0018.md).
 - [ ] **Testes visuais** aprovados pelo dono para: traçados, degradês, booleanas, mesclagem e cada formato de exportação.
 
 ## Ao concluir
