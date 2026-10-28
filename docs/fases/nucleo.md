@@ -26,7 +26,7 @@
 - [ ] Testes de propriedades: qualquer sequência aleatória de operações válidas seguida de "desfazer tudo" volta ao estado inicial.
 - [ ] Duas cópias do documento recebem operações concorrentes em ordens diferentes e terminam idênticas (prova de compatibilidade com CRDT, ADR-0005).
 - [ ] **"A última escrita vence", com aviso** (ADR-0019, decisão 3): duas cópias mudam o mesmo parâmetro ao mesmo tempo. Depois da junção, as duas mostram o mesmo valor, o mesmo aviso, e o histórico guarda o valor que perdeu.
-- [ ] **Movimentos e reordenações simultâneos** (ADR-0019, decisão 3): duas cópias movem o mesmo nó para lugares diferentes, e outro teste move A para dentro de B enquanto outra cópia move B para dentro de A. Vence um, e todas as cópias mostram o mesmo aviso, o mesmo registro no painel de conflitos e o movimento que perdeu no histórico.
+- [ ] **Movimentos e reordenações simultâneos** (ADR-0019, decisão 3): duas cópias movem o mesmo nó para lugares diferentes, e outro teste move A para dentro de B enquanto outra cópia move B para dentro de A. Um terceiro teste muda a posição do mesmo item da pilha nas duas cópias. Nos três, vence um, nenhum objeto é duplicado, e todas as cópias mostram o mesmo aviso, o mesmo registro no painel de conflitos e o movimento que perdeu no histórico. Um quarto teste move itens diferentes da mesma pilha nas duas cópias: os dois movimentos valem, e não há aviso.
 
 ### N.2 Formato de arquivo (`bivar-doc`)
 
