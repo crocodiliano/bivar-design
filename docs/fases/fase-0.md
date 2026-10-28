@@ -94,7 +94,7 @@ As escolhas ficam registradas em **ADRs novos**, com as alternativas comparadas 
 
   Na prova: um arquivo com um gatilho ou uma visão injetada é recusado com uma mensagem clara, e o carregador ganha um alvo de fuzzing (ADR-0011).
 - [ ] **Onde mora a verdade do documento (achado A1):** o ADR do CRDT diz:
-  - se o documento vive na biblioteca CRDT ou no `bivar-core`, e como os dois ficam iguais;
+  - se o documento vive na biblioteca CRDT ou no `bivar-core`, e como os dois ficam iguais. Em qualquer caso, o grafo é o modelo lógico do documento e o CRDT é onde ele é armazenado e sincronizado (ADR-0019, decisão 2), para o princípio 1 continuar valendo;
   - como cada nó é identificado de forma única entre computadores;
   - como cada tipo de operação vira estrutura CRDT: árvore para a hierarquia, lista para a pilha, mapa para os parâmetros, e as conexões entre nós, que não formam árvore;
   - a versão do formato das operações.
