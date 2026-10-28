@@ -4,6 +4,8 @@
 
 **ADRs:** 0001, 0002, 0003, 0004, 0005, 0006, 0007, 0008, 0010, 0011, 0012, 0015.
 
+**Pré-requisito:** as entregas 0.4, 0.5 e 0.6 da [Fase 0](fase-0.md) estão concluídas e revisadas pelo agente auditor. O Núcleo não começa sem isso.
+
 ## Entregas
 
 ### N.1 Grafo e operações (`bivar-core`)

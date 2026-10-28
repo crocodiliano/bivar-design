@@ -16,13 +16,18 @@ O Bivar é um programa de design open source (GPL-3.0) escrito em Rust. Ele une 
 
 Cada uma dessas áreas é uma **persona**: uma aba com as suas próprias ferramentas e painéis. Por baixo de todas elas há uma **nodetree**, que é a fonte da verdade do documento. O usuário trabalha com camadas e painéis comuns, que são uma projeção amigável desse grafo.
 
-O plano completo está em `docs/PLANO.md`, e as decisões de arquitetura estão em `docs/adr/`.
+O plano completo está em `docs/PLANO.md`, que é a versão oficial do plano. As decisões de arquitetura estão em `docs/adr/`.
 
 ## 2. Papéis
 
 - **Dono do produto:** não programa. Ele decide o quê, aprova os seus planos, testa usando o programa e aprova as imagens de referência dos testes visuais. **Explique tudo em português claro, sem jargão desnecessário.**
 - **Você (Claude Code):** implementa tarefas pequenas, sempre com testes, seguindo este arquivo, os ADRs e a especificação da entrega em `docs/fases/`.
-- **Auditor Rust:** valida os ADRs e revisa os módulos críticos. Qualquer mudança em um ADR exige um novo ADR e a aprovação dele.
+- **Auditoria:** por enquanto não há auditor humano. A revisão é feita pelo agente `.claude/agents/auditor.md`, por ferramentas automáticas e por revisores voluntários da comunidade.
+  - **Os ADRs têm três níveis de status, nesta ordem:**
+    1. **Proposto:** escrito, ainda sem revisão.
+    2. **Revisado por IA:** o agente auditor revisou, os achados foram tratados e o dono aprovou.
+    3. **Aceito:** só depois de revisão humana de alguém experiente em Rust.
+  - **Mudar um ADR** exige um novo ADR, revisão pelo agente auditor e aprovação do dono, com status "Revisado por IA". O status "Aceito" só vem depois de revisão humana.
 
 ## 3. Princípios de arquitetura (inegociáveis)
 
@@ -43,6 +48,7 @@ O plano completo está em `docs/PLANO.md`, e as decisões de arquitetura estão 
 - **Leitura de arquivos externos só em Rust.** Isso vale para SVG, fontes, imagens, PDF e qualquer outro formato. Todo leitor novo ganha um alvo de fuzzing. (ADR-0011)
 - **Abrir um arquivo nunca executa código.** Arquivos de projeto não carregam scripts.
 - **`unsafe` só com justificativa:** um comentário `// SAFETY:` explicando por que é correto, mais o registro em `docs/unsafe.md`. (ADR-0012)
+- **Miri:** quando o primeiro bloco `unsafe` for aprovado, um job de Miri (que roda os testes procurando usos errados de memória) passa a ser obrigatório na compilação automática do GitHub.
 - **Criptografia nunca é caseira.** Só bibliotecas consolidadas, aprovadas em ADR.
 - **Toda operação vinda de script, plugin ou rede é entrada não confiável** e passa pela validação.
 - **Sem acesso a rede em testes,** exceto nos testes de P2P em loopback.
@@ -90,6 +96,10 @@ O plano completo está em `docs/PLANO.md`, e as decisões de arquitetura estão 
 
 **Se algo na especificação estiver ambíguo ou contradizer um ADR, pergunte. Não presuma.**
 
+**Ordem das fases:** o Núcleo só começa quando as entregas 0.4, 0.5 e 0.6 da Fase 0 estiverem concluídas e revisadas pelo agente auditor.
+
+**Antes de fechar uma entrega, do Núcleo em diante:** o dono dispara manualmente no GitHub o workflow de testes de mutação (`mutants.yml`), e os resultados são analisados.
+
 ## 8. Convenções
 
 - **Código, comentários, nomes e mensagens de commit:** em inglês.
@@ -102,7 +112,7 @@ O plano completo está em `docs/PLANO.md`, e as decisões de arquitetura estão 
 - **Formatação e lints:** `rustfmt` padrão e Clippy sem avisos.
 - **Crates:** prefixo `bivar-`.
 
-## 9. Estrutura planejada do repositório (proposta; validar com o auditor)
+## 9. Estrutura planejada do repositório (proposta; revisar com o agente auditor)
 
 ```
 crates/

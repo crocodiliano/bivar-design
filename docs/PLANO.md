@@ -2,6 +2,8 @@
 
 Oct 20, 2026 · @bruno
 
+> **Esta é a versão oficial do plano.** Ela vive no repositório e é atualizada junto com os ADRs e as especificações das fases.
+
 ## Visão geral
 
 Bivar é um programa de design open source (GPL-3.0) que une, numa só interface, vetor e UI, tipografia, animação, diagramação editorial, foto, áudio e 3D leve. Por baixo de tudo há uma nodetree como fonte da verdade, e o usuário trabalha com camadas e painéis comuns. O projeto é construído em fases. Cada fase entrega algo usável antes da próxima começar.
@@ -18,10 +20,10 @@ Bivar é um programa de design open source (GPL-3.0) que une, numa só interface
 
 **Restrições do projeto:**
 
-- **Custo zero na construção:** só bibliotecas, fontes, ícones e formatos livres, com hospedagem e compilação automática gratuitas. O plano do Claude e o auditor ficam fora dessa conta.
+- **Custo zero na construção:** só bibliotecas, fontes, ícones e formatos livres, com hospedagem e compilação automática gratuitas. O plano do Claude fica fora dessa conta. Por falta de orçamento, não há auditor humano pago por enquanto.
 - **Plataforma:** Windows primeiro, com base multiplataforma. A máquina de referência é um Ryzen 7 5700X com 16 GB de RAM e uma GTX 1660 de 6 GB.
 - **Linguagem:** Rust em todo o projeto. Código em inglês, documentação em português e inglês.
-- **Equipe:** o dono do projeto (que não programa) trabalha com o Claude Code e conta com um auditor Rust. Depois da Fase 1a, a comunidade entra.
+- **Equipe:** o dono do projeto (que não programa) trabalha com o Claude Code. A revisão é feita por IA (o agente auditor), por ferramentas automáticas e por voluntários da comunidade, até que haja uma auditoria humana. Depois da Fase 1a, a comunidade também entra contribuindo com código.
 
 ## Escopo, equipe e papéis
 
@@ -31,7 +33,9 @@ O projeto é de longo prazo, com a arquitetura pensada para as 7 personas e a im
 | --- | --- | --- |
 | Dono do produto, designer e testador | Você | Decide o quê, aprova planos, testa com critérios de aceite e aprova as imagens de referência |
 | Implementação | Claude Code | Escreve código e testes seguindo o CLAUDE.md, os ADRs e as especificações |
-| Auditor Rust (pago) | A definir | Valida os ADRs e revisa os módulos críticos: modelo de dados, formato de arquivo, rede e segurança |
+| Auditoria por IA | Agente `.claude/agents/auditor.md` | Revisa os ADRs, o código, os testes e as dependências, com prioridade para os módulos críticos: modelo de dados, formato de arquivo, rede e segurança. Leva os ADRs até o status "Revisado por IA", com a aprovação do dono |
+| Ferramentas automáticas | Compilação no GitHub | Formatação, Clippy, testes, licenças, vulnerabilidades, cobertura de testes e, sob demanda, testes de mutação |
+| Revisão humana | Voluntários da comunidade (por enquanto) | Revisão de quem tem experiência em Rust. Só ela leva um ADR ao status "Aceito" |
 | Comunidade | Depois da Fase 1a | Contribui por DCO, inclusive com código feito com IA, desde que declarado e revisado |
 
 **Referências de mercado que calibram o plano:**
@@ -44,7 +48,7 @@ Enquanto o Bivar cresce, o dono usa alternativas gratuitas: Affinity, Penpot, Kr
 
 ## Arquitetura do núcleo
 
-O documento é um grafo de nós hierárquico, e toda mudança nele é uma operação. Essa é a decisão mais valiosa do projeto e a primeira que o auditor valida.
+O documento é um grafo de nós hierárquico, e toda mudança nele é uma operação. Essa é a decisão mais valiosa do projeto e a primeira a ser revisada.
 
 ### Modelo de dados (ponto 1)
 
@@ -149,7 +153,7 @@ Colaboração, scripts e plugins são três fontes de operações no mesmo grafo
 
 ### Scripts e automação (ponto 7)
 
-- **Linguagem:** JS/TS, com o motor escolhido pelo auditor.
+- **Linguagem:** JS/TS, com o motor escolhido na entrega 0.6 da Fase 0.
 - **Execução:** um script desfaz com um único Ctrl+Z, sincroniza via P2P e passa pela mesma validação das outras operações.
 - **Gravador de macros:** prioridade. Grava ações e gera um script JS editável. Escrever scripts do zero também é suportado.
 - **Modo sem interface:** pelo terminal do Windows, para trabalho em lote.
@@ -329,18 +333,18 @@ Cada persona tem um escopo de v1 completo, dividido em entregas menores que já 
 
 O projeto tem 11 etapas: fundações, núcleo, as sete personas na ordem de uso real e um bloco futuro. O código abre ao fim da Fase 1a. Não há datas: cada etapa termina quando os critérios de aceite das suas entregas passam.
 
-*(Diagrama do roadmap: ver `fases/README.md` ou o documento online.)*
+*(Diagrama do roadmap: ver `fases/README.md`.)*
 
 As funções que atravessam o programa entram ao fim da fase indicada à direita. A API de plugins só é congelada depois que três personas provaram que ela é suficiente.
 
 ## Método de trabalho com o Claude Code
 
-Você conduz o projeto por documentos, critérios de aceite e testes visuais, sem escrever código. O Claude Code implementa tarefas pequenas, e o auditor valida as decisões e os módulos críticos.
+Você conduz o projeto por documentos, critérios de aceite e testes visuais, sem escrever código. O Claude Code implementa tarefas pequenas, e o agente auditor revisa as decisões e os módulos críticos.
 
-**Documentos que guiam o Claude Code** (rascunhos entregues junto com este plano):
+**Documentos que guiam o Claude Code** (todos no repositório):
 
 - **CLAUDE.md:** regras permanentes, lidas em toda sessão. Reúne princípios de arquitetura, regras de segurança, obrigação de testes e convenções.
-- **docs/adr/:** um registro de decisão por escolha de arquitetura, com contexto, decisão e alternativas descartadas. O auditor aprova cada um.
+- **docs/adr/:** um registro de decisão por escolha de arquitetura, com contexto, decisão e alternativas descartadas. Cada um passa por três níveis de status: Proposto → Revisado por IA → Aceito (este, só com revisão humana).
 - **docs/fases/:** a especificação de cada entrega, com critérios de aceite em linguagem simples que você testa usando o programa.
 
 **O ciclo de cada tarefa:**
@@ -350,7 +354,7 @@ Você conduz o projeto por documentos, critérios de aceite e testes visuais, se
 3. **Implementação com testes,** seguida das checagens automáticas de formatação, erros comuns, vulnerabilidades e licenças.
 4. **Você testa** com os critérios de aceite da entrega.
 5. **Salvamento no Git** com descrição clara. Cada salvamento é um ponto ao qual dá para voltar.
-6. **Revisão do auditor** a cada entrega, com prioridade para os módulos críticos.
+6. **Revisão do agente auditor** a cada entrega, com prioridade para os módulos críticos. Do Núcleo em diante, o dono também dispara os testes de mutação antes de fechar cada entrega.
 
 **Testes que protegem o projeto:**
 
@@ -402,7 +406,7 @@ O projeto usa GPL-3.0, inclusive para plugins, e abre o código ao fim da Fase 1
 
 ## Registros de decisão e pontos a verificar
 
-São 16 registros de decisão (ADRs) para o auditor validar antes de o núcleo começar. Os marcados como "Alta" são os mais caros de mudar depois.
+Os registros de decisão (ADRs) passam pela revisão por IA (entrega 0.4 da Fase 0) antes de o Núcleo começar. Os marcados como "Alta" são os mais caros de mudar depois. O índice atualizado, com o status de cada um, está em `docs/adr/README.md`.
 
 | ADR | Decisão | Prioridade de revisão |
 | --- | --- | --- |
@@ -422,15 +426,20 @@ São 16 registros de decisão (ADRs) para o auditor validar antes de o núcleo c
 | 0014 | Segurança do P2P: identidade, convite, assinatura e papéis | Alta |
 | 0015 | Módulo de interpolação compartilhado (mesclagem e fontes variáveis) | Média |
 | 0016 | Licença GPL-3.0, DCO e política de contribuições com IA | Baixa |
+| 0017 | Interface em egui (resultado da prova de conceito do ADR-0009) | Alta |
+| 0018 | Vello sobre wgpu confirmado, com ressalvas (resultado da prova de conceito do ADR-0007) | Alta |
 
 **Pontos a verificar:**
 
-- [ ] Prova de conceito da interface: estilo, janela separada, NVDA e pressão de caneta
-- [ ] Prova de conceito do Vello na GTX 1660
-- [ ] Busca manual do nome "Bivar" no INPI, classes 9 e 42 (feita em 20/10/2026, sem conflitos)
+- [x] Prova de conceito da interface: estilo, janela separada, NVDA e pressão de caneta (entrega 0.2, ADR-0017)
+- [x] Prova de conceito do Vello na GTX 1660 (entrega 0.3, ADR-0018)
+- [x] Busca manual do nome "Bivar" no INPI, classes 9 e 42 (feita em 20/10/2026, sem conflitos)
 - [ ] Se o formato .riv do Rive é documentado o bastante para importar ou exportar
-- [ ] Motor JS para scripts (decisão do auditor)
-- [ ] Biblioteca de leitura de RAW: Rust ou C++ (decisão do auditor)
-- [ ] Biblioteca de gerenciamento de cor (decisão do auditor)
+- [ ] Prova de conceito do motor de texto: shaping, kerning, ligaduras e acentos (entrega 0.5)
+- [ ] Motor JS para scripts (entrega 0.6)
+- [ ] Biblioteca de gerenciamento de cor (entrega 0.6)
+- [ ] CRDT, com o teste de velocidade da Loro (entrega 0.6)
+- [ ] Biblioteca de leitura de RAW: Rust ou C++ (a decidir antes da persona Foto, com revisão do agente auditor)
 - [ ] Ferramenta de hinting automático e como isolá-la, se for em C
-- [ ] Contratar o auditor e definir a frequência de revisão
+- [ ] Revisão por IA dos ADRs, segunda opinião e pedido de revisão à comunidade Rust (entrega 0.4)
+- [ ] Revisão humana dos ADRs de prioridade Alta, quando houver um revisor com experiência em Rust

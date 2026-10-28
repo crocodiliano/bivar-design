@@ -38,6 +38,7 @@ cargo test
 - **Uso de IA:** contribuições feitas com auxílio de IA são bem-vindas, desde que:
   - o uso seja declarado no corpo da mensagem do commit;
   - uma pessoa tenha revisado o código.
+- **Revisão:** o projeto **ainda não passou por auditoria humana**. As decisões e o código foram revisados apenas por IA e por ferramentas automáticas. Revisões da comunidade, sobretudo de quem tem experiência em Rust, são muito bem-vindas: os relatórios ficam em [`docs/auditoria/`](docs/auditoria/).
 
 ## Licença
 
@@ -81,6 +82,7 @@ cargo test
 - **AI use:** AI-assisted contributions are welcome, as long as:
   - the AI use is declared in the commit message body;
   - a human has reviewed the code.
+- **Review:** the project **has not had a human audit yet**. Decisions and code have been reviewed only by AI and automated tools. Community reviews, especially from experienced Rust developers, are very welcome: reports live in [`docs/auditoria/`](docs/auditoria/).
 
 ### License
 

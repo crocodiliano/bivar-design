@@ -7,8 +7,10 @@ Este pacote é o ponto de partida do repositório do Bivar. Ainda não há códi
 | Arquivo | Para quê |
 | --- | --- |
 | `CLAUDE.md` | Regras permanentes que o Claude Code lê em toda sessão |
-| `docs/PLANO.md` | O plano completo (cópia do documento online) |
-| `docs/adr/` | 16 registros de decisão para o auditor validar |
+| `docs/PLANO.md` | O plano completo (versão oficial) |
+| `docs/adr/` | Registros de decisão, revisados pelo agente auditor (IA) |
+| `docs/auditoria/` | Relatórios de revisão por IA e da comunidade |
+| `.claude/agents/auditor.md` | O agente auditor, que revisa decisões e código |
 | `docs/fases/` | Roadmap e especificações da Fase 0, do Núcleo e da Fase 1a, com critérios de aceite |
 
 ## Primeiros passos
@@ -16,7 +18,7 @@ Este pacote é o ponto de partida do repositório do Bivar. Ainda não há códi
 > **Instalação completa (VS Code, Git, Rust e Claude Code), passo a passo:** veja o `PASSO-A-PASSO.md`.
 
 1. Crie uma pasta `bivar` no seu PC e copie este conteúdo para dentro dela.
-2. Mande `docs/adr/` e `docs/PLANO.md` para o auditor revisar.
+2. Peça ao Claude Code uma revisão de `docs/adr/` e `docs/PLANO.md` com o agente auditor (entrega 0.4 da Fase 0).
 3. Faça a busca do nome no INPI (instruções em `docs/PLANO.md`, seção "Verificação do nome").
 4. Abra o Claude Code nessa pasta e comece pela Fase 0 com um pedido como este:
 

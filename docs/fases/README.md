@@ -4,7 +4,7 @@
 
 | Etapa | Persona | Entregas | Especificação |
 | --- | --- | --- | --- |
-| Fase 0 | Fundações | Provas de conceito, ADRs, repositório | [fase-0.md](fase-0.md) |
+| Fase 0 | Fundações | Repositório, provas de conceito (interface, renderizador, texto), revisão por IA dos ADRs, bibliotecas pendentes | [fase-0.md](fase-0.md) |
 | Núcleo | — | Grafo, operações, arquivo, render, texto, cor, módulos | [nucleo.md](nucleo.md) |
 | Fase 1 | Vetor | 1a ilustração · 1b UI e handoff | [fase-1a.md](fase-1a.md) · 1b a escrever |
 | Fase 2 | Tipografia | 2a estática · 2b variável | a escrever |

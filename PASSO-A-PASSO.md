@@ -128,5 +128,5 @@ Depois:
 - **Nunca** cole senhas, tokens ou códigos de verificação na conversa com o Claude.
 - **Se algo der errado:** peça "volte para o último commit" ou "desfaça o que você acabou de fazer". O Git guarda tudo.
 - **Se o Claude sugerir instalar uma dependência nova:** pela regra do CLAUDE.md, ele precisa justificar antes. Peça a justificativa se ele não der.
-- **Se o Claude quiser mudar algo que contradiz um ADR:** pare e traga a dúvida para a conversa de planejamento (ou para o auditor) antes de aprovar.
+- **Se o Claude quiser mudar algo que contradiz um ADR:** pare e traga a dúvida para a conversa de planejamento (ou peça uma revisão ao agente auditor) antes de aprovar.
 - **Se um comando der erro e você não entender:** copie a mensagem de erro inteira e cole para o Claude, pedindo "me explique o que aconteceu antes de tentar consertar".
