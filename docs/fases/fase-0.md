@@ -48,7 +48,7 @@ Um programa mínimo que desenha com **Vello sobre wgpu** na GTX 1660.
 - [x] A mesma cena renderiza também **sem GPU**, no modo CPU, para PNG.
 - [x] O Vello funciona com a mesma versão do wgpu usada pelo eframe 0.37 (wgpu 30).
 
-**Resultado esperado:** o resultado é registrado no [ADR-0018](../adr/0018.md), que confirma o ADR-0007 com ressalvas e passa pela revisão do agente auditor (entrega 0.4). O ADR-0007 fica como está.
+**Resultado esperado:** o resultado é registrado no [ADR-0018](../adr/0018.md), que confirma o ADR-0007 com ressalvas e passa pela revisão do agente auditor (entrega 0.4). O ADR-0007 fica como está. *(Texto histórico: depois disso, o [ADR-0019](../adr/0019.md), decisão 6, mudou o ADR-0007, que passou a valer para a tela e a exportação em 8 bits.)*
 
 > **Auditoria:** por enquanto não há auditor humano. As revisões são feitas pelo agente auditor (`.claude/agents/auditor.md`), por ferramentas automáticas e por voluntários da comunidade. Veja a seção 2 do `CLAUDE.md`.
 

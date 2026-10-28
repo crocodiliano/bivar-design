@@ -13,7 +13,7 @@ Bivar é um programa de design open source (GPL-3.0) que une, numa só interface
 - **O grafo é a fonte da verdade.** Camadas e painéis são uma projeção amigável dele.
 - **Tudo é operação.** Cliques, scripts, colegas via P2P e o desfazer passam pelo mesmo sistema de operações no grafo.
 - **Personas são módulos.** O núcleo é uma plataforma, e cada aba é um módulo, inclusive as que a comunidade criar.
-- **Nada se perde sem registro e aviso.** Conflitos e edições que quebram o procedural ficam visíveis e são resolvidos pelo usuário. Quando duas pessoas mudam o mesmo valor, fica a última mudança, mas com aviso e registro no histórico (ADR-0019).
+- **Nada se perde sem registro e aviso.** Conflitos e edições que quebram o procedural ficam visíveis e são resolvidos pelo usuário. Quando duas pessoas mudam o mesmo valor, ou movem o mesmo item, fica a última mudança, mas com aviso e registro no histórico. Se movem itens diferentes, os dois movimentos valem (ADR-0019).
 - **Local, offline e privado.** Zero telemetria e nenhum servidor obrigatório.
 - **Acessível sempre.** Leitor de tela, teclado completo e cor nunca como único sinal.
 - **Ciência com honestidade.** Recursos de ergonomia são "baseados em estudos", com referências, nunca "comprovados".
@@ -419,7 +419,7 @@ Os registros de decisão (ADRs) passam pela revisão por IA (entrega 0.4 da Fase
 | 0007 | wgpu como base, Vello como renderizador 2D e Skia como plano B isolado | Alta |
 | 0008 | Gerenciamento de cor: ICC, CMYK, cores especiais, 16/32 bits | Alta |
 | 0009 | Framework de interface pela prova de conceito (egui, depois Slint) | Alta |
-| 0010 | Arquivo de projeto em SQLite com especificação aberta e migrações | Alta |
+| 0010 | Arquivo de projeto único com especificação aberta e migrações (o formato por dentro é escolhido na entrega 0.6; ADR-0019) | Alta |
 | 0011 | Leitura de arquivos externos só em Rust, com fuzzing | Alta |
 | 0012 | Política de dependências e de código unsafe | Média |
 | 0013 | Scripts em JS/TS isolados; plugins em WebAssembly com a mesma API | Média |

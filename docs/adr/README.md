@@ -27,7 +27,7 @@ A prioridade indica o quanto custaria mudar a decisão depois. Os ADRs de priori
 | [0007](0007.md) | wgpu + Vello; Skia como plano B isolado | Alta | Proposto |
 | [0008](0008.md) | Gerenciamento de cor profissional | Alta | Proposto |
 | [0009](0009.md) | Framework de interface decidido por prova de conceito | Alta | Proposto |
-| [0010](0010.md) | Arquivo de projeto em SQLite com especificação aberta | Alta | Proposto |
+| [0010](0010.md) | Arquivo de projeto em SQLite com especificação aberta (o formato por dentro foi reaberto pelo ADR-0019 e é escolhido na entrega 0.6) | Alta | Proposto |
 | [0011](0011.md) | Leitura de arquivos externos só em Rust, com fuzzing | Alta | Proposto |
 | [0012](0012.md) | Política de dependências e de unsafe | Média | Proposto |
 | [0013](0013.md) | Scripts em JS/TS e plugins em WebAssembly, com uma única API | Média | Proposto |
