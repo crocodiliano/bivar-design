@@ -88,11 +88,15 @@ Três escolhas que o Núcleo precisa. Cada uma fica registrada num **ADR própri
   - um ADR compara pelo menos três motores e escolhe um;
   - numa prova mínima, um script chama uma função do Bivar e recebe a resposta;
   - um script com laço infinito é interrompido por limite de tempo, sem travar o programa;
-  - um script não consegue abrir arquivos nem acessar a rede, a não ser pelo que o Bivar oferecer.
+  - um script não consegue abrir arquivos nem acessar a rede, a não ser pelo que o Bivar oferecer;
+  - um script que gasta memória sem parar é interrompido por um limite de memória, e um script que chama a si mesmo sem fim é interrompido por um limite de pilha. Nos dois casos, o programa não cai, não trava e mostra uma mensagem clara.
 - [ ] **Gerenciamento de cor (ADR-0008):**
   - um ADR compara as opções e escolhe uma;
   - numa prova mínima, um conjunto de cores é convertido de sRGB para CMYK com um perfil ICC e de volta. A diferença é medida em **Delta E 2000** (ΔE00), a medida padrão de diferença de cor percebida pelo olho: ΔE00 = 1 é mais ou menos a menor diferença que uma pessoa atenta consegue notar. Tolerâncias:
-    - **conversão contra valores de referência:** ΔE00 ≤ 1,0 para cada cor. As referências são geradas por outro programa de gerenciamento de cor, com o mesmo perfil e a mesma intenção de renderização, e o ADR registra qual programa foi usado;
+    - **intenção de renderização:** todas as conversões da prova usam a intenção **colorimétrica relativa**. Na intenção "perceptual", até as cores dentro da gama mudam, e a ida e volta não faria sentido. O ADR registra se a compensação de ponto preto está ligada ou desligada, e ela é igual na biblioteca e na referência;
+    - **referência independente:** as referências são geradas por outro programa de gerenciamento de cor, com o mesmo perfil e a mesma intenção, e com **um motor de cor diferente** do da biblioteca escolhida. Por exemplo, se a biblioteca usar a LittleCMS por dentro, a referência não pode usar a LittleCMS. O ADR registra qual programa e qual motor foram usados;
+    - **conversão contra valores de referência:** ΔE00 ≤ 1,0 para cada cor;
+    - **o que é "dentro da gama":** uma cor está dentro da gama do perfil quando, **calculado pela referência independente**, sRGB → CMYK → cor de volta muda essa cor no máximo ΔE00 1,0. Assim a biblioteca testada não decide sozinha quais cores entram no teste;
     - **ida e volta (sRGB → CMYK → sRGB):** ΔE00 ≤ 2,0 para cada cor dentro da gama do perfil;
   - **exceção esperada:** cores fora da gama de impressão do perfil CMYK (por exemplo, verdes e azuis muito saturados de tela) não voltam iguais, porque a impressora não consegue reproduzi-las. Para essas cores não vale a tolerância de ida e volta. Elas precisam ser convertidas sempre do mesmo jeito, sem erro, e a prova lista quais saíram da gama e com que ΔE00;
   - a leitura de perfis ICC respeita o ADR-0011 (leitura de arquivos externos só em Rust) ou registra uma exceção justificada.
