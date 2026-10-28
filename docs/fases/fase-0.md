@@ -95,6 +95,8 @@ As escolhas ficam registradas em **ADRs novos**, com as alternativas comparadas 
   - (b) SQLite aberto num processo isolado, para arquivos de terceiros;
   - (c) um formato próprio com leitor 100% em Rust.
 
+  Se a escolha for (a), o ADR vem com uma emenda registrada ao ADR-0011 e ao CLAUDE.md §4 ("leitura de arquivos externos só em Rust"), aprovada pelo dono, porque o SQLite é escrito em C.
+
   Na prova: um arquivo com um gatilho ou uma visão injetada é recusado com uma mensagem clara, e o carregador ganha um alvo de fuzzing (ADR-0011).
 - [ ] **Toda entrada externa (achado A7):** um ADR novo completa o ADR-0011 para toda entrada externa, não só arquivos: área de transferência, arrastar e soltar, fontes instaladas no sistema, perfis de cor embutidos em imagens, dados recebidos por P2P e o próprio `.bivar`. Ele define:
   - limites obrigatórios de tamanho, recursão, memória e tempo, contra arquivos feitos para esgotar recursos ("bombas");
@@ -110,20 +112,25 @@ As escolhas ficam registradas em **ADRs novos**, com as alternativas comparadas 
   - a versão do formato das operações.
 
   Um protótipo modela a cadeia Forma → Traçado → Preenchimento → Saída, com as conexões.
-- [ ] **Sistema de operações independente da biblioteca CRDT** (ADR-0019, plano de contingência): no protótipo, só uma camada pequena fala com a biblioteca. O resto usa as operações do ADR-0002, sem tipos da biblioteca.
-- [ ] **Comparação Loro × Automerge.** As duas rodam a mesma prova, na máquina de referência, e o ADR registra os números e escolhe uma:
+- [ ] **Sistema de operações independente da biblioteca CRDT** (ADR-0019, plano de contingência): no protótipo, só um crate depende da biblioteca CRDT, e uma checagem automática na compilação confere isso (como a do achado B4, que impede `bivar-core` e `bivar-doc` de depender da interface). O resto usa as operações do ADR-0002, sem tipos da biblioteca.
+- [ ] **Comparação Loro × Automerge.** As duas rodam a mesma prova, na máquina de referência, e o ADR registra os números e escolhe uma. Os limites numéricos de carregamento e velocidade são fixados no plano da entrega e aprovados pelo dono antes da medição. O ADR registra também por que o Yrs, alternativa citada no ADR-0005, ficou fora da comparação, com o motivo conferido na documentação dele, ou o inclui na comparação:
   - **escrita simultânea:** duas cópias mudam o mesmo parâmetro ao mesmo tempo. Depois da junção, o programa sabe que houve escrita simultânea e conhece os dois valores, para avisar e registrar no histórico (ADR-0019). Se a biblioteca não oferecer isso pronto, o ADR mede o custo de fazer por fora;
   - **desfazer em colaboração:** A muda um objeto, B muda outro, e A desfaz. Só a mudança de A some. O ADR registra também o que acontece quando A desfaz algo que B já editou por cima;
   - **carregamento:** tempo e memória para abrir um documento com 1 milhão de operações no histórico. O ADR diz também se dá para carregar só a parte de uma persona;
   - **remoção do histórico (achado A5; ADR-0019, decisão 5):** um texto com um marcador único e uma imagem são apagados, e depois vem "Salvar cópia para enviar". O arquivo da cópia é descomprimido antes da busca (ou salvo com a compressão desligada), e o marcador não aparece em nenhum byte. Nenhum pedaço da imagem apagada, nem o hash dela, está na cópia. A cópia abre com um histórico novo e não se junta com o original;
-  - **velocidade:** 100.000 operações num documento de teste, e a junção de duas cópias que receberam 10.000 operações diferentes cada uma, ao mesmo tempo. São medidos o tempo, a memória e o tamanho salvo, e as duas cópias terminam idênticas.
+  - **velocidade:** 100.000 operações num documento de teste, misturando todos os tipos de operação do ADR-0002 (criar e remover nó, conectar e desconectar, mudar parâmetro, reordenar e mover na hierarquia), nas proporções definidas no plano da entrega (achado A12), e a junção de duas cópias que receberam 10.000 operações diferentes cada uma, ao mesmo tempo. São medidos o tempo, a memória e o tamanho salvo, e as duas cópias terminam idênticas.
 - [ ] **Arquivos grandes em pedaços** (ADR-0019; achado A6): um arquivo de teste de 2 GB, maior que o limite de 1 GB por valor do SQLite, é guardado em pedaços, salvo, reaberto e sai idêntico (mesmo hash). Mudar um parâmetro e salvar não regrava nenhum pedaço.
 - [ ] **Riscos de armazenamento (achado A6).** O ADR de armazenamento trata de cada um, e a prova testa:
   - **arquivo único de verdade:** copiar o arquivo com o programa aberto gera uma cópia completa, ou o ADR explica como isso é evitado (por exemplo, os arquivos `-wal` e `-shm` do SQLite);
   - **mesmo arquivo aberto duas vezes:** a segunda abertura é recusada ou abre só para leitura, com uma mensagem clara;
   - **queda no meio da gravação:** o processo é morto durante o salvamento, e o arquivo reabre com a última versão salva;
+  - **edições desde o último salvamento:** fazer N edições sem salvar, matar o processo e reabrir: as N edições voltam. Era a função do diário eliminado pelo ADR-0019;
+  - **gravação no disco de verdade:** matar o processo não prova que os dados chegaram ao disco, por causa de uma queda de energia. O ADR diz o que é forçado ao disco e quando (por exemplo, a cada operação ou a cada intervalo), e quantas edições podem se perder no pior caso;
+  - **salvamento com a interface aberta:** o tempo de salvamento é medido com a interface aberta, e o salvamento automático não causa pausa perceptível. O limite numérico é fixado no plano da entrega e aprovado pelo dono (Gemini);
+  - **limpeza dos arquivos grandes:** o ADR diz quando um arquivo grande que ninguém mais usa pode ser apagado do arquivo de projeto, já que o histórico e o desfazer ainda podem precisar dele e a "cópia para enviar" precisa removê-lo (Gemini);
   - **arquivo corrompido ou cortado:** abre o que for possível ou mostra uma mensagem clara. O programa nunca cai;
   - **migração de versão:** guarda uma cópia antes; uma falha no meio não estraga o original; um arquivo de versão mais nova é recusado com mensagem, nunca "consertado";
+  - **migração do histórico:** o ADR diz como as operações antigas do histórico do CRDT são lidas depois de uma migração e o que acontece numa junção entre colegas com versões diferentes do formato;
   - **pastas sincronizadas** (OneDrive, unidades de rede): o ADR diz o que o programa faz, por exemplo um aviso ao abrir;
   - **criptografia opcional:** o ADR diz como será feita sem biblioteca paga (CLAUDE.md §5), ou adia a decisão com justificativa;
   - **especificação aberta:** o ADR diz como a especificação em `docs/formato/` fica legível sem depender do formato interno da biblioteca CRDT, ou registra essa dependência.
