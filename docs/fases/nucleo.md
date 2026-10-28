@@ -27,6 +27,7 @@
 - [ ] Duas cópias do documento recebem operações concorrentes em ordens diferentes e terminam idênticas (prova de compatibilidade com CRDT, ADR-0005).
 - [ ] **"A última escrita vence", com aviso** (ADR-0019, decisão 3): duas cópias mudam o mesmo parâmetro ao mesmo tempo. Depois da junção, as duas mostram o mesmo valor, o mesmo aviso, e o histórico guarda o valor que perdeu.
 - [ ] **Movimentos e reordenações simultâneos** (ADR-0019, decisão 3): duas cópias movem o mesmo nó para lugares diferentes, e outro teste move A para dentro de B enquanto outra cópia move B para dentro de A. Um terceiro teste muda a posição do mesmo item da pilha nas duas cópias. Nos três, vence um, nenhum objeto é duplicado, e todas as cópias mostram o mesmo aviso, o mesmo registro no painel de conflitos e o movimento que perdeu no histórico. Um quarto teste move itens diferentes da mesma pilha nas duas cópias: os dois movimentos valem, e não há aviso.
+- [ ] **Só um crate depende da biblioteca CRDT** (ADR-0019, decisão 7): uma checagem automática na compilação confere isso, como na prova da 0.6. O resto do programa usa as operações do ADR-0002, sem tipos da biblioteca.
 - [ ] **Contingência avaliada** (ADR-0019, decisão 7): com a N.1 pronta, o dono decide se dispara a versão de uma pessoa só. A decisão fica registrada.
 
 ### N.2 Formato de arquivo (`bivar-doc`)
@@ -45,6 +46,11 @@
 - [ ] **Edições desde o último salvamento:** fazer N edições sem salvar, fechar o programa à força e reabrir: as N edições voltam, na forma definida pelo ADR de armazenamento da 0.6.
 - [ ] **Arquivos grandes em pedaços:** um arquivo de 2 GB é guardado em pedaços, salvo, reaberto e sai idêntico (mesmo hash).
 - [ ] **Arquivo adulterado recusado:** um arquivo com conteúdo fora da especificação (por exemplo, um gatilho ou uma visão injetada, se o formato for SQLite) é recusado com uma mensagem clara, e o leitor tem um alvo de fuzzing (ADR-0011).
+- [ ] **Arquivo feito para esgotar recursos** (achado A7; ADR de entrada externa da 0.6): um arquivo feito para esgotar memória ou tempo é recusado com uma mensagem clara, sem derrubar o programa, dentro dos limites definidos naquele ADR.
+- [ ] **Mesmo arquivo aberto duas vezes:** a segunda abertura é recusada ou abre só para leitura, com uma mensagem clara, como definido no ADR de armazenamento da 0.6.
+- [ ] **Gravação no disco de verdade:** o que é forçado ao disco, e quando, segue o ADR de armazenamento da 0.6. Um teste confere que essa gravação forçada acontece nos momentos definidos, e o plano da entrega diz quantas edições podem se perder no pior caso, numa queda de energia.
+- [ ] **Salvamento sem pausa perceptível:** com a interface aberta, o salvamento automático fica dentro do limite numérico aprovado pelo dono na 0.6.
+- [ ] **Migração do histórico:** depois da migração de exemplo da "versão 1" para a "versão 2", as operações antigas do histórico continuam legíveis (o desfazer funciona sobre elas), e a junção com uma cópia de outra versão do formato segue o que o ADR de armazenamento da 0.6 definiu.
 - [ ] **"Salvar cópia para enviar":** um texto com um marcador único, inserido de uma só vez, e uma imagem são apagados antes de salvar a cópia. Com o arquivo descomprimido do mesmo jeito que o programa o lê, o marcador não aparece em nenhum byte, e nenhum pedaço nem o hash da imagem apagada está na cópia. A biblioteca CRDT confere que o histórico da cópia não tem nenhuma operação anterior à cópia. A cópia começa um histórico novo.
 - [ ] **Pendências antes da cópia:** com um conflito ou um aviso ainda sem resolver no painel de conflitos, "Salvar cópia para enviar" avisa antes de gravar. Sem pendências, não há esse aviso.
 - [ ] **Aviso ao compartilhar:** "Salvar como" num arquivo com histórico mostra um aviso discreto sugerindo "Salvar cópia para enviar". O salvamento normal não mostra aviso.
