@@ -91,4 +91,4 @@
 - [ ] Ctrl+K encontra e executa a ação "Trocar para tema Conforto".
 - [ ] O tema nunca altera a cor do canvas (teste visual).
 - [ ] O NVDA lê o painel de camadas da persona de exemplo.
-- [ ] **Painel de conflitos** (ADR-0019; especificado na 0.7): mostra os conflitos e os avisos de "última escrita vence" de um documento de teste, com as ações de cada tipo. Ele é usado inteiro só pelo teclado, o NVDA lê cada item e o tipo dele, e cor nunca é o único sinal.
+- [ ] **Painel de conflitos** (ADR-0019; especificado na 0.7): mostra os conflitos e os avisos de um documento de teste em duas seções, "Conflitos" (exigem ação) e "Avisos" (o mesmo parâmetro e o raster, que podem ser dispensados), com as ações de cada tipo. Dispensar um aviso tira o item do painel, e o registro continua no histórico. Ele é usado inteiro só pelo teclado, o NVDA lê cada item e o tipo dele, e cor nunca é o único sinal.
