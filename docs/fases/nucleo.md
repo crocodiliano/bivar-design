@@ -45,7 +45,8 @@
 - [ ] **Edições desde o último salvamento:** fazer N edições sem salvar, fechar o programa à força e reabrir: as N edições voltam, na forma definida pelo ADR de armazenamento da 0.6.
 - [ ] **Arquivos grandes em pedaços:** um arquivo de 2 GB é guardado em pedaços, salvo, reaberto e sai idêntico (mesmo hash).
 - [ ] **Arquivo adulterado recusado:** um arquivo com conteúdo fora da especificação (por exemplo, um gatilho ou uma visão injetada, se o formato for SQLite) é recusado com uma mensagem clara, e o leitor tem um alvo de fuzzing (ADR-0011).
-- [ ] **"Salvar cópia para enviar":** um texto com um marcador único e uma imagem são apagados antes de salvar a cópia. Com o arquivo descomprimido, o marcador não aparece em nenhum byte, e nenhum pedaço nem o hash da imagem apagada está na cópia. A cópia começa um histórico novo.
+- [ ] **"Salvar cópia para enviar":** um texto com um marcador único, inserido de uma só vez, e uma imagem são apagados antes de salvar a cópia. Com o arquivo descomprimido do mesmo jeito que o programa o lê, o marcador não aparece em nenhum byte, e nenhum pedaço nem o hash da imagem apagada está na cópia. A biblioteca CRDT confere que o histórico da cópia não tem nenhuma operação anterior à cópia. A cópia começa um histórico novo.
+- [ ] **Pendências antes da cópia:** com um conflito ou um aviso ainda sem resolver no painel de conflitos, "Salvar cópia para enviar" avisa antes de gravar. Sem pendências, não há esse aviso.
 - [ ] **Aviso ao compartilhar:** "Salvar como" num arquivo com histórico mostra um aviso discreto sugerindo "Salvar cópia para enviar". O salvamento normal não mostra aviso.
 
 ### N.3 Renderização (`bivar-render`)

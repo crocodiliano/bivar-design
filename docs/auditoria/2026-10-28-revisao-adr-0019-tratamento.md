@@ -36,5 +36,5 @@ Acompanha o relatório [`2026-10-28-revisao-adr-0019.md`](2026-10-28-revisao-adr
 | --- | --- |
 | Comportamento da Loro e do Automerge na escrita simultânea, nos movimentos e na compressão | 0.6 (comparação Loro × Automerge) e 0.7 (testes de junção). |
 | A cópia sem histórico não se junta com o original | Respondida pelo dono no achado 4: a cópia começa um histórico novo e não se junta mais. |
-| O aviso da "última escrita vence" depende do histórico | Ainda sem critério próprio. Tem relação com a 0.6 (escrita simultânea e limpeza dos arquivos grandes) e com a 0.7 (o painel calcula a lista a partir do estado). Fica para o plano dessas entregas. |
+| O aviso da "última escrita vence" depende do histórico | Em parte respondida pelo dono na revisão seguinte: "Salvar cópia para enviar" avisa quando ainda houver conflitos ou avisos sem resolver (ADR-0019, decisão 5; critérios na 0.6 e na N.2). A limpeza dos arquivos grandes segue para o plano da 0.6. |
 | Igualdade exata do vello_cpu entre Windows e Linux | 0.5 (critério "mesma imagem no PC do dono e no GitHub"). |
