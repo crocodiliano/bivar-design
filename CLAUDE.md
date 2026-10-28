@@ -48,6 +48,7 @@ O plano completo está em `docs/PLANO.md`, que é a versão oficial do plano. As
 - **Leitura de arquivos externos só em Rust.** Isso vale para SVG, fontes, imagens, PDF e qualquer outro formato. Todo leitor novo ganha um alvo de fuzzing. (ADR-0011)
 - **Abrir um arquivo nunca executa código.** Arquivos de projeto não carregam scripts.
 - **`unsafe` só com justificativa:** um comentário `// SAFETY:` explicando por que é correto, mais o registro em `docs/unsafe.md`. (ADR-0012)
+  - O `Cargo.toml` da raiz nega `unsafe_code` em todo o workspace, e todo crate herda essa regra (`[lints] workspace = true`). Liberar num crate exige a aprovação do dono e o registro em `docs/unsafe.md`.
 - **Miri:** quando o primeiro bloco `unsafe` for aprovado, um job de Miri (que roda os testes procurando usos errados de memória) passa a ser obrigatório na compilação automática do GitHub.
 - **Criptografia nunca é caseira.** Só bibliotecas consolidadas, aprovadas em ADR.
 - **Toda operação vinda de script, plugin ou rede é entrada não confiável** e passa pela validação.

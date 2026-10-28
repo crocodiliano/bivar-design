@@ -9,3 +9,8 @@ edition = "2024"
 rust-version = "1.99"
 license = "GPL-3.0-or-later"
 publish = false
+
+# unsafe is denied everywhere (ADR-0012, CLAUDE.md section 4). A crate may
+# allow it only with owner approval recorded in docs/unsafe.md.
+[workspace.lints.rust]
+unsafe_code = "deny"
