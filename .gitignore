@@ -2,8 +2,10 @@
 /tests/deny-fixture/target
 /poc/ui-egui/target
 /poc/render-vello/target
+/poc/text-parley/target
 # PNGs written by the renderer proof of concept when the owner tests it.
 /poc/render-vello/exportacoes/
+/poc/text-parley/exportacoes/
 # Snapshot test leftovers; only approved *.png references are committed.
 *.new.png
 *.diff.png

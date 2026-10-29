@@ -52,6 +52,36 @@ jobs:
       - name: cargo audit
         run: cargo audit
 
+  # Phase 0.5: images rendered without a GPU (vello_cpu) must match, pixel
+  # for pixel, the references approved on the owner's PC (Windows).
+  poc-text-cpu:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install toolchain from rust-toolchain.toml
+        run: rustup show
+
+      - name: Processor and vello_cpu SIMD level
+        run: |
+          grep -m1 'model name' /proc/cpuinfo
+          cargo run --locked --manifest-path poc/text-parley/Cargo.toml --no-default-features -- --sem-placa
+
+      - name: Text proof tests, without a GPU (exact golden comparison)
+        run: cargo test --locked --manifest-path poc/text-parley/Cargo.toml --no-default-features
+
+      - name: Keep the images for the owner to compare
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: poc-text-cpu-images
+          path: |
+            poc/text-parley/exportacoes/
+            poc/text-parley/tests/golden/*.new.png
+            poc/text-parley/tests/golden/*.diff.png
+          if-no-files-found: ignore
+          retention-days: 30
+
   # Report only: shows which lines the tests run. No minimum yet.
   coverage:
     runs-on: ubuntu-24.04

@@ -1,0 +1,36 @@
+# Disposable text engine proof of concept (phase 0.5).
+# Not part of the workspace and never a code base for the product.
+[package]
+name = "bivar-poc-text-parley"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.99"
+license = "GPL-3.0-or-later"
+publish = false
+
+[dependencies]
+# No "system" feature: only the embedded fonts exist, so layout never depends
+# on the fonts installed on the machine (and never reads them).
+parley = { version = "=0.12.0", default-features = false, features = ["std"] }
+# Same version as vello 0.11 and parley 0.12; reads the font tables that the
+# tests use as an independent reference.
+skrifa = "=0.44.0"
+# Same versions as the phase 0.3 proof (ADR-0018): vello 0.11 uses wgpu 30.
+vello = { version = "=0.11.0", optional = true }
+vello_cpu = "=0.3.0"
+png = "0.18"
+pollster = { version = "1.0", optional = true }
+
+[features]
+# GPU rendering. GitHub has no GPU, so CI builds with --no-default-features.
+default = ["gpu"]
+gpu = ["dep:vello", "dep:pollster"]
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
