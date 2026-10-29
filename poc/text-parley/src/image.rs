@@ -52,17 +52,6 @@ impl Rgba {
         Ok(Self::new(info.width, info.height, pixels))
     }
 
-    /// Copies the `width` × `height` block whose top-left corner is (`x`, `y`).
-    pub fn crop(&self, x: u32, y: u32, width: u32, height: u32) -> Self {
-        assert!(x + width <= self.width && y + height <= self.height);
-        let mut pixels = Vec::with_capacity(width as usize * height as usize * 4);
-        for row in y..y + height {
-            let start = (row as usize * self.width as usize + x as usize) * 4;
-            pixels.extend_from_slice(&self.pixels[start..start + width as usize * 4]);
-        }
-        Self::new(width, height, pixels)
-    }
-
     /// The pixels as `[r, g, b, a]` groups.
     pub fn texels(&self) -> &[[u8; 4]] {
         self.pixels.as_chunks().0
@@ -78,17 +67,15 @@ pub struct Diff {
     pub max_channel_delta: u8,
     /// Average difference per channel over all pixels, 0–255.
     pub mean_channel_delta: f64,
+    /// Pixels where some channel differs by at least [`STRONG_DELTA`]. Edge
+    /// smoothing never changes a pixel that much; a missing or misplaced
+    /// letter does, over hundreds of pixels.
+    pub strongly_differing_pixels: usize,
 }
 
-/// Vello on the GPU is not bit-for-bit repeatable on the reference machine:
-/// measured over 99 repeated renders of the same scene, up to 3 pixels in
-/// 1,024,000 changed by 1 level (of 255) on DirectX 12, and up to 1 pixel on
-/// Vulkan. This is the allowed difference between two GPU renders of the
-/// same view.
-pub const GPU_REPEAT_TOLERANCE: Tolerance = Tolerance {
-    max_channel_delta: 1,
-    max_differing_pixels: 3,
-};
+/// Half the range: dark text on a light page differs by about 220 where a
+/// letter is missing, while CPU and GPU edges differ by at most 72.
+pub const STRONG_DELTA: u8 = 128;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Tolerance {
@@ -105,10 +92,6 @@ impl Diff {
         self.max_channel_delta <= tolerance.max_channel_delta
             && self.differing_pixels <= tolerance.max_differing_pixels
     }
-
-    pub fn differing_percent(&self) -> f64 {
-        100.0 * self.differing_pixels as f64 / self.total_pixels.max(1) as f64
-    }
 }
 
 pub fn compare(a: &Rgba, b: &Rgba) -> Result<Diff, String> {
@@ -119,17 +102,19 @@ pub fn compare(a: &Rgba, b: &Rgba) -> Result<Diff, String> {
         ));
     }
     let mut differing_pixels = 0;
+    let mut strongly_differing_pixels = 0;
     let mut max_channel_delta = 0;
     let mut sum = 0u64;
     for (pa, pb) in a.texels().iter().zip(b.texels()) {
-        let mut differs = false;
+        let mut pixel_delta = 0;
         for (ca, cb) in pa.iter().zip(pb) {
             let d = ca.abs_diff(*cb);
-            differs |= d != 0;
-            max_channel_delta = max_channel_delta.max(d);
+            pixel_delta = pixel_delta.max(d);
             sum += u64::from(d);
         }
-        differing_pixels += usize::from(differs);
+        max_channel_delta = max_channel_delta.max(pixel_delta);
+        differing_pixels += usize::from(pixel_delta != 0);
+        strongly_differing_pixels += usize::from(pixel_delta >= STRONG_DELTA);
     }
     let total_pixels = a.pixels.len() / 4;
     Ok(Diff {
@@ -137,6 +122,7 @@ pub fn compare(a: &Rgba, b: &Rgba) -> Result<Diff, String> {
         differing_pixels,
         max_channel_delta,
         mean_channel_delta: sum as f64 / (total_pixels.max(1) * 4) as f64,
+        strongly_differing_pixels,
     })
 }
 
@@ -234,16 +220,15 @@ mod tests {
     }
 
     #[test]
-    fn crop_takes_the_right_block() {
-        let image = checker(10, 6);
-        let block = image.crop(3, 2, 4, 3);
-        assert_eq!((block.width, block.height), (4, 3));
-        for row in 0..3 {
-            for col in 0..4 {
-                let src = (((2 + row) * 10 + 3 + col) * 4) as usize;
-                let dst = ((row * 4 + col) * 4) as usize;
-                assert_eq!(block.pixels[dst..dst + 4], image.pixels[src..src + 4]);
-            }
-        }
+    fn strong_differences_are_counted_apart_from_small_ones() {
+        let a = checker(8, 8);
+        let mut b = a.clone();
+        // An edge-like change and a missing-ink-like change.
+        b.pixels[0] = b.pixels[0].wrapping_add(72);
+        b.pixels[4] = a.pixels[4].wrapping_add(STRONG_DELTA);
+        let diff = compare(&a, &b).unwrap();
+        assert_eq!(diff.differing_pixels, 2);
+        assert_eq!(diff.strongly_differing_pixels, 1);
+        assert_eq!(compare(&a, &a).unwrap().strongly_differing_pixels, 0);
     }
 }

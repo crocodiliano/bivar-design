@@ -64,6 +64,12 @@
 - [ ] **Testes visuais com folga medida** (decisão do [ADR-0018](../adr/0018.md)). O teste mostra a imagem de diferença quando falha, e:
   - **sem placa de vídeo (vello_cpu):** falha quando qualquer pixel muda;
   - **com a placa de vídeo:** falha quando mais de 3 pixels mudam, ou quando algum pixel muda mais de 1 nível em 255. Qualquer outra folga precisa vir de uma medição registrada no plano da entrega.
+- [ ] **Mesma imagem sem placa em qualquer máquina** (decisão do [ADR-0020](../adr/0020.md)):
+  - os testes visuais sem placa desenham com o modo SIMD fixado em AVX2 e com o número de linhas de execução fixo;
+  - são compilados sem `target-cpu` nem `target-feature`, e um teste confere que o modo mínimo da compilação é SSE2;
+  - numa máquina sem AVX2 (Mac com chip Apple, Windows em ARM), o teste visual sem placa é pulado com uma mensagem visível, que diz o motivo e o modo detectado; ele continua obrigatório no GitHub e no PC do dono;
+  - uma cena de referência com desfoque, degradê, traçado e imagem sai idêntica, pixel a pixel, no Windows e no Linux. O plano da entrega avalia o recurso `libm` do vello_cpu.
+- [ ] **Placa × sem placa:** a comparação entre as duas não usa a média da diferença. Ela falha quando algum pixel muda 128 ou mais em 255, e um teste prova que isso detecta um único objeto pequeno faltando (achado 1 da [auditoria da entrega 0.5](../auditoria/2026-10-29-fase-0.5.md)).
 - [ ] Mexer num objeto redesenha só os tiles afetados (verificado por contador).
 - [ ] **Tela × exportação, automático** (achado B11 da auditoria da Fase 0). Um teste automático compara a imagem que vai para a tela com a exportação PNG da mesma vista, dentro da folga da placa de vídeo. Na prova da 0.3, essa comparação era manual (botão "Capturar a tela e comparar").
 - [ ] **Computador sem DirectX 12 nem Vulkan** (achado B10 da auditoria da Fase 0). Quando a placa de vídeo não oferece nenhum dos dois, o programa não cai e mostra uma mensagem clara, que diz o que falta. Um teste simula a falta de placa compatível.
@@ -81,6 +87,9 @@
 
 **Critérios de aceite:**
 - [ ] O texto "Açaí à brasileira — ótimo" renderiza com acentos corretos e kerning da fonte.
+- [ ] **Fuzzing de fontes** (ADR-0011 e [ADR-0020](../adr/0020.md)): um alvo de fuzzing passa fontes malformadas pelo carregamento, pelo *shaping* e pela extração de contornos (e pelo hinting, se ele for ligado) sem derrubar o programa.
+- [ ] **Fonte ou letra faltando avisa** (princípio 5 e ADR-0020): quando a fonte do documento falta e outra é usada, ou quando uma letra não existe na fonte e vira o desenho vazio (`.notdef`), aparece um aviso visível.
+- [ ] **Sem fontes do sistema por engano** (ADR-0020): as fontes são carregadas por bytes, e uma checagem automática falha se o `fontique` aparecer com o recurso `system` sem um ADR que o autorize.
 - [ ] Uma cor definida em CMYK é preservada sem conversão ao salvar e reabrir.
 - [ ] A interpolação entre um quadrado (4 pontos) e um hexágono (6 pontos) produz passos intermediários sem cruzamentos.
 

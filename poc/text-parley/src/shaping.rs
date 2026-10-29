@@ -290,6 +290,14 @@ mod tests {
             );
             assert_eq!(on.glyph_ids(), off.glyph_ids());
             assert!(off.width > on.width, "{font:?}: AV is kerned tighter");
+            // Without kerning, each glyph advances by its own width.
+            let font_ref = font.font_ref();
+            let scale = OPTIONS.size / f32::from(crate::font_tables::units_per_em(&font_ref));
+            for glyph in off.glyphs() {
+                let id = skrifa::GlyphId::new(glyph.id);
+                let width = crate::font_tables::advance_width(&font_ref, id).unwrap();
+                assert!((glyph.advance - width * scale).abs() < 1e-3, "{font:?}");
+            }
         }
     }
 

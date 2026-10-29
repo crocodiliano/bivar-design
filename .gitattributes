@@ -1,3 +1,7 @@
 * text=auto
 # Hooks run under sh and break with CRLF line endings.
 .githooks/* text eol=lf
+# Reference images and fonts are bytes; never convert their line endings.
+*.png binary
+*.otf binary
+*.ttf binary

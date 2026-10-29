@@ -30,11 +30,37 @@ fn criteria_page(font: TestFont) -> Page {
     page::criteria_page(&mut Shaper::new(), font)
 }
 
+/// Renders without a GPU at the fixed level of the reference images: AVX2,
+/// no worker threads (ADR-0020). On a processor without AVX2 (Apple or other
+/// ARM chips) it returns `None` after printing why; the test is then skipped
+/// there and stays mandatory on GitHub and on the owner's PC.
+fn reference_render(name: &str, page: &Page) -> Option<Rgba> {
+    let Some(settings) = cpu::reference_settings() else {
+        eprintln!(
+            "SKIPPED {name}: this processor has no AVX2 (detected {}), so its pixels \
+             cannot match the reference images. This test runs on GitHub and on the \
+             owner's PC.",
+            cpu::simd_level()
+        );
+        return None;
+    };
+    #[cfg(target_arch = "x86_64")]
+    assert!(
+        cpu::baseline_is_sse2(),
+        "{name}: built with target-cpu or target-feature, which would silently raise the \
+         fixed AVX2 level (ADR-0020); build without them"
+    );
+    Some(cpu::render_with_settings(page, settings))
+}
+
 fn check_golden(name: &str, image: &Rgba, tolerance: Tolerance) {
     let reference = golden_dir().join(format!("{name}.png"));
     let candidate = golden_dir().join(format!("{name}.new.png"));
     let mask = golden_dir().join(format!("{name}.diff.png"));
-    let level = cpu::simd_level();
+    let level = format!(
+        "vello_cpu at fixed AVX2; this processor detects {}",
+        cpu::simd_level()
+    );
     match Rgba::load_png(&reference) {
         Ok(expected) => {
             let diff = compare(&expected, image);
@@ -48,15 +74,14 @@ fn check_golden(name: &str, image: &Rgba, tolerance: Tolerance) {
                 diff_mask(&expected, image).save_png(&mask).unwrap();
             }
             panic!(
-                "{name}: differs from the reference ({diff:?}, vello_cpu SIMD level {level}); \
-                 new image at {}",
+                "{name}: differs from the reference ({diff:?}, {level}); new image at {}",
                 candidate.display()
             );
         }
         Err(_) => {
             image.save_png(&candidate).unwrap();
             panic!(
-                "{name}: no reference image yet (vello_cpu SIMD level {level}); \
+                "{name}: no reference image yet ({level}); \
                  candidate at {} for the owner to review",
                 candidate.display()
             );
@@ -72,14 +97,18 @@ fn background_pixel() -> [u8; 4] {
 
 #[test]
 fn cpu_golden_otf_source_sans_3() {
-    let image = cpu::render(&criteria_page(TestFont::SourceSans3Otf));
-    check_golden("cpu_otf_source_sans_3", &image, EXACT);
+    let name = "cpu_otf_source_sans_3";
+    if let Some(image) = reference_render(name, &criteria_page(TestFont::SourceSans3Otf)) {
+        check_golden(name, &image, EXACT);
+    }
 }
 
 #[test]
 fn cpu_golden_ttf_source_serif_4() {
-    let image = cpu::render(&criteria_page(TestFont::SourceSerif4Ttf));
-    check_golden("cpu_ttf_source_serif_4", &image, EXACT);
+    let name = "cpu_ttf_source_serif_4";
+    if let Some(image) = reference_render(name, &criteria_page(TestFont::SourceSerif4Ttf)) {
+        check_golden(name, &image, EXACT);
+    }
 }
 
 #[test]
@@ -122,6 +151,26 @@ fn cpu_ligature_switch_changes_the_pixels() {
             !diff.identical(),
             "{font:?}: {text} looks the same either way"
         );
+    }
+}
+
+/// Proves the check used between GPU and CPU images: dropping a single
+/// glyph, even a letter of a 16 px grey caption, leaves pixels that differ
+/// by half the range or more.
+#[test]
+fn strong_difference_catches_one_missing_letter() {
+    for font in TestFont::ALL {
+        let page = criteria_page(font);
+        let full = cpu::render(&page);
+        for (run_index, glyph_index) in [(0, 0), (1, 3), (5, 0)] {
+            let mut missing = page.clone();
+            missing.runs[run_index].glyphs.remove(glyph_index);
+            let diff = compare(&full, &cpu::render(&missing)).unwrap();
+            assert!(
+                diff.strongly_differing_pixels > 0,
+                "{font:?}: run {run_index}, glyph {glyph_index} not detected: {diff:?}"
+            );
+        }
     }
 }
 
@@ -183,9 +232,10 @@ mod gpu_tests {
         }
     }
 
-    /// Not a pass/fail limit on the look: the CPU and GPU differ at the
-    /// anti-aliased edges (ADR-0018). This only catches a glyph that one of
-    /// them drops, which changes far more than edge pixels.
+    /// The CPU and GPU differ at the anti-aliased edges (ADR-0018), by at
+    /// most 72 of 255 here. No pixel may differ by half the range or more:
+    /// that is what a glyph drawn by one and not the other looks like (see
+    /// `strong_difference_catches_one_missing_letter`).
     #[test]
     #[ignore = "needs a GPU; run with --include-ignored"]
     fn gpu_and_cpu_draw_the_same_text() {
@@ -193,7 +243,7 @@ mod gpu_tests {
             let page = criteria_page(font);
             let diff = compare(&render(&page), &cpu::render(&page)).unwrap();
             eprintln!("{font:?}: GPU vs CPU {diff:?}");
-            assert!(diff.mean_channel_delta < 2.0, "{font:?}: {diff:?}");
+            assert_eq!(diff.strongly_differing_pixels, 0, "{font:?}: {diff:?}");
         }
     }
 }

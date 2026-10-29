@@ -75,13 +75,13 @@ A prova de conceito da 0.3 desenhou texto letra por letra, sem *shaping* (a mont
 **Regra da prova:** nenhum `unsafe` no nosso código.
 
 **Critérios de aceite:**
-- [ ] **Acentos em português:** o texto "Açaí à brasileira — ótimo, pão, avô, ação" aparece com todos os acentos no lugar certo. Isso vale para as letras acentuadas prontas (como "á") e para as montadas com acento separado (letra "a" seguida do acento agudo), que devem ficar iguais.
-- [ ] **Kerning:** em pares como "AV", "To" e "Ty", o espaço entre as letras segue o ajuste definido na fonte, e não só a largura de cada letra. Um teste confere a posição contra os valores da fonte.
-- [ ] **Ligaduras:** com uma fonte que as tem, "fi" e "fl" viram o desenho único da ligadura. Elas podem ser desligadas, e então as letras voltam a aparecer separadas.
-- [ ] **Formatos de fonte:** funciona com uma fonte OTF (contornos CFF) e com uma TTF, as duas com licença OFL.
-- [ ] **Testes visuais:** o dono aprova as imagens de referência dos quatro critérios acima, desenhadas pelo Vello na placa de vídeo e pelo vello_cpu.
-- [ ] **Mesma imagem no PC do dono e no GitHub:** as imagens sem placa de vídeo (vello_cpu) saem idênticas, pixel a pixel, no PC do dono (Windows) e na compilação automática do GitHub (Linux). Veja "Testes visuais: onde rodam", abaixo. Se não saírem, o Claude Code para e mostra a diferença ao dono, que decide o que fazer.
-- [ ] **Registro:** o resultado e a biblioteca escolhida ficam num ADR novo, com status "Revisado por IA".
+- [x] **Acentos em português:** o texto "Açaí à brasileira — ótimo, pão, avô, ação" aparece com todos os acentos no lugar certo. Isso vale para as letras acentuadas prontas (como "á") e para as montadas com acento separado (letra "a" seguida do acento agudo), que devem ficar iguais.
+- [x] **Kerning:** em pares como "AV", "To" e "Ty", o espaço entre as letras segue o ajuste definido na fonte, e não só a largura de cada letra. Um teste confere a posição contra os valores da fonte.
+- [x] **Ligaduras:** com uma fonte que as tem, "fi" e "fl" viram o desenho único da ligadura. Elas podem ser desligadas, e então as letras voltam a aparecer separadas. **Com ressalva, aceita pelo dono:** a Source Sans 3 (OTF) não tem "fi" nem "fl", então esse par foi testado com a Source Serif 4 (TTF), e ligar e desligar foi testado nas duas fontes. Veja o [ADR-0020](../adr/0020.md).
+- [x] **Formatos de fonte:** funciona com uma fonte OTF (contornos CFF) e com uma TTF, as duas com licença OFL.
+- [x] **Testes visuais:** o dono aprova as imagens de referência dos quatro critérios acima, desenhadas pelo Vello na placa de vídeo e pelo vello_cpu.
+- [x] **Mesma imagem no PC do dono e no GitHub:** as imagens sem placa de vídeo (vello_cpu) saem idênticas, pixel a pixel, no PC do dono (Windows) e na compilação automática do GitHub (Linux). Veja "Testes visuais: onde rodam", abaixo. Se não saírem, o Claude Code para e mostra a diferença ao dono, que decide o que fazer.
+- [x] **Registro:** o resultado e a biblioteca escolhida ficam num ADR novo, com status "Revisado por IA". Ficaram no [ADR-0020](../adr/0020.md), "Revisado por IA" em 2026-10-29.
 
 ### 0.6 Armazenamento e sincronização
 
@@ -246,8 +246,9 @@ O Vello 0.11 fica lento com muitos degradês diferentes e cai acima de 16.384 (l
 | **Sem placa de vídeo** (vello_cpu) | Roda a cada envio, com **comparação exata**: qualquer pixel diferente faz o teste falhar. | Roda também, com a mesma comparação exata. |
 | **Com placa de vídeo** (Vello) | **Não roda:** o GitHub não tem placa de vídeo. | Roda, com a folga medida do [ADR-0018](../adr/0018.md): até 3 pixels, com diferença de no máximo 1 em 255. |
 
-- **Antes de um commit que muda o que aparece na tela,** o dono roda os testes com placa no PC dele. O plano da 0.5 diz qual comando faz isso.
-- **As imagens sem placa precisam sair iguais nos dois lugares.** A 0.5 confere isso com as primeiras imagens de referência. Se o PC e o GitHub não concordarem, o Claude Code para e o dono decide.
+- **Antes de um commit que muda o que aparece na tela,** o dono roda os testes com placa no PC dele. Na prova da 0.5, o comando é `cargo test --manifest-path poc/text-parley/Cargo.toml -- --include-ignored`.
+- **As imagens sem placa precisam sair iguais nos dois lugares.** A 0.5 conferiu isso com as primeiras imagens de referência: o PC e o GitHub concordaram, os dois no modo SIMD AVX2. Se o PC e o GitHub não concordarem, o Claude Code para e o dono decide.
+- **O modo SIMD muda os pixels** ([ADR-0020](../adr/0020.md)). Na prova da 0.5, o vello_cpu usa o modo que detecta. No produto (entrega N.3), os testes sem placa fixam o modo em AVX2 e o número de linhas de execução. Numa máquina sem AVX2, o teste é pulado com aviso, e continua obrigatório no GitHub e no PC do dono.
 - **Nenhuma imagem de referência muda sem a aprovação do dono** (CLAUDE.md §6).
 
 ## Antes do Núcleo

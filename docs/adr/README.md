@@ -37,3 +37,4 @@ A prioridade indica o quanto custaria mudar a decisão depois. Os ADRs de priori
 | [0017](0017.md) | Interface em egui (resultado da prova de conceito do ADR-0009) | Alta | Proposto |
 | [0018](0018.md) | Vello sobre wgpu confirmado, com ressalvas (resultado da prova de conceito do ADR-0007) | Alta | Proposto |
 | [0019](0019.md) | Decisões do dono após a auditoria da Fase 0 | Alta | Revisado por IA |
+| [0020](0020.md) | Motor de texto Parley sobre o Vello (resultado da prova de conceito da entrega 0.5) | Alta | Revisado por IA |
