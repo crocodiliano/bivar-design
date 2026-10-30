@@ -142,4 +142,10 @@ O que a cópia leva além do conteúdo visível:
 
 ### 2.4 Fuzzing no GitHub
 
-Ainda não rodou: a primeira rodada acontece neste envio. O resultado entra aqui depois.
+**Primeira rodada no GitHub: passou.** Envio `8fbd2d7`, 2026-10-30, rodada [41121776881](https://github.com/crocodiliano/bivar-design/actions/runs/41121776881):
+
+- os dois alvos, `bivar_container` e `bivar_records`, rodaram os 2 minutos cada, com os limites de 4 GiB e 60 s, e **não acharam nenhuma entrada que derrubasse o leitor**;
+- o passo que guarda entradas problemáticas não rodou (só roda em falha), e a rodada não tem anexos;
+- a compilação automática (CI) do mesmo envio também passou, incluindo o job novo das provas da 0.6.
+
+A rodada diária de 30 minutos por alvo continua no horário marcado (04:17 UTC).

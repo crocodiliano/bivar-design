@@ -210,4 +210,4 @@ A ferramenta de linha de comando que roda o fuzzing.
 
 ## Fuzzing no GitHub
 
-A primeira rodada acontece no primeiro envio ao GitHub. O resultado fica registrado no relatório do fechamento ([`RELATORIO-FECHAMENTO.md`](../RELATORIO-FECHAMENTO.md)).
+**Primeira rodada no GitHub (2026-10-30, envio `8fbd2d7`): passou.** Os dois alvos rodaram 2 minutos cada e não acharam nenhuma entrada que derrubasse o leitor. Detalhes no [relatório do fechamento](../RELATORIO-FECHAMENTO.md).

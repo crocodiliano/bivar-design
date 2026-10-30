@@ -151,7 +151,7 @@ As escolhas ficam registradas em **ADRs novos**, com as alternativas comparadas 
 - **O que não está feito:**
   - **revisão pelo agente auditor:** os ADRs 0021 a 0024 estão como "Proposto". A auditoria será pedida pelo dono numa conversa nova;
   - **ressalva na "cópia para enviar":** o aviso de pendências cobre o mesmo parâmetro editado em duas cópias e a remoção. Os movimentos que perderam e as edições escondidas por uma remoção ainda não ficam guardados como pendência; isso é o item "Avisos e registros de conflito gravados no documento" da 0.7;
-  - **a primeira rodada de fuzzing no GitHub** acontece no primeiro envio; o resultado vai para o relatório do fechamento.
+  - (resolvido) a primeira rodada de fuzzing no GitHub, em 2026-10-30, passou sem achar nenhuma entrada que derrubasse o leitor.
 
 ### 0.7 Especificação do modelo de dados, com protótipo
 
