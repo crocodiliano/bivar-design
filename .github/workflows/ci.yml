@@ -89,6 +89,35 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
+  # Phase 0.6: storage and sync proofs (ADR-0021). Only the store crate may
+  # depend on Loro, at the approved exact version (ADR-0019, decision 7).
+  # CI runs 6 random merge scenarios per test; the full 2,000 + 2,000 run
+  # on the owner's PC before closing a delivery or accepting a Loro update.
+  poc-crdt:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install toolchain from rust-toolchain.toml
+        run: rustup show
+
+      - name: Only the store crate depends on Loro
+        run: sh poc/crdt-armazenamento/prototipo/check-loro-isolated.sh
+
+      - name: Prototype tests (model, Loro store, chain)
+        run: cargo test --locked --release --manifest-path poc/crdt-armazenamento/prototipo/Cargo.toml
+
+      - name: Comparison proof tests (Loro x Automerge)
+        run: cargo test --locked --release --manifest-path poc/crdt-armazenamento/Cargo.toml
+
+      # The proofs are outside the workspace, so their dependencies are
+      # checked here: licenses, sources and security advisories.
+      - name: cargo deny on both proofs
+        run: |
+          cargo install --locked cargo-deny
+          cargo deny --manifest-path poc/crdt-armazenamento/Cargo.toml --config poc/crdt-armazenamento/deny.toml check
+          cargo deny --manifest-path poc/crdt-armazenamento/prototipo/Cargo.toml --config poc/crdt-armazenamento/prototipo/deny.toml check
+
   # Report only: shows which lines the tests run. No minimum yet.
   coverage:
     runs-on: ubuntu-24.04

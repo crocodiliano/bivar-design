@@ -1,0 +1,6 @@
+# cargo-fuzz needs a nightly toolchain. Pinned to a date, and used only in
+# this folder (ADR-0024); the program builds with the stable toolchain of
+# the repository root.
+[toolchain]
+channel = "nightly-2026-10-15"
+profile = "minimal"

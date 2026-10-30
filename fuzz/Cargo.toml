@@ -1,0 +1,41 @@
+# Fuzzing targets (ADR-0011, ADR-0024). Run by `cargo fuzz` on the nightly
+# toolchain pinned in rust-toolchain.toml, only here and only in the
+# automatic build; the program itself stays on stable. libFuzzer (C++, NCSA
+# license) is used only here and never ships in the program.
+[package]
+name = "bivar-fuzz"
+version = "0.0.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+# Approved by the owner on 2026-10-30, only in fuzz/.
+libfuzzer-sys = "=0.4.13"
+# The `.bivar` reader of the phase 0.6 prototype; the product reader
+# (bivar-doc, delivery N.2) replaces it here.
+bivar-poc-verificador = { path = "../poc/crdt-armazenamento/prototipo/verificador" }
+
+# A separate workspace: not part of the program's build.
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "bivar_container"
+path = "fuzz_targets/bivar_container.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "bivar_records"
+path = "fuzz_targets/bivar_records.rs"
+test = false
+doc = false
+bench = false
+
+[profile.release]
+debug = 1

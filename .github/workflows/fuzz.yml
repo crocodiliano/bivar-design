@@ -1,0 +1,57 @@
+name: Fuzz
+
+# Fuzzing of every external-input reader (ADR-0011, ADR-0024). Each target
+# runs 2 minutes on every push and 30 minutes once a day. The nightly
+# toolchain is pinned in fuzz/rust-toolchain.toml and used only here.
+
+on:
+  push:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [bivar_container, bivar_records]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install the pinned nightly toolchain (fuzz/ only)
+        working-directory: fuzz
+        run: rustup show
+
+      - name: Install cargo-fuzz
+        working-directory: fuzz
+        run: cargo install --locked cargo-fuzz --version 0.13.2
+
+      - name: Licenses and advisories of the fuzzing folder (NCSA allowed only here)
+        working-directory: fuzz
+        run: |
+          cargo install --locked cargo-deny
+          cargo deny --manifest-path Cargo.toml --config deny.toml check
+
+      - name: Fuzz ${{ matrix.target }}
+        working-directory: fuzz
+        env:
+          SECONDS_TO_RUN: ${{ github.event_name == 'schedule' && '1800' || '120' }}
+        run: |
+          mkdir -p corpus/${{ matrix.target }}
+          cargo fuzz run ${{ matrix.target }} corpus/${{ matrix.target }} -- \
+            -max_total_time=$SECONDS_TO_RUN -rss_limit_mb=4096 -timeout=60
+
+      # A crash leaves its input in fuzz/artifacts; keep it so it can become
+      # a file in fuzz/regressions (replayed by the normal tests).
+      - name: Keep crashing inputs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fuzz-artifacts-${{ matrix.target }}
+          path: fuzz/artifacts/
+          retention-days: 30
