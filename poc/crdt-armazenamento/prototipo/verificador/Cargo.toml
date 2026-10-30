@@ -1,0 +1,24 @@
+[package]
+name = "bivar-poc-verificador"
+description = "Opens files from outside in an isolated, limited process first (ADR-0024)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+bivar-poc-modelo = { path = "../modelo" }
+bivar-poc-arquivo = { path = "../arquivo" }
+# The verifier is like the application: it runs the real store.
+bivar-poc-loja-loro = { path = "../loja-loro" }
+# Approved by the owner on 2026-10-30, only for the verifier process: caps
+# its memory. No release since 2023-03 (see the dependency sheet).
+cap = "=0.1.2"
+
+[[bin]]
+name = "bivar-poc-verificador"
+path = "src/main.rs"
+
+[lints]
+workspace = true

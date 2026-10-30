@@ -1,0 +1,41 @@
+## SSD (C:, pasta temporaria do sistema)
+test a_copy_made_while_writing_always_opens ... ok
+test a_copy_offline_longer_than_the_kept_history_is_told_not_merged_silently ... ok
+test a_cut_last_write_is_dropped_and_everything_before_stays ... ok
+test a_second_opening_is_read_only_with_a_reason ... ok
+test child_process ... ignored, child process for the kill tests
+test compaction_cleans_only_what_the_rules_allow ... ok
+test damage_in_the_middle_opens_what_it_can_read_only ... ok
+test edits_not_saved_are_back_after_reopening ... ok
+test edits_since_the_last_save_survive_a_kill ... ok
+test killing_during_compaction_leaves_the_old_file_or_the_new_one ... 30 kills during compaction in 17.2051312s
+test killing_the_program_while_writing_never_breaks_the_file ... ok
+test large_files_are_stored_once_and_a_parameter_change_rewrites_no_piece ... ok
+test migration_keeps_a_copy_never_harms_the_original_and_newer_files_are_refused ... ok
+test milestones_and_open_conflicts_are_never_cleaned ... ok
+test random_damage_never_crashes_the_reader ... ok
+test save_and_reopen_keep_the_document ... ok
+test result: ok. 15 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 37.78s
+## HD (A:)
+test a_copy_made_while_writing_always_opens ... ok
+test a_copy_offline_longer_than_the_kept_history_is_told_not_merged_silently ... ok
+test a_cut_last_write_is_dropped_and_everything_before_stays ... ok
+test a_second_opening_is_read_only_with_a_reason ... ok
+test child_process ... ignored, child process for the kill tests
+test compaction_cleans_only_what_the_rules_allow ... ok
+test damage_in_the_middle_opens_what_it_can_read_only ... ok
+test edits_not_saved_are_back_after_reopening ... ok
+test edits_since_the_last_save_survive_a_kill ... ok
+test killing_during_compaction_leaves_the_old_file_or_the_new_one ... 30 kills during compaction in 17.7362694s
+test killing_the_program_while_writing_never_breaks_the_file ... ok
+test large_files_are_stored_once_and_a_parameter_change_rewrites_no_piece ... ok
+test migration_keeps_a_copy_never_harms_the_original_and_newer_files_are_refused ... ok
+test milestones_and_open_conflicts_are_never_cleaned ... ok
+test random_damage_never_crashes_the_reader ... ok
+test save_and_reopen_keep_the_document ... ok
+test result: ok. 15 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 45.96s
+## 2026-10-30: troca com copia de seguranca (.anterior)
+## SSD (C:)
+test result: ok. 17 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 38.33s
+## HD (A:)
+test result: ok. 17 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 46.78s

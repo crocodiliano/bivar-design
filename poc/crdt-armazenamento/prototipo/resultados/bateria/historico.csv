@@ -1,0 +1,64 @@
+﻿data;medida;valor
+2026-10-30T16:20:47;operacoes_100k_s;1.51
+2026-10-30T16:20:47;juncao_10k_10k_s;0.325
+2026-10-30T16:20:47;gerar_1m_s;32.5
+2026-10-30T16:20:47;tamanho_1m_mb;35950456
+2026-10-30T16:20:47;abrir_ler_1m_s;2.51
+2026-10-30T16:20:47;memoria_1m_mb;229
+2026-10-30T16:20:47;indice_leitura_us;1.1
+2026-10-30T16:20:47;abrir_confiavel_s;0.11
+2026-10-30T16:20:47;abrir_de_fora_s;2.87
+2026-10-30T16:20:47;SSD C:.gravar_no_disco_ms;0.37
+2026-10-30T16:20:47;SSD C:.pausa_autosave_ms;1.52
+2026-10-30T16:20:47;SSD C:.arquivo_compactado_mb;3.1
+2026-10-30T16:20:47;SSD C:.compactar_s;0.98
+2026-10-30T16:20:47;HD A:.gravar_no_disco_ms;23.44
+2026-10-30T16:20:47;HD A:.pausa_autosave_ms;1.36
+2026-10-30T16:20:47;HD A:.arquivo_compactado_mb;3.1
+2026-10-30T16:20:47;HD A:.compactar_s;1.01
+2026-10-30T16:20:47;HD A:.arquivo_2gb_gravar_s;12.9
+2026-10-30T16:20:47;HD A:.arquivo_2gb_abrir_s;0.01
+2026-10-30T16:20:47;HD A:.arquivo_2gb_ler_s;4.4
+2026-10-30T16:24:50;operacoes_100k_s;1.527
+2026-10-30T16:24:50;juncao_10k_10k_s;0.331
+2026-10-30T16:24:50;gerar_1m_s;36.3
+2026-10-30T16:24:50;tamanho_1m_mb;35951138
+2026-10-30T16:24:50;abrir_ler_1m_s;2.55
+2026-10-30T16:24:50;memoria_1m_mb;229
+2026-10-30T16:24:50;indice_leitura_us;1.4
+2026-10-30T16:24:50;abrir_confiavel_s;0.11
+2026-10-30T16:24:50;abrir_de_fora_s;2.86
+2026-10-30T16:24:50;SSD C:.gravar_no_disco_ms;0.35
+2026-10-30T16:24:50;SSD C:.pausa_autosave_ms;1.19
+2026-10-30T16:24:50;SSD C:.arquivo_compactado_mb;3.1
+2026-10-30T16:24:50;SSD C:.compactar_s;0.99
+2026-10-30T16:24:50;HD A:.gravar_no_disco_ms;22.14
+2026-10-30T16:24:50;HD A:.pausa_autosave_ms;1.32
+2026-10-30T16:24:50;HD A:.arquivo_compactado_mb;3.1
+2026-10-30T16:24:50;HD A:.compactar_s;0.98
+2026-10-30T16:24:50;HD A:.arquivo_2gb_gravar_s;12.4
+2026-10-30T16:24:50;HD A:.arquivo_2gb_abrir_s;0.01
+2026-10-30T16:24:50;HD A:.arquivo_2gb_ler_s;4.4
+2026-10-30T17:09:38;operacoes_100k_s;1.537
+2026-10-30T17:09:38;juncao_10k_10k_s;0.324
+2026-10-30T17:09:38;gerar_1m_s;30.9
+2026-10-30T17:09:38;tamanho_1m_mb;35951885
+2026-10-30T17:09:38;abrir_ler_1m_s;2.46
+2026-10-30T17:09:38;memoria_1m_mb;229
+2026-10-30T17:09:38;indice_leitura_us;1.2
+2026-10-30T17:09:38;abrir_confiavel_s;0.11
+2026-10-30T17:09:38;abrir_de_fora_s;2.77
+2026-10-30T17:09:38;SSD C:.gravar_no_disco_ms;0.34
+2026-10-30T17:09:38;SSD C:.pausa_autosave_ms;1.06
+2026-10-30T17:09:38;SSD C:.arquivo_compactado_mb;3.1
+2026-10-30T17:09:38;SSD C:.compactar_s;1.04
+2026-10-30T17:09:38;SSD C:.arquivo_2gb_gravar_s;37.7
+2026-10-30T17:09:38;SSD C:.arquivo_2gb_abrir_s;0.02
+2026-10-30T17:09:38;SSD C:.arquivo_2gb_ler_s;4.4
+2026-10-30T17:09:38;HD A:.gravar_no_disco_ms;18.79
+2026-10-30T17:09:38;HD A:.pausa_autosave_ms;1.04
+2026-10-30T17:09:38;HD A:.arquivo_compactado_mb;3.1
+2026-10-30T17:09:38;HD A:.compactar_s;1.01
+2026-10-30T17:09:38;HD A:.arquivo_2gb_gravar_s;12.9
+2026-10-30T17:09:38;HD A:.arquivo_2gb_abrir_s;0.01
+2026-10-30T17:09:38;HD A:.arquivo_2gb_ler_s;4.3

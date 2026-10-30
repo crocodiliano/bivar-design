@@ -1,0 +1,33 @@
+## Entradas
+test a_later_counter_wins_over_a_higher_peer ... ok
+test concurrent_writes_stay_visible_and_the_bivar_picks_the_winner ... ok
+test undo_never_overwrites_another_copys_edit ... ok
+test a_later_write_that_saw_both_clears_the_conflict ... ok
+test nothing_is_lost_silently_two_copies ... ok
+test register_every_copy_warns_about_parameters ... FAILED
+test every_copy_warns_about_parameters ... ok
+test nothing_is_lost_silently_three_copies ... ok
+1986 of 2000 seeds failed: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 7
+test result: FAILED. 7 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 57.84s
+## Registro
+test clean_copy_has_no_history_and_nothing_removed ... ok
+test nothing_is_lost_silently_two_copies ... ok
+test nothing_is_lost_silently_three_copies ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 48.86s
+## Entradas (depois da leitura em uma passada)
+test register_every_copy_warns_about_parameters ... ignored, comparison measurement
+test concurrent_writes_stay_visible_and_the_bivar_picks_the_winner ... ok
+test a_later_counter_wins_over_a_higher_peer ... ok
+test undo_never_overwrites_another_copys_edit ... ok
+test a_later_write_that_saw_both_clears_the_conflict ... ok
+test nothing_is_lost_silently_two_copies ... ok
+test every_copy_warns_about_parameters has been running for over 60 seconds
+test nothing_is_lost_silently_three_copies has been running for over 60 seconds
+test nothing_is_lost_silently_three_copies ... ok
+test every_copy_warns_about_parameters ... ok
+test result: ok. 7 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 60.65s
+## Registro (depois da leitura em uma passada)
+test clean_copy_has_no_history_and_nothing_removed ... ok
+test nothing_is_lost_silently_two_copies ... ok
+test nothing_is_lost_silently_three_copies ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 55.36s

@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
-exclude = ["tests/deny-fixture", "poc/ui-egui", "poc/render-vello", "poc/text-parley"]
+exclude = ["tests/deny-fixture", "poc/ui-egui", "poc/render-vello", "poc/text-parley", "poc/crdt-armazenamento"]
 
 [workspace.package]
 version = "0.0.0"

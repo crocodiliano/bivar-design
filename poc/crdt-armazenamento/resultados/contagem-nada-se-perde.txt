@@ -1,0 +1,5 @@
+test loro::nothing_is_lost_silently ... ok
+test loro::nothing_is_lost_silently_with_three_copies ... ok
+test automerge::nothing_is_lost_silently ... ok
+test automerge::nothing_is_lost_silently_with_three_copies ... ok
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 150.65s

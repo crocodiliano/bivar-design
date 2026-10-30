@@ -1,0 +1,28 @@
+﻿{
+    "data":  "2026-10-30T17:09:38",
+    "valores":  {
+                    "operacoes_100k_s":  1.537,
+                    "juncao_10k_10k_s":  0.324,
+                    "gerar_1m_s":  30.9,
+                    "tamanho_1m_mb":  35951885,
+                    "abrir_ler_1m_s":  2.46,
+                    "memoria_1m_mb":  229,
+                    "indice_leitura_us":  1.2,
+                    "abrir_confiavel_s":  0.11,
+                    "abrir_de_fora_s":  2.77,
+                    "SSD C:.gravar_no_disco_ms":  0.34,
+                    "SSD C:.pausa_autosave_ms":  1.06,
+                    "SSD C:.arquivo_compactado_mb":  3.1,
+                    "SSD C:.compactar_s":  1.04,
+                    "SSD C:.arquivo_2gb_gravar_s":  37.7,
+                    "SSD C:.arquivo_2gb_abrir_s":  0.02,
+                    "SSD C:.arquivo_2gb_ler_s":  4.4,
+                    "HD A:.gravar_no_disco_ms":  18.79,
+                    "HD A:.pausa_autosave_ms":  1.04,
+                    "HD A:.arquivo_compactado_mb":  3.1,
+                    "HD A:.compactar_s":  1.01,
+                    "HD A:.arquivo_2gb_gravar_s":  12.9,
+                    "HD A:.arquivo_2gb_abrir_s":  0.01,
+                    "HD A:.arquivo_2gb_ler_s":  4.3
+                }
+}

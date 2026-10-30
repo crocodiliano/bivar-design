@@ -1,0 +1,40 @@
+## Forma escolhida: parametros e marca de removido em entradas (2026-10-29)
+test nothing_is_lost_silently_two_copies ... ok
+test every_copy_warns_about_parameters has been running for over 60 seconds
+test nothing_is_lost_silently_three_copies has been running for over 60 seconds
+test every_copy_warns_about_parameters ... ok
+test nothing_is_lost_silently_three_copies ... ok
+test result: ok. 8 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 73.89s
+test clean_copy_has_no_history_and_nothing_removed ... ok
+test nothing_is_lost_silently_two_copies ... ok
+test nothing_is_lost_silently_three_copies has been running for over 60 seconds
+test nothing_is_lost_silently_three_copies ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 70.39s
+## Lacuna conhecida (0.7): edicao escondida por remocao, em todas as copias: 1947 de 2000 cenarios falham
+## Com o indice de escondidos (2026-10-29, Parte 4)
+test nothing_is_lost_silently_two_copies ... ok
+test every_copy_warns_about_parameters ... ok
+test nothing_is_lost_silently_three_copies ... ok
+test result: ok. 8 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 39.47s
+test clean_copy_has_no_history_and_nothing_removed ... ok
+test nothing_is_lost_silently_two_copies ... ok
+test nothing_is_lost_silently_three_copies ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 38.42s
+## Indice com nos vivos (2026-10-29, Parte 4)
+test nothing_is_lost_silently_two_copies ... ok
+test every_copy_warns_about_parameters ... ok
+test nothing_is_lost_silently_three_copies ... ok
+test result: ok. 8 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 38.27s
+test clean_copy_has_no_history_and_nothing_removed ... ok
+test nothing_is_lost_silently_two_copies ... ok
+test nothing_is_lost_silently_three_copies ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 37.59s
+## 2026-10-30: indice sob demanda e organizacao 2
+test nothing_is_lost_silently_two_copies ... ok
+test every_copy_warns_about_parameters ... ok
+test nothing_is_lost_silently_three_copies ... ok
+test result: ok. 8 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 51.02s
+test clean_copy_has_no_history_and_nothing_removed ... ok
+test nothing_is_lost_silently_two_copies ... ok
+test nothing_is_lost_silently_three_copies ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 47.84s

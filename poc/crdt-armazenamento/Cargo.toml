@@ -1,0 +1,28 @@
+# Disposable storage and sync proof of concept (phase 0.6).
+# Not part of the workspace and never a code base for the product.
+[package]
+name = "bivar-poc-crdt"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.99"
+license = "GPL-3.0-or-later"
+publish = false
+
+[dependencies]
+# Both approved by the owner on 2026-10-29, only for this proof, with exact
+# versions (see ficha/FICHA-DEPENDENCIAS.md).
+loro = "=1.17.1"
+automerge = "=0.12.0"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+# Measurements run in release mode.
+[profile.release]
+debug = 1

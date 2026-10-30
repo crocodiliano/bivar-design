@@ -1,0 +1,18 @@
+[package]
+name = "bivar-poc-cadeia"
+description = "Shape -> Stroke -> Fill -> Output chain on the library-independent model"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+bivar-poc-modelo = { path = "../modelo" }
+
+# Tests run the chain on the real store; the chain itself never sees Loro.
+[dev-dependencies]
+bivar-poc-loja-loro = { path = "../loja-loro" }
+
+[lints]
+workspace = true

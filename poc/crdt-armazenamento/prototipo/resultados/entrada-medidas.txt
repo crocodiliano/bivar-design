@@ -1,0 +1,18 @@
+RESULT open trusted (this computer saved it): Trusted in 3.17 s
+RESULT open from outside: Verified in 8.52 s
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 17.69s
+RESULT open trusted (this computer saved it): Trusted in 3.38 s
+RESULT open from outside: Verified in 9.15 s
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 18.47s
+## 2026-10-30, indice sob demanda e organizacao 2
+RESULT Loro (entries) build_1m_seconds=33.4 file_bytes=35962591
+RESULT Loro (entries) open_1m_load_seconds=0.018 first_full_read_seconds=2.44 total=2.46 extra_memory_mb=229 visible_nodes=101424
+RESULT Loro (entries) open_1m_load_seconds=0.018 first_full_read_seconds=2.45 total=2.47 extra_memory_mb=229 visible_nodes=101424
+RESULT Loro (entries) open_1m_load_seconds=0.018 first_full_read_seconds=2.48 total=2.49 extra_memory_mb=229 visible_nodes=101424
+RESULT hidden_index depth=10000 per_read_without_index_ms=1021.1 per_read_with_index_us=1.2 rebuild_deep_ms=0.0 rebuild_100k_ops_doc_ms=0.0
+RESULT open trusted (this computer saved it): Trusted in 0.11 s
+RESULT open from outside: Verified in 2.81 s
+RESULT open trusted (this computer saved it): Trusted in 0.11 s
+RESULT open from outside: Verified in 2.78 s

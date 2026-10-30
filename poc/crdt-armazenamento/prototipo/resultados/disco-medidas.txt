@@ -1,0 +1,41 @@
+RESULT %TEMP%/bivar-medidas sync_ms median=0.35 p95=0.50 max=0.69
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.05s
+RESULT %TEMP%/bivar-medidas autosave_on_interface_thread_ms max=1.03 median=0.92 (limit 16) writer_thread_worst_sync_ms=0.7 edit_frame_ms_median=0.46
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 11.40s
+RESULT %TEMP%/bivar-medidas blob_2gb write_and_save_s=16.4 open_s=3.01 read_and_check_s=4.3 param_change_save_ms=0.5 param_change_growth_bytes=333
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 23.87s
+RESULT %TEMP%/bivar-medidas growth ops=200000 removals=10103 visible_nodes=19924 file_before_mb=6.0 purged=6441 history_trimmed=true file_after_mb=3.1 compact_s=1.29 open_after_s=0.29
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 8.50s
+RESULT A:/Projetos/Bivar/poc/crdt-armazenamento/prototipo/resultados/tmp-hd sync_ms median=23.99 p95=35.28 max=64.01
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 2.61s
+RESULT A:/Projetos/Bivar/poc/crdt-armazenamento/prototipo/resultados/tmp-hd autosave_on_interface_thread_ms max=1.02 median=0.94 (limit 16) writer_thread_worst_sync_ms=35.1 edit_frame_ms_median=0.46
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 11.48s
+RESULT A:/Projetos/Bivar/poc/crdt-armazenamento/prototipo/resultados/tmp-hd blob_2gb write_and_save_s=13.0 open_s=3.13 read_and_check_s=4.3 param_change_save_ms=23.0 param_change_growth_bytes=333
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 20.62s
+RESULT A:/Projetos/Bivar/poc/crdt-armazenamento/prototipo/resultados/tmp-hd growth ops=200000 removals=10103 visible_nodes=19924 file_before_mb=6.0 purged=6441 history_trimmed=true file_after_mb=3.1 compact_s=1.30 open_after_s=0.28
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 9.30s
+## Depois da correcao (identidade no comeco do pedaco)
+RESULT %TEMP%/bivar-medidas blob_2gb write_and_save_s=16.7 open_s=0.00 read_and_check_s=4.3 param_change_save_ms=0.5 param_change_growth_bytes=333
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 21.49s
+RESULT A:/Projetos/Bivar/poc/crdt-armazenamento/prototipo/resultados/tmp-hd blob_2gb write_and_save_s=12.5 open_s=0.00 read_and_check_s=4.2 param_change_save_ms=17.7 param_change_growth_bytes=333
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 16.95s
+RESULT hidden_index depth=10000 reads=10000 walk_s=0.97 index_s=0.0002 per_read_walk_us=97 per_read_index_us=0.0 rebuild_deep_ms=5.9 rebuild_100k_ops_doc_ms=11.2
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 102.54s
+RESULT hidden_index depth=10000 per_read_without_index_ms=962.3 per_read_with_index_us=223.6 
+         rebuild_deep_ms=6.1 rebuild_100k_ops_doc_ms=11.1
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 101.77s
+RESULT hidden_index depth=10000 per_read_without_index_ms=985.6 per_read_with_index_us=0.6 
+         rebuild_deep_ms=5.9 rebuild_100k_ops_doc_ms=13.7
+.

@@ -1,0 +1,17 @@
+[package]
+name = "bivar-poc-loja-loro"
+description = "The only crate that depends on Loro (ADR-0021)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+bivar-poc-modelo = { path = "../modelo" }
+# Exact version (ADR-0021, owner's condition 1). A new version is accepted
+# only after the tie-break lock test and the 2,000 + 2,000 random scenarios.
+loro = "=1.17.1"
+
+[lints]
+workspace = true

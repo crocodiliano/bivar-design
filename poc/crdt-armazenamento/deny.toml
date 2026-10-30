@@ -1,0 +1,56 @@
+# cargo-deny configuration for the disposable storage and sync proof of concept.
+# Same rules as the root deny.toml, plus the advisory exceptions the owner
+# approved on 2026-10-29 for this proof only (ficha/FICHA-DEPENDENCIAS.md).
+# Keep in sync with the root deny.toml.
+
+[graph]
+all-features = true
+
+[advisories]
+version = 2
+# Known advisories in Loro 1.17.1 dependencies, listed in the dependency
+# sheet the owner read before approving Loro for this proof. No fixed
+# version exists; loro-dev/loro#1122 and #818 are still open.
+ignore = [
+    { id = "RUSTSEC-2023-0126", reason = "im 15.1.0 OrdSet aliasing; Loro uses only im::HashMap/HashSet (proof only)" },
+    { id = "RUSTSEC-2026-0255", reason = "sized-chunks panic-safety; pulled by im via Loro (proof only)" },
+    { id = "RUSTSEC-2026-0248", reason = "im unmaintained; pulled by Loro (proof only)" },
+    { id = "RUSTSEC-2026-0251", reason = "sized-chunks unmaintained; pulled by Loro (proof only)" },
+    { id = "RUSTSEC-2026-0247", reason = "bitmaps unmaintained; pulled by im via Loro (proof only)" },
+    { id = "RUSTSEC-2023-0089", reason = "atomic-polyfill unmaintained; pulled by heapless 0.7 via Loro (proof only)" },
+]
+
+[licenses]
+version = 2
+confidence-threshold = 0.93
+unused-allowed-license = "allow"
+allow = [
+    "GPL-3.0-or-later",
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "MPL-2.0",
+    "ISC",
+    "Zlib",
+    "LGPL-2.1-only",
+    "LGPL-2.1-or-later",
+    "LGPL-3.0-only",
+    "LGPL-3.0-or-later",
+    "Unicode-3.0",
+    "BSL-1.0",
+]
+
+[licenses.private]
+ignore = false
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

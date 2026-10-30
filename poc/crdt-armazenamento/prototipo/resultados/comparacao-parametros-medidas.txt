@@ -1,0 +1,19 @@
+RESULT Loro (register) merged_file_bytes=625221
+RESULT Loro (register) merge_10k_plus_10k_median_seconds=0.572 all=[0.4864165, 0.5718577, 0.5755591]
+RESULT Loro (entries) merged_file_bytes=718847
+RESULT Loro (entries) merge_10k_plus_10k_median_seconds=0.691 all=[0.5870415, 0.690994, 0.7162934]
+RESULT Loro (register) build_1m_seconds=36.0 file_bytes=31568912
+RESULT Loro (entries) build_1m_seconds=37.8 file_bytes=35562379
+RESULT Loro (register) open_1m_load_seconds=0.016 first_full_read_seconds=13.95 total=13.97 extra_memory_mb=225 visible_nodes=101424
+RESULT Loro (register) open_1m_load_seconds=0.015 first_full_read_seconds=13.81 total=13.83 extra_memory_mb=225 visible_nodes=101424
+RESULT Loro (register) open_1m_load_seconds=0.016 first_full_read_seconds=14.06 total=14.08 extra_memory_mb=225 visible_nodes=101424
+RESULT Loro (entries) open_1m_load_seconds=0.018 first_full_read_seconds=14.17 total=14.19 extra_memory_mb=232 visible_nodes=101424
+RESULT Loro (entries) open_1m_load_seconds=0.018 first_full_read_seconds=14.17 total=14.18 extra_memory_mb=232 visible_nodes=101424
+RESULT Loro (entries) open_1m_load_seconds=0.017 first_full_read_seconds=14.12 total=14.13 extra_memory_mb=232 visible_nodes=101424
+--- abertura depois da correcao
+RESULT Loro (register) open_1m_load_seconds=0.016 first_full_read_seconds=2.36 total=2.38 extra_memory_mb=221 visible_nodes=101424
+RESULT Loro (register) open_1m_load_seconds=0.016 first_full_read_seconds=2.44 total=2.46 extra_memory_mb=221 visible_nodes=101424
+RESULT Loro (register) open_1m_load_seconds=0.016 first_full_read_seconds=2.40 total=2.41 extra_memory_mb=221 visible_nodes=101424
+RESULT Loro (entries) open_1m_load_seconds=0.018 first_full_read_seconds=2.64 total=2.66 extra_memory_mb=229 visible_nodes=101424
+RESULT Loro (entries) open_1m_load_seconds=0.017 first_full_read_seconds=2.57 total=2.58 extra_memory_mb=229 visible_nodes=101424
+RESULT Loro (entries) open_1m_load_seconds=0.017 first_full_read_seconds=2.46 total=2.48 extra_memory_mb=228 visible_nodes=101424

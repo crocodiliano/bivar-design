@@ -1,0 +1,21 @@
+[package]
+name = "bivar-poc-arquivo"
+description = "The .bivar file: header plus append-only checksummed records (phase 0.6, part 4)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+bivar-poc-modelo = { path = "../modelo" }
+# Approved by the owner on 2026-10-29 (exact version): record checksums and
+# content ids of large-file pieces. "Criptografia nunca é caseira."
+sha2 = "=0.11.1"
+
+# Tests run the file on the real store; the file format never sees Loro.
+[dev-dependencies]
+bivar-poc-loja-loro = { path = "../loja-loro" }
+
+[lints]
+workspace = true
