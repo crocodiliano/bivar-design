@@ -33,6 +33,7 @@ allow = [
     "LGPL-3.0-only",
     "LGPL-3.0-or-later",
     "Unicode-3.0",
+    "BSL-1.0",
 ]
 
 [licenses.private]

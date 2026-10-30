@@ -38,3 +38,7 @@ A prioridade indica o quanto custaria mudar a decisão depois. Os ADRs de priori
 | [0018](0018.md) | Vello sobre wgpu confirmado, com ressalvas (resultado da prova de conceito do ADR-0007) | Alta | Proposto |
 | [0019](0019.md) | Decisões do dono após a auditoria da Fase 0 | Alta | Revisado por IA |
 | [0020](0020.md) | Motor de texto Parley sobre o Vello (resultado da prova de conceito da entrega 0.5) | Alta | Revisado por IA |
+| [0021](0021.md) | Loro como biblioteca CRDT, e como o grafo vive dentro dela (resultado da entrega 0.6) | Alta | Proposto |
+| [0022](0022.md) | "A última escrita" é decidida por um relógio lógico, não necessariamente o do CRDT (substitui um trecho do ADR-0019) | Alta | Proposto |
+| [0023](0023.md) | Arquivo `.bivar` em formato próprio, só em Rust, que só cresce no fim (resultado da entrega 0.6) | Alta | Proposto |
+| [0024](0024.md) | Toda entrada externa: limites, verificação isolada e fuzzing (resultado da entrega 0.6) | Alta | Proposto |

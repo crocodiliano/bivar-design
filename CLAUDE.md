@@ -38,7 +38,7 @@ O plano completo está em `docs/PLANO.md`, que é a versão oficial do plano. As
 4. **Personas são módulos.** O núcleo não conhece personas específicas. Cada persona é um crate que registra seus tipos de nó, ferramentas e painéis pela mesma interface que os plugins usarão. (ADR-0006)
 5. **Nada se perde sem registro e aviso.** (ADR-0001, ADR-0004, ADR-0005, ADR-0019)
    - **Conflitos estruturais viram estado de conflito,** reunido num painel central de conflitos e visível na camada: nó removido enquanto editado, ciclo depois da junção (nas conexões entre nós), ajuste invalidado e referência quebrada. Grafos que o painel não sabe representar ganham o indicador "customizado". Nada disso é descartado.
-   - **O mesmo parâmetro editado em duas cópias ao mesmo tempo** (duas pessoas, dois computadores ou um script), e o mesmo bloco de raster, fica com "a última escrita vence", mas sempre com aviso visível e registro no histórico, que guarda também o valor que perdeu. "A última" é decidida pelo relógio lógico do CRDT, nunca pela hora do computador.
+   - **O mesmo parâmetro editado em duas cópias ao mesmo tempo** (duas pessoas, dois computadores ou um script), e o mesmo bloco de raster, fica com "a última escrita vence", mas sempre com aviso visível e registro no histórico, que guarda também o valor que perdeu. "A última" é decidida por um relógio lógico, nunca pela hora do computador (ADR-0022).
    - **Movimentos e reordenações simultâneos** seguem a mesma regra, item por item. Se duas cópias movem o mesmo item (inclusive mover A para dentro de B enquanto outro move B para dentro de A), vence um, com aviso visível, registro no histórico e registro no painel de conflitos. Se movem itens diferentes da mesma pilha, os dois movimentos valem. O objeto movido nunca é duplicado.
    - **O painel de conflitos mostra tudo, em duas seções:** "Conflitos" (os estruturais e os movimentos que perderam; exigem ação) e "Avisos" (o mesmo parâmetro e o raster; informativos, podem ser dispensados sem apagar o registro no histórico).
    - **Um limite do renderizador nunca recusa um arquivo:** ou ele desenha corretamente, ou mostra um aviso visível.
@@ -69,7 +69,8 @@ O plano completo está em `docs/PLANO.md`, que é a versão oficial do plano. As
   - BSD-2-Clause e BSD-3-Clause;
   - MPL-2.0, ISC e Zlib;
   - LGPL-2.1-only, LGPL-2.1-or-later, LGPL-3.0-only e LGPL-3.0-or-later;
-  - Unicode-3.0.
+  - Unicode-3.0;
+  - BSL-1.0 (Boost Software License; aprovada pelo dono em 2026-10-29, entrega 0.6).
 - **Arquivos que não são código** (fora do `deny.toml` de propósito, para que nenhuma biblioteca de código entre com estas licenças). O `cargo deny` não verifica esses arquivos, então quem revisa precisa conferir:
   - OFL-1.1, **só para fontes**;
   - CC0-1.0, **só para arquivos de dados**, como HDRI. Nunca para código.

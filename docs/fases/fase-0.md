@@ -90,7 +90,7 @@ Como o documento é guardado no disco e como duas cópias se juntam. Segue as de
 As escolhas ficam registradas em **ADRs novos**, com as alternativas comparadas em licença, manutenção, quantidade de código `unsafe` ou em C, tamanho e segurança. Os testes são provas de conceito **descartáveis**.
 
 **Critérios de aceite:**
-- [ ] **Formato por dentro do arquivo (achado C1):** um ADR escolhe entre:
+- [x] **Formato por dentro do arquivo (achado C1):** um ADR escolhe entre:
   - (a) SQLite com proteções obrigatórias: modo defensivo, `trusted_schema` desligado, verificação das células, carregamento de extensões desligado, limites de tamanho, `quick_check` ao abrir, recusa de tabelas, gatilhos e visões fora da especificação, e validação de todo o conteúdo como se viesse da rede;
   - (b) SQLite aberto num processo isolado, para arquivos de terceiros;
   - (c) um formato próprio com leitor 100% em Rust.
@@ -98,30 +98,30 @@ As escolhas ficam registradas em **ADRs novos**, com as alternativas comparadas 
   Se a escolha for (a), o ADR vem com uma emenda registrada ao ADR-0011 e ao CLAUDE.md §4 ("leitura de arquivos externos só em Rust"), aprovada pelo dono, porque o SQLite é escrito em C.
 
   Na prova: um arquivo com um gatilho ou uma visão injetada é recusado com uma mensagem clara, e o carregador ganha um alvo de fuzzing (ADR-0011).
-- [ ] **Toda entrada externa (achado A7):** um ADR novo completa o ADR-0011 para toda entrada externa, não só arquivos: área de transferência, arrastar e soltar, fontes instaladas no sistema, perfis de cor embutidos em imagens, dados recebidos por P2P e o próprio `.bivar`. Ele define:
+- [x] **Toda entrada externa (achado A7):** um ADR novo completa o ADR-0011 para toda entrada externa, não só arquivos: área de transferência, arrastar e soltar, fontes instaladas no sistema, perfis de cor embutidos em imagens, dados recebidos por P2P e o próprio `.bivar`. Ele define:
   - limites obrigatórios de tamanho, recursão, memória e tempo, contra arquivos feitos para esgotar recursos ("bombas");
   - um critério de estresse para cada leitor;
   - um inventário do código `unsafe` e em C de cada biblioteca de leitura, feito ao aprová-la;
   - a ferramenta de fuzzing e onde ela roda: um caminho só (`tests/fuzz/` ou `fuzz/`), como lidar com a exigência da versão *nightly* do Rust e se há um job na compilação automática.
 
   Na prova: o leitor do `.bivar` é o primeiro a seguir esse ADR. Um arquivo feito para esgotar memória ou tempo é recusado com uma mensagem clara, sem derrubar o programa.
-- [ ] **Onde mora a verdade do documento (achado A1):** o ADR do CRDT diz:
+- [x] **Onde mora a verdade do documento (achado A1):** o ADR do CRDT diz:
   - se o documento vive na biblioteca CRDT ou no `bivar-core`, e como os dois ficam iguais. Em qualquer caso, o grafo é o modelo lógico do documento e o CRDT é onde ele é armazenado e sincronizado (ADR-0019, decisão 2), para o princípio 1 continuar valendo;
   - como cada nó é identificado de forma única entre computadores;
   - como cada tipo de operação vira estrutura CRDT: árvore para a hierarquia, lista para a pilha, mapa para os parâmetros, e as conexões entre nós, que não formam árvore;
   - a versão do formato das operações.
 
   Um protótipo modela a cadeia Forma → Traçado → Preenchimento → Saída, com as conexões.
-- [ ] **Sistema de operações independente da biblioteca CRDT** (ADR-0019, plano de contingência): no protótipo, só um crate depende da biblioteca CRDT, e uma checagem automática na compilação confere isso (como a do achado B4, que impede `bivar-core` e `bivar-doc` de depender da interface). O resto usa as operações do ADR-0002, sem tipos da biblioteca.
-- [ ] **Comparação Loro × Automerge.** As duas rodam a mesma prova, na máquina de referência, e o ADR registra os números e escolhe uma. Os limites numéricos de carregamento e velocidade são fixados no plano da entrega e aprovados pelo dono antes da medição. O ADR registra também por que o Yrs, alternativa citada no ADR-0005, ficou fora da comparação, com o motivo conferido na documentação dele, ou o inclui na comparação:
+- [x] **Sistema de operações independente da biblioteca CRDT** (ADR-0019, plano de contingência): no protótipo, só um crate depende da biblioteca CRDT, e uma checagem automática na compilação confere isso (como a do achado B4, que impede `bivar-core` e `bivar-doc` de depender da interface). O resto usa as operações do ADR-0002, sem tipos da biblioteca.
+- [x] **Comparação Loro × Automerge.** As duas rodam a mesma prova, na máquina de referência, e o ADR registra os números e escolhe uma. Os limites numéricos de carregamento e velocidade são fixados no plano da entrega e aprovados pelo dono antes da medição. O ADR registra também por que o Yrs, alternativa citada no ADR-0005, ficou fora da comparação, com o motivo conferido na documentação dele, ou o inclui na comparação:
   - **escrita simultânea:** duas cópias mudam o mesmo parâmetro ao mesmo tempo. Depois da junção, o programa sabe que houve escrita simultânea e conhece os dois valores, para avisar e registrar no histórico (ADR-0019). Se a biblioteca não oferecer isso pronto, o ADR mede o custo de fazer por fora;
   - **movimentos simultâneos (ADR-0019, decisão 3):** dois casos, um teste cada: duas cópias movem o mesmo nó para lugares diferentes; uma cópia move A para dentro de B enquanto outra move B para dentro de A. Depois da junção, o objeto está num lugar só, nunca duplicado, nenhum ciclo se forma, e o programa sabe qual movimento perdeu, para avisar e registrar no histórico. Se a biblioteca não tiver árvore com movimentação, o ADR diz como o movimento é feito e mede o custo de detectar o movimento perdido;
   - **desfazer em colaboração:** A muda um objeto, B muda outro, e A desfaz. Só a mudança de A some. O ADR registra também o que acontece quando A desfaz algo que B já editou por cima;
   - **carregamento:** tempo e memória para abrir um documento com 1 milhão de operações no histórico. O ADR diz também se dá para carregar só a parte de uma persona;
   - **remoção do histórico (achado A5; ADR-0019, decisão 5):** um texto com um marcador único, inserido de uma só vez, e uma imagem são apagados, e depois vem "Salvar cópia para enviar". O arquivo da cópia é descomprimido antes da busca, do mesmo jeito que o programa o lê, e o marcador não aparece em nenhum byte. A própria biblioteca confere que o histórico da cópia não tem nenhuma operação anterior à cópia. Nenhum pedaço da imagem apagada, nem o hash dela, está na cópia. A cópia abre com um histórico novo e não se junta com o original. Com um conflito ou um aviso ainda sem resolver, "Salvar cópia para enviar" avisa antes de gravar;
   - **velocidade:** 100.000 operações num documento de teste, misturando todos os tipos de operação do ADR-0002 (criar e remover nó, conectar e desconectar, mudar parâmetro, reordenar e mover na hierarquia), nas proporções definidas no plano da entrega (achado A12), e a junção de duas cópias que receberam 10.000 operações diferentes cada uma, ao mesmo tempo. São medidos o tempo, a memória e o tamanho salvo, e as duas cópias terminam idênticas.
-- [ ] **Arquivos grandes em pedaços** (ADR-0019; achado A6): um arquivo de teste de 2 GB, maior que o limite de 1 GB por valor do SQLite, é guardado em pedaços, salvo, reaberto e sai idêntico (mesmo hash). Mudar um parâmetro e salvar não regrava nenhum pedaço.
-- [ ] **Riscos de armazenamento (achado A6).** O ADR de armazenamento trata de cada um, e a prova testa:
+- [x] **Arquivos grandes em pedaços** (ADR-0019; achado A6): um arquivo de teste de 2 GB, maior que o limite de 1 GB por valor do SQLite, é guardado em pedaços, salvo, reaberto e sai idêntico (mesmo hash). Mudar um parâmetro e salvar não regrava nenhum pedaço.
+- [x] **Riscos de armazenamento (achado A6).** O ADR de armazenamento trata de cada um, e a prova testa:
   - **arquivo único de verdade:** copiar o arquivo com o programa aberto gera uma cópia completa, ou o ADR explica como isso é evitado (por exemplo, os arquivos `-wal` e `-shm` do SQLite);
   - **mesmo arquivo aberto duas vezes:** a segunda abertura é recusada ou abre só para leitura, com uma mensagem clara;
   - **queda no meio da gravação:** o processo é morto durante o salvamento, e o arquivo reabre com a última versão salva;
@@ -135,9 +135,23 @@ As escolhas ficam registradas em **ADRs novos**, com as alternativas comparadas 
   - **pastas sincronizadas** (OneDrive, unidades de rede): o ADR diz o que o programa faz, por exemplo um aviso ao abrir;
   - **criptografia opcional:** o ADR diz como será feita sem biblioteca paga (CLAUDE.md §5), ou adia a decisão com justificativa;
   - **especificação aberta:** o ADR diz como a especificação em `docs/formato/` fica legível sem depender do formato interno da biblioteca CRDT, ou registra essa dependência.
-- [ ] **Contingência avaliada** (ADR-0019, decisão 7): com o resultado da 0.6 em mãos, o dono decide se dispara a versão de uma pessoa só. A decisão fica registrada.
+- [x] **Contingência avaliada** (ADR-0019, decisão 7): com o resultado da 0.6 em mãos, o dono decide se dispara a versão de uma pessoa só. A decisão fica registrada. **Decisão do dono em 2026-10-29:** a contingência não foi acionada e será reavaliada no fim da N.1. Registro no ADR-0021.
 - [ ] **Revisão:** os ADRs novos estão com status "Revisado por IA".
-- [ ] **Licenças:** `cargo deny check` e `cargo audit` passam nas provas.
+- [x] **Licenças:** `cargo deny check` e `cargo audit` passam nas provas.
+
+**Situação no fechamento da 0.6 (2026-10-30), antes da auditoria:**
+
+- **Onde cada critério foi provado:**
+  - **formato (C1):** opção (c), [ADR-0023](../adr/0023.md). Num formato próprio não existe gatilho nem visão; o equivalente, um registro de tipo desconhecido injetado com resumo correto, é tratado como dano, com mensagem (`an_injected_record_of_an_unknown_kind_is_refused`). Alvos de fuzzing em `fuzz/`;
+  - **entrada externa (A7):** [ADR-0024](../adr/0024.md), com o processo verificador, os limites e o fuzzing na compilação automática (`.github/workflows/fuzz.yml`);
+  - **verdade do documento (A1) e operações independentes:** [ADR-0021](../adr/0021.md), protótipo da cadeia e checagem `check-loro-isolated.sh` na compilação automática;
+  - **comparação:** [ADR-0021](../adr/0021.md) e os relatórios das Partes 2 e 3; a "cópia para enviar" está na seção 7 do [ADR-0023](../adr/0023.md);
+  - **arquivos grandes e riscos de armazenamento (A6):** [ADR-0023](../adr/0023.md), provados no HD e no SSD;
+  - **licenças:** `cargo deny check` passa na raiz, nas provas e em `fuzz/`; `cargo audit` passa, com os alertas do `im` e do `sized-chunks` registrados na ficha de dependências.
+- **O que não está feito:**
+  - **revisão pelo agente auditor:** os ADRs 0021 a 0024 estão como "Proposto". A auditoria será pedida pelo dono numa conversa nova;
+  - **ressalva na "cópia para enviar":** o aviso de pendências cobre o mesmo parâmetro editado em duas cópias e a remoção. Os movimentos que perderam e as edições escondidas por uma remoção ainda não ficam guardados como pendência; isso é o item "Avisos e registros de conflito gravados no documento" da 0.7;
+  - **a primeira rodada de fuzzing no GitHub** acontece no primeiro envio; o resultado vai para o relatório do fechamento.
 
 ### 0.7 Especificação do modelo de dados, com protótipo
 
@@ -184,6 +198,20 @@ A especificação fica num documento em `docs/` (o nome é proposto no plano da 
   - ler o grafo no painel e gravar de volta sem mudar nada deixa o grafo idêntico.
 - [ ] **Recálculo do grafo (DeepSeek):** a especificação diz como uma mudança se propaga e como o cache evita recalcular o que não mudou, incluindo os nós de ajuste do ADR-0004. **Teste:** mudar um parâmetro recalcula só os nós que dependem dele (verificado por contador).
 - [ ] **Painel de conflitos (ADR-0019):** o painel tem duas seções, "Conflitos" (exigem ação) e "Avisos" (informativos, podem ser dispensados; incluem o mesmo parâmetro e o raster). Dispensar um aviso não apaga o registro no histórico. A especificação define os tipos de conflito e de aviso, a seção de cada um, a gravidade de cada um e as ações próprias de cada tipo (não só "reaplicar/assar/descartar"). A especificação diz também como o painel é usado por teclado e leitor de tela e como cada tipo é sinalizado sem depender só de cor. No protótipo, a lista de conflitos é calculada do estado e sai igual em todas as cópias. A interface do painel, e o teste de acessibilidade dela, ficam para o Núcleo (entrega N.5).
+- [ ] **Avisos e registros de conflito gravados no documento** (ADR-0021; decisão do dono em 2026-10-29):
+  - a cópia que detecta um conflito ou um aviso grava o registro **dentro do próprio documento**;
+  - cada registro tem um **identificador estável**, calculado a partir das operações envolvidas;
+  - assim, todas as cópias recebem o mesmo registro pela junção, e duas cópias que detectam o mesmo conflito não criam dois registros.
+
+  **Por quê:** na prova da 0.6, com três cópias, só a cópia que fez a junção percebia o conflito. As outras recebiam as mudanças já juntadas e não viam nada.
+
+  **O que já foi resolvido na 0.6:** os parâmetros e a marca de removido passaram a ser guardados como "uma entrada por escrita" (ADR-0021, seção 5). Neles, a disputa fica no próprio documento, e toda cópia a vê (0 falhas em 2.000 cenários).
+
+  **O que fica para esta entrega:**
+  - **os movimentos** que perderam;
+  - **as edições escondidas por uma remoção.** Na medida da 0.6, em 1.947 de 2.000 cenários, a cópia que recebeu as mudanças já juntadas não avisou.
+
+  **Teste:** três cópias. A recebe B e depois C; B e C recebem A. As três mostram os mesmos avisos de movimento perdido e de edição escondida, uma vez cada, inclusive os conflitos entre A e C vistos por B. Os testes `every_copy_warns_about_hidden_edits` e o equivalente de movimentos passam nos 2.000 cenários.
 - [ ] **Revisão:** os ADRs novos estão com status "Revisado por IA".
 
 ### 0.8 Cor, scripts e papel do Vello
@@ -220,7 +248,7 @@ Duas bibliotecas que o Núcleo precisa, a decisão sobre o que o Vello faz e a p
   - versões fixas para as ferramentas da compilação automática e ações do GitHub fixadas por hash, não por etiqueta;
   - se o projeto adota um registro de quem revisou cada dependência (por exemplo, o cargo-vet), com as alternativas comparadas.
 - [ ] **Revisão:** os quatro ADRs novos estão com status "Revisado por IA".
-- [ ] **Licenças:** `cargo deny check` e `cargo audit` passam nas provas.
+- [x] **Licenças:** `cargo deny check` e `cargo audit` passam nas provas.
 
 ### 0.9 Prova de degradês
 
