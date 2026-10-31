@@ -270,7 +270,7 @@ fn growth_and_compaction() {
         .unwrap_or(0);
     let plan = s.plan_compaction(now() + 31 * 24 * 3600, 30 * 24 * 3600, false);
     let t = Instant::now();
-    let f = f.compact(&mut s, &plan).unwrap();
+    f.compact(&mut s, &plan).unwrap();
     let compact_s = t.elapsed().as_secs_f64();
     let after = f.len();
     drop(f);

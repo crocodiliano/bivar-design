@@ -885,9 +885,12 @@ impl<M: ParamMode> LoroStore<M> {
     }
 
     fn trim_err(&self, e: LoroError) -> OpError {
+        // Only the errors that mean "before the kept history" (M13): any
+        // other error of a compacted document was reported as a cut history,
+        // which hid real errors.
         match e {
-            LoroError::ImportUpdatesThatDependsOnOutdatedVersion => OpError::HistoryTrimmed,
-            _ if self.doc.is_shallow() => OpError::HistoryTrimmed,
+            LoroError::ImportUpdatesThatDependsOnOutdatedVersion
+            | LoroError::SwitchToVersionBeforeShallowRoot => OpError::HistoryTrimmed,
             other => lib_err(other),
         }
     }
@@ -1403,13 +1406,12 @@ impl<M: ParamMode> Store for LoroStore<M> {
         {
             return Err(OpError::HistoryTrimmed);
         }
-        let updates = other.doc.export(ExportMode::updates(&mine)).map_err(|e| {
-            if other.doc.is_shallow() {
-                OpError::HistoryTrimmed
-            } else {
-                OpError::Library(e.to_string())
-            }
-        })?;
+        // A cut history was refused just above; any other error is a real
+        // one, never reported as a cut history (M13).
+        let updates = other
+            .doc
+            .export(ExportMode::updates(&mine))
+            .map_err(|e| OpError::Library(e.to_string()))?;
         let remote_json = other.json_between(&mine, &theirs)?;
         // Local operations concurrent with the incoming ones: those the
         // other copy had not seen. Starting points are the incoming changes

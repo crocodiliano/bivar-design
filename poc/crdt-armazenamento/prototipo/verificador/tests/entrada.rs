@@ -719,3 +719,56 @@ fn large_file_indexes_above_their_total_are_refused() {
     limit_refused(&path, &t, &low, "large-file indexes");
     assert_eq!(open(&path, &t).unwrap(), How::Verified);
 }
+
+/// DeepSeek 3.3: the verifier on a legitimate file with a 2 GB large file
+/// stays well inside its 60 s (it reads the pieces' identities, not their
+/// bytes). Measurement: writes 2 GB in BIVAR_TEST_DIR (or the temp folder).
+#[test]
+#[ignore = "measurement"]
+fn verification_of_a_file_with_2_gb_of_large_files() {
+    let t = trust("2gb");
+    let path = fresh("verify-2gb");
+    let mut s = S::new_document(1);
+    let mut f = DocFile::create(&path, &mut s).unwrap();
+    // 2 GB of bytes that never repeat a piece.
+    struct Noise(u64, u64);
+    impl std::io::Read for Noise {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            let n = (buf.len() as u64).min(self.1) as usize;
+            for c in buf[..n].chunks_mut(8) {
+                self.0 = self
+                    .0
+                    .wrapping_mul(6_364_136_223_846_793_005)
+                    .wrapping_add(1);
+                c.copy_from_slice(&self.0.to_le_bytes()[..c.len()]);
+            }
+            self.1 -= n as u64;
+            Ok(n)
+        }
+    }
+    let h = f.put_blob(Noise(7, 2 << 30)).unwrap();
+    let n = s
+        .apply(&Op::CreateNode {
+            parent: None,
+            index: None,
+            kind: "image".into(),
+        })
+        .unwrap()
+        .created
+        .unwrap();
+    s.apply(&Op::SetParam {
+        node: n,
+        key: "blob".into(),
+        value: Some(Value::Str(h)),
+    })
+    .unwrap();
+    f.save(&mut s, "pc").unwrap();
+    drop(f);
+    let started = Instant::now();
+    assert_eq!(open(&path, &t).unwrap(), How::Verified);
+    println!(
+        "RESULT verify_2gb verified_s={:.2}",
+        started.elapsed().as_secs_f64()
+    );
+    let _ = std::fs::remove_file(&path);
+}

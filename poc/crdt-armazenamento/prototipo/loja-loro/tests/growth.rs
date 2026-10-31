@@ -270,3 +270,54 @@ fn small_merge_vs_history() {
         );
     }
 }
+
+/// For the measurement battery (owner's rule, 2026-10-31: a compaction with
+/// two copies, checking the final size). 1,000 parameters written 100 times
+/// each, half on each of two copies, merged every 100 writes; the copies
+/// confirm in turn and the history is cut. The test fails unless the file
+/// is at most a tenth of what it was.
+#[test]
+#[ignore = "measurement"]
+fn two_copy_compaction_size() {
+    let mut a = LoroStore::<Entries>::new_document(1);
+    let node = a
+        .apply(&Op::CreateNode {
+            parent: None,
+            index: None,
+            kind: "shape".into(),
+        })
+        .unwrap()
+        .created
+        .unwrap();
+    a.commit();
+    let mut b = a.fork_as(2);
+    let keys: Vec<String> = (0..1_000).map(|i| format!("k{i}")).collect();
+    let mut written = 0;
+    while written < WRITES {
+        for copy in [&mut a, &mut b] {
+            for _ in 0..50 {
+                set(copy, &node, &keys[written % keys.len()], written as f64);
+                written += 1;
+            }
+        }
+        a.merge_from(&mut b).unwrap();
+        b.merge_from(&mut a).unwrap();
+    }
+    for t in [1, 2] {
+        a.record_seen("a", t);
+        b.merge_from(&mut a).unwrap();
+        b.record_seen("b", t);
+        a.merge_from(&mut b).unwrap();
+    }
+    let before = a.save().len();
+    let plan = a.plan_compaction(40 * 24 * 3600, 30 * 24 * 3600, false);
+    let state = a.state();
+    let t = Instant::now();
+    let after = a.compact(&plan).unwrap().len();
+    let compact_s = t.elapsed().as_secs_f64();
+    assert_eq!(a.state(), state);
+    assert!(after * 10 <= before, "not cut: {before} -> {after} bytes");
+    println!(
+        "RESULT two_copy_compaction bytes_before={before} bytes_after={after} compact_s={compact_s:.3}"
+    );
+}

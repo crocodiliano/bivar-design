@@ -338,7 +338,7 @@ fn compaction_cleans_only_what_the_rules_allow() {
         "{plan:?}"
     );
     let size_before = f.len();
-    let f = f.compact(&mut s, &plan).unwrap();
+    f.compact(&mut s, &plan).unwrap();
     assert!(f.len() < size_before, "{} < {size_before}", f.len());
     assert!(
         f.read_blob(&h, std::io::sink()).is_err(),
@@ -471,7 +471,7 @@ fn child_process() {
                 w.run(&mut s, 20);
                 f.save(&mut s, "pc-1").unwrap();
                 let plan = s.plan_compaction(now(), 0, false);
-                f = f.compact(&mut s, &plan).unwrap();
+                f.compact(&mut s, &plan).unwrap();
             }
             "compact-once" => {
                 // One compaction; BIVAR_CRASH_AT kills it at a chosen step.
@@ -802,4 +802,89 @@ fn a_safety_copy_that_is_not_the_replaced_file_is_never_deleted() {
     let (_, _, report) = DocFile::open::<S>(&path, 6).unwrap();
     assert_eq!(report.backup_available.as_ref(), Some(&backup));
     assert_eq!(std::fs::read(&backup).unwrap(), old);
+}
+
+/// M13: a compaction that fails before the swap (here, its temporary file
+/// cannot be created) gives the file back still open for writing, and
+/// nothing is lost.
+#[test]
+fn a_compaction_that_fails_keeps_the_file_open_and_whole() {
+    let (path, mut f, mut s) = new_file("compact-fails");
+    f.save(&mut s, "pc-1").unwrap();
+    let mut tmp = path.as_os_str().to_owned();
+    tmp.push(".compact-tmp");
+    let tmp = std::path::PathBuf::from(tmp);
+    let _ = std::fs::remove_file(&tmp);
+    std::fs::create_dir_all(&tmp).unwrap(); // in the way
+    let plan = s.plan_compaction(now() + 31 * DAY, RETENTION, false);
+    assert!(f.compact(&mut s, &plan).is_err());
+    std::fs::remove_dir(&tmp).unwrap();
+    assert!(f.is_writable());
+    let x = create(&mut s, "shape");
+    set(&mut s, &x, "name", Value::Str("after the failure".into()));
+    f.save(&mut s, "pc-1").unwrap();
+    let state = s.state();
+    drop(f);
+    let (_, back, _) = DocFile::open::<S>(&path, 2).unwrap();
+    assert_eq!(back.state(), state);
+}
+
+/// M13: a file that cannot be opened for writing for another reason than
+/// another program holding it opens read-only with that reason, not with
+/// "already open elsewhere".
+#[test]
+fn a_file_that_cannot_be_written_says_why() {
+    let (path, f, _) = new_file("read-only-file");
+    drop(f);
+    let mut perms = std::fs::metadata(&path).unwrap().permissions();
+    perms.set_readonly(true);
+    std::fs::set_permissions(&path, perms.clone()).unwrap();
+    let (f, _, report) = DocFile::open::<S>(&path, 2).unwrap();
+    assert!(!f.is_writable());
+    let why = report.read_only.clone().unwrap_or_default();
+    assert!(why.contains("cannot be opened for writing"), "{why}");
+    drop(f);
+    #[allow(clippy::permissions_set_readonly_false)]
+    perms.set_readonly(false);
+    std::fs::set_permissions(&path, perms).unwrap();
+    // Held by another program: that reason.
+    let (_held, _, _) = DocFile::open::<S>(&path, 3).unwrap();
+    let (_, _, report) = DocFile::open::<S>(&path, 4).unwrap();
+    let why = report.read_only.unwrap_or_default();
+    assert!(why.contains("already open"), "{why}");
+}
+
+/// M9: three rules the reader did not enforce. Each such file is refused
+/// with a message, never read "as well as it can".
+#[test]
+fn files_that_break_the_spec_in_small_ways_are_refused() {
+    let snapshot = S::new_document(1).save();
+    let mark = 0u64.to_le_bytes();
+    let refused = |name: &str, bytes: Vec<u8>, why: &str| {
+        let path = fresh(name);
+        std::fs::write(&path, bytes).unwrap();
+        match DocFile::open::<S>(&path, 2) {
+            Err(FileError::Unreadable(m)) => assert!(m.contains(why), "{name}: {m}"),
+            Err(e) => panic!("{name}: {e:?}"),
+            Ok(_) => panic!("{name}: opened"),
+        }
+    };
+    // The snapshot is always the first record.
+    refused(
+        "spec-first-record",
+        bivar_poc_arquivo::build_file_bytes(&[(5, &mark), (1, &snapshot)]),
+        "first record",
+    );
+    // A save mark has exactly 8 bytes.
+    refused(
+        "spec-save-mark",
+        bivar_poc_arquivo::build_file_bytes(&[(1, &snapshot), (5, &mark[..3]), (5, &mark)]),
+        "save mark",
+    );
+    // The 16 reserved header bytes are zeros (with a correct header digest).
+    let mut bytes = bivar_poc_arquivo::build_file_bytes(&[(1, &snapshot), (5, &mark)]);
+    bytes[20] = 1;
+    let digest = bivar_poc_arquivo::hex_to_id(&bivar_poc_arquivo::sha_hex(&bytes[..32])).unwrap();
+    bytes[32..64].copy_from_slice(&digest);
+    refused("spec-reserved", bytes, "reserved");
 }

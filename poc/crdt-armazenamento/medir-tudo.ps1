@@ -20,10 +20,18 @@ param(
     [string]$PastaHD = (Join-Path $PSScriptRoot 'prototipo\resultados\tmp-hd'),
     [string]$PastaSSD = (Join-Path $env:TEMP 'bivar-medidas'),
     # O teste do arquivo de 2 GB é pulado num disco com menos espaço livre.
-    [double]$EspacoMinimoGB = 6
+    [double]$EspacoMinimoGB = 6,
+    # Só para testar a própria bateria: roda mesmo com alterações sem commit.
+    [switch]$Rascunho
 )
 
 $ErrorActionPreference = 'Continue'
+# Todo número fica ligado a um commit (auditoria de 2026-10-31, O1): com
+# alterações sem commit, a bateria não roda, a não ser com -Rascunho.
+if ((& git -C $PSScriptRoot status --porcelain 2>$null) -and -not $Rascunho) {
+    Write-Host "Há alterações sem commit. Faça o commit antes de medir (ou use -Rascunho, que não vale como registro)."
+    exit 1
+}
 $proto = Join-Path $PSScriptRoot 'prototipo'
 $manifest = Join-Path $proto 'Cargo.toml'
 $saida = Join-Path $proto 'resultados\bateria'
@@ -54,6 +62,10 @@ function Disco($pasta, $rotulo) {
                 (M "$rotulo.compactar_s" "Tempo de compactar ($rotulo)" 'compact_s=([\d.]+)' 's' $null 0.5)) }
     )
     if ($livre -ge $EspacoMinimoGB) {
+        # DeepSeek 3.3: verificar um arquivo legítimo com 2 GB de arquivos
+        # grandes cabe com folga nos 60 s do verificador.
+        $medidas += @{ Teste = 'verification_of_a_file_with_2_gb_of_large_files'; Pacote2 = 'bivar-poc-verificador'; Arquivo2 = 'entrada'; Metricas = @(
+                (M "$rotulo.verificar_2gb_s" "Verificar arquivo de fora com 2 GB de arquivos grandes ($rotulo)" 'verified_s=([\d.]+)' 's' 60 2)) }
         $medidas += @{ Teste = 'blob_2gb'; Metricas = @(
                 (M "$rotulo.arquivo_2gb_gravar_s" "Arquivo grande de 2 GB: guardar ($rotulo)" 'write_and_save_s=([\d.]+)' 's' $null 5),
                 (M "$rotulo.arquivo_2gb_abrir_s" "Arquivo grande de 2 GB: abrir o documento ($rotulo)" 'open_s=([\d.]+)' 's' $null 0.5),
@@ -62,7 +74,9 @@ function Disco($pasta, $rotulo) {
         $script:pulados += "Arquivo grande de 2 GB ($rotulo): só $([math]::Round($livre, 1)) GB livres, mínimo $EspacoMinimoGB GB"
     }
     foreach ($m in $medidas) {
-        $m.Pacote = 'bivar-poc-arquivo'; $m.Arquivo = 'medidas'; $m.Pasta = $pasta
+        $m.Pacote = if ($m.Pacote2) { $m.Pacote2 } else { 'bivar-poc-arquivo' }
+        $m.Arquivo = if ($m.Arquivo2) { $m.Arquivo2 } else { 'medidas' }
+        $m.Pasta = $pasta
     }
     $medidas
 }
@@ -83,7 +97,18 @@ $bateria = @(
             (M 'indice_leitura_us' 'Ler um nó a 10 mil níveis, com o índice' 'per_read_with_index_us=([\d.]+)' 'µs' $null 5)) },
     @{ Pacote = 'bivar-poc-verificador'; Arquivo = 'entrada'; Teste = 'verification_cost_on_a_large_document'; Metricas = @(
             (M 'abrir_confiavel_s' 'Abrir arquivo deste computador (1 milhão de operações)' 'Trusted in ([\d.]+) s' 's' $null 0.2),
-            (M 'abrir_de_fora_s' 'Abrir arquivo de fora, com verificação' 'Verified in ([\d.]+) s' 's' $null 0.5)) }
+            (M 'abrir_de_fora_s' 'Abrir arquivo de fora, com verificação' 'Verified in ([\d.]+) s' 's' $null 0.5)) },
+    # Auditoria de 2026-10-31: a compactação com duas cópias, conferindo o
+    # tamanho final (o teste falha se o arquivo não ficar com um décimo).
+    @{ Pacote = 'bivar-poc-loja-loro'; Arquivo = 'growth'; Teste = 'two_copy_compaction_size'; Metricas = @(
+            (M 'compactar_2_copias_bytes' 'Duas cópias, 100 mil escritas: arquivo depois da compactação' 'bytes_after=(\d+)' 'bytes' 65536 4096)) },
+    # A junção pequena (100 + 100) não pode crescer com o histórico.
+    @{ Pacote = 'bivar-poc-loja-loro'; Arquivo = 'growth'; Teste = 'small_merge_vs_history'; Metricas = @(
+            (M 'juncao_pequena_1m_ms' 'Junção de 100 + 100 com 1 milhão de escritas no histórico' 'history_writes=1000000 merge_100_plus_100_ms_median=([\d.]+)' 'ms' $null 2)) },
+    # O mapa de pedaços que o programa guarda ao abrir (meta do Núcleo: no
+    # máximo 50 bytes por pedaço; o protótipo usa 124).
+    @{ Pacote = 'bivar-poc-arquivo'; Arquivo = 'medidas'; Teste = 'pieces_map_worst_case_memory'; Metricas = @(
+            (M 'mapa_pedacos_bytes_por_pedaco' 'Mapa de pedaços: bytes por pedaço (5 milhões de pedaços mínimos)' 'per_piece_bytes=(\d+)' 'bytes' $null 10)) }
 )
 $bateria += Disco $PastaSSD 'SSD C:'
 $bateria += Disco $PastaHD 'HD A:'

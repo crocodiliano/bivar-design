@@ -240,6 +240,12 @@ fn check_header(h: &[u8]) -> Result<u32, FileError> {
     if flags != 0 {
         return Err(FileError::UnknownFlags(flags));
     }
+    // Reserved for encryption: zeros in version 1 (M9: not checked before).
+    if h[16..32].iter().any(|b| *b != 0) {
+        return Err(FileError::Unreadable(
+            "reserved header bytes are not zero".into(),
+        ));
+    }
     Ok(version)
 }
 
@@ -453,6 +459,13 @@ fn scan<R: Read + Seek>(
                         });
                     }
                 }
+                // The snapshot is always the first record (M9: a file starting
+                // with anything else was read).
+                if s.snapshot.is_none() && kind != Kind::Snapshot {
+                    return Err(FileError::Unreadable(
+                        "the first record is not the document snapshot".into(),
+                    ));
+                }
                 match kind {
                     Kind::Snapshot => {
                         if s.snapshot.is_some() {
@@ -502,7 +515,13 @@ fn scan<R: Read + Seek>(
                             s.blobs.insert(id, entry);
                         }
                     }
-                    Kind::SaveMark => s.report.edits_after_last_save = 0,
+                    Kind::SaveMark => {
+                        // Exactly 8 bytes (M9: 0 to 8 were accepted).
+                        if payload.len() != 8 {
+                            return Err(FileError::Unreadable(format!("bad save mark at {at}")));
+                        }
+                        s.report.edits_after_last_save = 0;
+                    }
                 }
                 s.end = end;
             }
@@ -512,6 +531,11 @@ fn scan<R: Read + Seek>(
                 len,
                 end,
             } => {
+                if s.snapshot.is_none() {
+                    return Err(FileError::Unreadable(
+                        "the first record is not the document snapshot".into(),
+                    ));
+                }
                 // Computing a fingerprint holds no map of pieces (I9).
                 if keep {
                     s.chunks.insert(id, (data_at, len));
@@ -762,6 +786,14 @@ fn open_writer(path: &Path) -> io::Result<File> {
     Ok(f)
 }
 
+/// Whether opening for writing failed because another program holds the
+/// file: a sharing or lock violation on Windows (errors 32 and 33), the
+/// advisory lock elsewhere (`open_writer` reports it as `WouldBlock`).
+fn held_by_another(e: &io::Error) -> bool {
+    e.kind() == io::ErrorKind::WouldBlock
+        || (cfg!(windows) && matches!(e.raw_os_error(), Some(32 | 33)))
+}
+
 fn open_reader(path: &Path) -> io::Result<File> {
     let mut o = OpenOptions::new();
     o.read(true);
@@ -889,11 +921,33 @@ fn write_new_file(
     }
     let done = write(&partial)
         .and_then(|()| OpenOptions::new().write(true).open(&partial)?.sync_all())
-        .and_then(|()| std::fs::rename(&partial, dest));
-    if done.is_err() {
-        let _ = std::fs::remove_file(&partial);
+        .and_then(|()| give_final_name(&partial, dest));
+    match done {
+        Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
+            // A file appeared at `dest` in the meantime: it is left alone,
+            // and the copy stays as `.parcial`, reported, never deleted.
+            Err(FileError::AlreadyExists)
+        }
+        Err(e) => {
+            let _ = std::fs::remove_file(&partial);
+            Err(e.into())
+        }
+        Ok(()) => Ok(()),
     }
-    Ok(done?)
+}
+
+/// Gives a finished file its final name without ever replacing a file that
+/// appeared there after the check (M13; a rename replaces it on Windows).
+/// A hard link fails if the name is taken; then the `.parcial` name goes.
+/// Where hard links do not exist (some USB sticks), a plain rename, after
+/// checking once more.
+fn give_final_name(partial: &Path, dest: &Path) -> io::Result<()> {
+    match std::fs::hard_link(partial, dest) {
+        Ok(()) => std::fs::remove_file(partial),
+        Err(e) if e.kind() == io::ErrorKind::AlreadyExists => Err(e),
+        Err(_) if dest.exists() => Err(io::ErrorKind::AlreadyExists.into()),
+        Err(_) => std::fs::rename(partial, dest),
+    }
 }
 
 /// The large files a new file carries, and where their pieces are read.
@@ -1030,8 +1084,15 @@ impl DocFile {
             Access::Write => match open_writer(path) {
                 Ok(f) => (f, true),
                 Err(e) if e.kind() == io::ErrorKind::NotFound => return Err(e.into()),
-                Err(_) => {
-                    busy = Some("the file is already open for writing elsewhere".to_owned());
+                // Read-only, with the real reason (M13): "already open
+                // elsewhere" only when another program holds it; any other
+                // refusal (a read-only folder, for example) says what it is.
+                Err(e) => {
+                    busy = Some(if held_by_another(&e) {
+                        "the file is already open for writing elsewhere".to_owned()
+                    } else {
+                        format!("the file cannot be opened for writing: {e}")
+                    });
                     (open_reader(path)?, false)
                 }
             },
@@ -1441,15 +1502,18 @@ impl DocFile {
     /// replaces it in one rename: whatever happens, the path holds either
     /// the old file or the new one, complete.
     pub fn compact<S: Store>(
-        mut self,
+        &mut self,
         store: &mut S,
         plan: &CompactionPlan,
-    ) -> Result<DocFile, FileError> {
+    ) -> Result<(), FileError> {
         self.append_changes(store)?;
         self.sync()?;
         // The new file names the file it replaces: the safety copy left by
         // an interrupted compaction is deleted only if it is that file (I10).
         store.set_note(REPLACED_NOTE, &hex(&self.fingerprint()));
+        // The document in memory is compacted first. If writing fails after
+        // this, it holds the same content with a shorter history, and keeps
+        // appending to the old file, which is untouched (M13).
         let snapshot = store.compact(plan)?;
         let (carried, _missing) = self.carried(&store.blob_hashes());
         let tmp = tmp_path(&self.path);
@@ -1463,31 +1527,47 @@ impl DocFile {
         crash_point("written");
         let path = self.path.clone();
         let backup = backup_path(&path);
-        drop(self); // releases the write handle so the renames can happen
+        // The write handle is released so the renames can happen; a handle
+        // that lets them happen takes its place. Until the swap, any failure
+        // gives this file back, still open for writing (M13: before, the
+        // open file was dropped on any failure).
+        self.file = open_reader(&path)?;
+        self.writable = false;
         // The old file becomes the safety copy; it is deleted only after the
         // new one has opened. At every instant there is a complete file: the
         // main one, or the safety copy (recovered when opening).
         let _ = std::fs::remove_file(&backup);
-        std::fs::rename(&path, &backup)?;
+        if let Err(e) = std::fs::rename(&path, &backup) {
+            self.file = open_writer(&path)?;
+            self.writable = true;
+            return Err(e.into());
+        }
         crash_point("backup");
-        std::fs::rename(&tmp, &path)?;
+        if let Err(e) = std::fs::rename(&tmp, &path) {
+            recover_from_backup(&path)?;
+            self.file = open_writer(&path)?;
+            self.writable = true;
+            return Err(e.into());
+        }
         crash_point("swapped");
-        let mut f = match DocFile::open_main::<S>(&path, 0, &Limits::default(), Access::Write, None)
-        {
-            Ok((f, _, report)) if report.damaged_at.is_none() => f,
+        match DocFile::open_main::<S>(&path, 0, &Limits::default(), Access::Write, None) {
+            Ok((f, _, report)) if report.damaged_at.is_none() => *self = f,
             other => {
-                // The new file does not open well: the old one goes back.
+                // The new file does not open well: the old one goes back,
+                // and this file is it again.
                 recover_from_backup(&path)?;
+                *self =
+                    DocFile::open_main::<S>(&path, 0, &Limits::default(), Access::Write, None)?.0;
                 return Err(match other {
                     Err(e) => e,
                     Ok(_) => FileError::Unreadable("the compacted file is damaged".into()),
                 });
             }
-        };
+        }
         crash_point("verified");
         std::fs::remove_file(&backup)?;
-        f.written_version = store.version();
-        Ok(f)
+        self.written_version = store.version();
+        Ok(())
     }
 }
 
@@ -1589,4 +1669,29 @@ pub struct SaveAsReport {
     /// Show a discreet hint: "this file carries its history; to send it to
     /// someone, use Salvar cópia para enviar".
     pub suggest_send_copy: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// M13: the final name never replaces a file that appeared there after
+    /// the check; the finished copy stays as `.parcial`.
+    #[test]
+    fn the_final_name_never_replaces_a_file_that_appeared_meanwhile() {
+        let dir = std::env::temp_dir().join("bivar-poc-arquivo-final-name");
+        std::fs::create_dir_all(&dir).unwrap();
+        let (partial, dest) = (dir.join("copia.bivar.parcial"), dir.join("copia.bivar"));
+        std::fs::write(&partial, b"the copy").unwrap();
+        std::fs::write(&dest, b"someone else's file").unwrap();
+        let e = give_final_name(&partial, &dest).unwrap_err();
+        assert_eq!(e.kind(), io::ErrorKind::AlreadyExists);
+        assert_eq!(std::fs::read(&dest).unwrap(), b"someone else's file");
+        assert_eq!(std::fs::read(&partial).unwrap(), b"the copy");
+        std::fs::remove_file(&dest).unwrap();
+        give_final_name(&partial, &dest).unwrap();
+        assert_eq!(std::fs::read(&dest).unwrap(), b"the copy");
+        assert!(!partial.exists());
+        std::fs::remove_file(&dest).unwrap();
+    }
 }

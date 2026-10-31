@@ -191,7 +191,7 @@ fn write_collection() {
             b.record_seen("laptop", at);
             a.merge_from(&mut b).unwrap();
         }
-        let f = DocFile::create(p, &mut a).unwrap();
+        let mut f = DocFile::create(p, &mut a).unwrap();
         let plan = a.plan_compaction(40 * 24 * 3600, 30 * 24 * 3600, false);
         assert!(plan.trim_before.is_some(), "{plan:?}");
         f.compact(&mut a, &plan).unwrap();

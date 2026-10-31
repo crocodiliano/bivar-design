@@ -292,3 +292,19 @@ fn a_removal_older_than_the_kept_history_is_cleaned_on_proof() {
     // The other copy still merges.
     sync(&mut a, &mut b);
 }
+
+/// M13: on a compacted document, an error that has nothing to do with the
+/// cut history (here, bytes that are not updates at all) is reported as
+/// what it is, not as "history cut".
+#[test]
+fn a_real_error_on_a_compacted_document_is_not_called_a_cut_history() {
+    let (mut a, mut b, _) = two_busy_copies();
+    confirm_in_turn(&mut a, &mut b, 1);
+    confirm_in_turn(&mut a, &mut b, 2);
+    let plan = a.plan_compaction(40 * DAY, 30 * DAY, false);
+    a.compact(&plan).unwrap();
+    match a.import_updates(b"not updates at all") {
+        Err(bivar_poc_modelo::OpError::Library(_)) => {}
+        other => panic!("{other:?}"),
+    }
+}
