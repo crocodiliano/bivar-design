@@ -36,8 +36,12 @@ jobs:
             exit 1
           fi
 
+      # Pinned versions (audit 2026-10-31, M5): a new release cannot change
+      # what passes without a commit here.
       - name: Install cargo-deny and cargo-audit
-        run: cargo install --locked cargo-deny cargo-audit
+        run: |
+          cargo install --locked cargo-deny --version 0.20.2
+          cargo install --locked cargo-audit --version 0.22.2
 
       - name: cargo deny
         run: cargo deny check
@@ -49,8 +53,9 @@ jobs:
             exit 1
           fi
 
+      # Unsound advisories (memory safety) fail the build (I7).
       - name: cargo audit
-        run: cargo audit
+        run: cargo audit --deny unsound
 
   # Phase 0.5: images rendered without a GPU (vello_cpu) must match, pixel
   # for pixel, the references approved on the owner's PC (Windows).
@@ -74,7 +79,7 @@ jobs:
       # are checked here: licenses, sources and security advisories.
       - name: cargo deny on the text proof
         run: |
-          cargo install --locked cargo-deny
+          cargo install --locked cargo-deny --version 0.20.2
           cargo deny --manifest-path poc/text-parley/Cargo.toml --config poc/text-parley/deny.toml check
 
       - name: Keep the images for the owner to compare
@@ -104,6 +109,13 @@ jobs:
       - name: Only the store crate depends on Loro
         run: sh poc/crdt-armazenamento/prototipo/check-loro-isolated.sh
 
+      # The prototype is outside the workspace: its format and lints are
+      # checked here (audit 2026-10-31, M14).
+      - name: Prototype format and lints
+        run: |
+          cargo fmt --manifest-path poc/crdt-armazenamento/prototipo/Cargo.toml --all --check
+          cargo clippy --locked --release --manifest-path poc/crdt-armazenamento/prototipo/Cargo.toml --all-targets -- -D warnings
+
       - name: Prototype tests (model, Loro store, chain)
         run: cargo test --locked --release --manifest-path poc/crdt-armazenamento/prototipo/Cargo.toml
 
@@ -112,11 +124,17 @@ jobs:
 
       # The proofs are outside the workspace, so their dependencies are
       # checked here: licenses, sources and security advisories.
-      - name: cargo deny on both proofs
+      - name: cargo deny and cargo audit on both proofs and on fuzz/
         run: |
-          cargo install --locked cargo-deny
+          cargo install --locked cargo-deny --version 0.20.2
+          cargo install --locked cargo-audit --version 0.22.2
           cargo deny --manifest-path poc/crdt-armazenamento/Cargo.toml --config poc/crdt-armazenamento/deny.toml check
           cargo deny --manifest-path poc/crdt-armazenamento/prototipo/Cargo.toml --config poc/crdt-armazenamento/prototipo/deny.toml check
+          # Unsound advisories fail (I7, M14), except the two in Loro's
+          # dependencies the owner approved for the proofs (2026-10-29).
+          for lock in poc/crdt-armazenamento/Cargo.lock poc/crdt-armazenamento/prototipo/Cargo.lock fuzz/Cargo.lock; do
+            cargo audit --file "$lock" --deny unsound --ignore RUSTSEC-2023-0126 --ignore RUSTSEC-2026-0255
+          done
 
   # Report only: shows which lines the tests run. No minimum yet.
   coverage:

@@ -12,3 +12,5 @@
 *.old.png
 # Owner's local visual references (mockups); kept out of the repository.
 /docs/referencias/
+# Inputs found by fuzzing runs (cached in CI, never committed).
+/fuzz/found/

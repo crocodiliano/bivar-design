@@ -5,6 +5,9 @@ all-features = true
 
 [advisories]
 version = 2
+# Unsound advisories (memory safety) in any dependency, not only in our own
+# crates (audit 2026-10-31, I7): without this, they were not even matched.
+unsound = "all"
 
 [licenses]
 version = 2

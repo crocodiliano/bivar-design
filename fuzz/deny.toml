@@ -1,6 +1,6 @@
 # cargo-deny configuration for the fuzzing folder (ADR-0024). Same rules as the
-# root deny.toml, plus: NCSA, only here (libFuzzer, owner approval 2026-10-30;
-# it never ships in the program), and the Loro advisory exceptions of the
+# root deny.toml, plus: NCSA, only for libfuzzer-sys (libFuzzer, owner approval
+# 2026-10-30; it never ships in the program), and the Loro advisory exceptions of the
 # phase 0.6 prototype the targets read (until the product reader exists).
 
 [graph]
@@ -8,6 +8,9 @@ all-features = true
 
 [advisories]
 version = 2
+# Unsound advisories (memory safety) in any dependency, not only in our own
+# crates (audit 2026-10-31, I7): without this, they were not even matched.
+unsound = "all"
 # Known advisories in Loro 1.17.1 dependencies, listed in the dependency
 # sheet the owner read before approving Loro for this proof. No fixed
 # version exists; loro-dev/loro#1122 and #818 are still open.
@@ -39,8 +42,13 @@ allow = [
     "LGPL-3.0-or-later",
     "Unicode-3.0",
     "BSL-1.0",
-    "NCSA",
 ]
+# NCSA only for libfuzzer-sys (libFuzzer, owner approval 2026-10-30), never
+# for any other crate of this folder (audit 2026-10-31, M6). The libFuzzer
+# code it embeds declares Apache-2.0 WITH LLVM-exception, also compatible.
+[[licenses.exceptions]]
+name = "libfuzzer-sys"
+allow = ["NCSA", "Apache-2.0 WITH LLVM-exception"]
 
 [licenses.private]
 ignore = false

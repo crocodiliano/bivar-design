@@ -71,6 +71,9 @@ O plano completo está em `docs/PLANO.md`, que é a versão oficial do plano. As
   - LGPL-2.1-only, LGPL-2.1-or-later, LGPL-3.0-only e LGPL-3.0-or-later;
   - Unicode-3.0;
   - BSL-1.0 (Boost Software License; aprovada pelo dono em 2026-10-29, entrega 0.6).
+- **Exceções por pasta** (aprovadas pelo dono, nunca no programa final; auditoria de 2026-10-31, M6). Ficam só no `deny.toml` da pasta, cada uma com o motivo:
+  - `fuzz/`: NCSA e Apache-2.0 com a exceção do LLVM, **só para o `libfuzzer-sys`** (o libFuzzer, aprovado em 2026-10-30);
+  - provas da 0.6 (`poc/crdt-armazenamento/`, o protótipo e `fuzz/`): os alertas de segurança das dependências da Loro listados na ficha de dependências, aprovados em 2026-10-29 só para as provas.
 - **Arquivos que não são código** (fora do `deny.toml` de propósito, para que nenhuma biblioteca de código entre com estas licenças). O `cargo deny` não verifica esses arquivos, então quem revisa precisa conferir:
   - OFL-1.1, **só para fontes**;
   - CC0-1.0, **só para arquivos de dados**, como HDRI. Nunca para código.
