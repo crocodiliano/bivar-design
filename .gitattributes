@@ -5,3 +5,7 @@
 *.png binary
 *.otf binary
 *.ttf binary
+# The .bivar files every future version must open, and their recorded
+# results: never converted, so the bytes and the text stay as written.
+tests/formato/*.bivar binary
+tests/formato/*.txt text eol=lf
