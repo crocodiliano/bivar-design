@@ -1,0 +1,35 @@
+doc_id: doc-559075669e5f662a6f97f2f300c706bb
+nodes: 28
+roots: [NodeId("2@1")]
+edges: {"e1.12": Edge { from: NodeId("4@1"), from_port: "out", to: NodeId("2@1"), to_port: "in" }, "e1.19": Edge { from: NodeId("203@1"), from_port: "out", to: NodeId("2@1"), to_port: "in" }, "e1.20": Edge { from: NodeId("4@1"), from_port: "out", to: NodeId("139@1"), to_port: "in" }, "e1.21": Edge { from: NodeId("14@1"), from_port: "out", to: NodeId("238@1"), to_port: "in" }, "e1.24": Edge { from: NodeId("34@1"), from_port: "out", to: NodeId("203@1"), to_port: "in" }, "e1.25": Edge { from: NodeId("10@1"), from_port: "out", to: NodeId("24@1"), to_port: "in" }, "e1.26": Edge { from: NodeId("26@1"), from_port: "out", to: NodeId("203@1"), to_port: "in" }, "e1.28": Edge { from: NodeId("26@1"), from_port: "out", to: NodeId("334@1"), to_port: "in" }, "e1.30": Edge { from: NodeId("258@1"), from_port: "out", to: NodeId("10@1"), to_port: "in" }, "e1.32": Edge { from: NodeId("34@1"), from_port: "out", to: NodeId("4@1"), to_port: "in" }, "e1.34": Edge { from: NodeId("4@1"), from_port: "out", to: NodeId("407@1"), to_port: "in" }, "e1.35": Edge { from: NodeId("34@1"), from_port: "out", to: NodeId("4@1"), to_port: "in" }, "e1.36": Edge { from: NodeId("364@1"), from_port: "out", to: NodeId("407@1"), to_port: "in" }, "e1.37": Edge { from: NodeId("144@1"), from_port: "out", to: NodeId("258@1"), to_port: "in" }, "e1.38": Edge { from: NodeId("407@1"), from_port: "out", to: NodeId("24@1"), to_port: "in" }, "e1.4": Edge { from: NodeId("2@1"), from_port: "out", to: NodeId("28@1"), to_port: "in" }, "e1.9": Edge { from: NodeId("51@1"), from_port: "out", to: NodeId("14@1"), to_port: "in" }}
+conflicts: []
+node 10@1: kind=shape parent=Some(NodeId("4@1")) children=[NodeId("24@1")] params={"name": Str("vf3f0f4b27663"), "opacity": Num(7430725706883.0), "width": Num(9832306692748.813), "y": Num(3277958690754.3125)} text=None
+node 144@1: kind=shape parent=Some(NodeId("92@1")) children=[NodeId("312@1"), NodeId("430@1")] params={"color": Str("v4d7bd0c768c4"), "name": Str("v3280e928519c"), "y": Num(13442385133822.625)} text=None
+node 14@1: kind=text parent=Some(NodeId("2@1")) children=[NodeId("4@1"), NodeId("92@1")] params={"color": Str("v55011d2d1024"), "opacity": Num(11142441363157.563), "x": Num(449786903921.9375), "y": Num(4023029354799.5)} text=Some("xrugsiqpgehnbpnbuxbhjywdpyecodkq")
+node 190@1: kind=text parent=Some(NodeId("4@1")) children=[NodeId("258@1"), NodeId("34@1")] params={"color": Str("vff671ffb1797"), "width": Num(10710666283819.813)} text=Some("twalqixpyeocqjpjpznssxl")
+node 236@1: kind=shape parent=Some(NodeId("34@1")) children=[NodeId("386@1")] params={"color": Str("v59615d2101a3"), "width": Num(3839124088059.25), "x": Num(13641802808329.188), "y": Num(6006749868827.6875)} text=None
+node 24@1: kind=shape parent=Some(NodeId("10@1")) children=[] params={"name": Str("vf47b54258780"), "width": Num(13136826186893.125), "y": Num(1849705057321.6875)} text=None
+node 258@1: kind=text parent=Some(NodeId("190@1")) children=[] params={"opacity": Num(5641720655383.25), "x": Num(213109894416.625)} text=Some("wpbmbub")
+node 26@1: kind=shape parent=Some(NodeId("92@1")) children=[NodeId("89@1")] params={"name": Str("v7cad19a1849"), "width": Num(7233322183169.4375), "x": Num(12013572757787.313), "y": Num(16860711325580.313)} text=None
+node 2@1: kind=shape parent=None children=[NodeId("364@1"), NodeId("14@1")] params={"color": Str("v678e85d13df2"), "name": Str("v82d17528166"), "width": Num(6280315119644.125), "x": Num(9448096930314.313), "y": Num(10110268693541.5)} text=None
+node 312@1: kind=text parent=Some(NodeId("144@1")) children=[NodeId("418@1"), NodeId("453@1")] params={"width": Num(8263925423892.6875)} text=Some("")
+node 317@1: kind=shape parent=Some(NodeId("34@1")) children=[NodeId("407@1")] params={"name": Str("vd262ed24a411"), "opacity": Num(349817647471.8125)} text=None
+node 319@1: kind=text parent=Some(NodeId("92@1")) children=[] params={} text=Some("xouszn")
+node 34@1: kind=shape parent=Some(NodeId("190@1")) children=[NodeId("236@1"), NodeId("317@1"), NodeId("398@1")] params={"color": Str("v83d4f85fe4b9"), "opacity": Num(11850140666494.875), "width": Num(7448367086680.9375), "x": Num(1986175484858.625), "y": Num(2777306205390.5)} text=None
+node 364@1: kind=shape parent=Some(NodeId("2@1")) children=[NodeId("464@1")] params={} text=None
+node 386@1: kind=text parent=Some(NodeId("236@1")) children=[] params={"x": Num(8892398637578.5)} text=Some("hgksgebl")
+node 398@1: kind=shape parent=Some(NodeId("34@1")) children=[] params={"color": Str("v362b8760e632"), "width": Num(11083189837594.063)} text=None
+node 405@1: kind=shape parent=Some(NodeId("92@1")) children=[] params={"color": Str("v11484039b626")} text=None
+node 407@1: kind=shape parent=Some(NodeId("317@1")) children=[] params={} text=None
+node 418@1: kind=text parent=Some(NodeId("312@1")) children=[] params={} text=Some("")
+node 421@1: kind=shape parent=Some(NodeId("4@1")) children=[] params={} text=None
+node 425@1: kind=shape parent=Some(NodeId("89@1")) children=[] params={} text=None
+node 430@1: kind=shape parent=Some(NodeId("144@1")) children=[] params={} text=None
+node 453@1: kind=shape parent=Some(NodeId("312@1")) children=[] params={"width": Num(8692477702172.0625)} text=None
+node 461@1: kind=shape parent=Some(NodeId("4@1")) children=[] params={} text=None
+node 464@1: kind=shape parent=Some(NodeId("364@1")) children=[] params={} text=None
+node 4@1: kind=text parent=Some(NodeId("14@1")) children=[NodeId("10@1"), NodeId("190@1"), NodeId("421@1"), NodeId("461@1")] params={"name": Str("vced57070a87b"), "opacity": Num(14367139588636.063), "x": Num(8464681732864.3125), "y": Num(3275487894265.5625)} text=Some("pjztuolbafmbsfbweuvzwdortaheuisdiasqbm")
+node 89@1: kind=shape parent=Some(NodeId("26@1")) children=[NodeId("425@1")] params={"name": Str("v80f437927c9d"), "width": Num(3770082439861.9375), "y": Num(16756378649703.438)} text=None
+node 92@1: kind=shape parent=Some(NodeId("14@1")) children=[NodeId("144@1"), NodeId("26@1"), NodeId("319@1"), NodeId("405@1")] params={"color": Str("vfd4eaa205d7d"), "name": Str("vd64e3f61b90b"), "opacity": Num(2280289395763.625), "width": Num(12623549911043.25), "y": Num(1412190504902.6875)} text=None
+edits after the last save: 0
+damaged: None

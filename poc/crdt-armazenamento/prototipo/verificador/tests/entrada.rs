@@ -645,3 +645,77 @@ fn a_bomb_in_a_root_map_is_refused() {
         s.add_milestone(&"a".repeat(200_000_000));
     });
 }
+
+/// A file of `n` minimal large-file pieces (4 bytes each, all different)
+/// and, with `index`, one index per piece.
+fn pieces_file(name: &str, n: u32, index: bool) -> PathBuf {
+    let path = fresh(name);
+    let mut s = S::new_document(1);
+    let snapshot = s.save();
+    let mut payloads: Vec<(u8, Vec<u8>)> = Vec::new();
+    for i in 0..n {
+        let data = i.to_le_bytes();
+        let id = bivar_poc_arquivo::hex_to_id(&bivar_poc_arquivo::sha_hex(&data))
+            .unwrap()
+            .to_vec();
+        let mut chunk = id.clone();
+        chunk.extend_from_slice(&data);
+        payloads.push((3, chunk));
+        if index {
+            // An index: the large file's id (here the same), size, pieces.
+            let mut idx = id.clone();
+            idx.extend_from_slice(&4u64.to_le_bytes());
+            idx.extend_from_slice(&id);
+            payloads.push((4, idx));
+        }
+    }
+    let mut records: Vec<(u8, &[u8])> = vec![(1, &snapshot)];
+    records.extend(payloads.iter().map(|(k, p)| (*k, p.as_slice())));
+    std::fs::write(&path, bivar_poc_arquivo::build_file_bytes(&records)).unwrap();
+    path
+}
+
+fn limit_refused(path: &Path, t: &TrustStore, l: &Limits, what: &str) {
+    let e = open_with(path, t, l, &VerifyLimits::default()).unwrap_err();
+    let CheckError::File(e @ FileError::LimitExceeded { .. }) = e else {
+        panic!("{e:?}")
+    };
+    let message = e.to_string();
+    assert!(
+        message.contains(what) && message.contains("settings"),
+        "{message}"
+    );
+}
+
+/// I9: too many large-file pieces are refused before anything reaches the
+/// document library, and the file opens once the owner raises the limit.
+/// A lower limit stands for the 2 million (owner, 2026-10-31).
+#[test]
+fn too_many_large_file_pieces_are_refused_and_the_limit_can_be_raised() {
+    let t = trust("pieces");
+    let path = pieces_file("pieces", 150, false);
+    let low = Limits {
+        pieces: 100,
+        ..Limits::default()
+    };
+    limit_refused(&path, &t, &low, "pieces of large files");
+    let raised = Limits { pieces: 200, ..low };
+    assert_eq!(
+        open_with(&path, &t, &raised, &VerifyLimits::default()).unwrap(),
+        How::Verified
+    );
+}
+
+/// I9: thousands of small indexes, each within its own limit, are refused
+/// by the limit on all of them together.
+#[test]
+fn large_file_indexes_above_their_total_are_refused() {
+    let t = trust("indexes");
+    let path = pieces_file("indexes", 200, true);
+    let low = Limits {
+        blob_index_total: 72 * 100, // each index here is 72 bytes
+        ..Limits::default()
+    };
+    limit_refused(&path, &t, &low, "large-file indexes");
+    assert_eq!(open(&path, &t).unwrap(), How::Verified);
+}

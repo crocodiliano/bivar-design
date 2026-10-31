@@ -1,0 +1,8 @@
+doc_id: doc-30253a08b0c76e0887ad6d732e497a4c
+nodes: 1
+roots: [NodeId("2@1")]
+edges: {}
+conflicts: ["2@1.color"]
+node 2@1: kind=shape parent=None children=[] params={"color": Str("blue")} text=None
+edits after the last save: 0
+damaged: None

@@ -1119,6 +1119,7 @@ impl<M: ParamMode> Store for LoroStore<M> {
     }
 
     fn apply(&mut self, op: &Op) -> Result<Applied, OpError> {
+        op.validate()?;
         let tree = self.tree();
         let mut out = Applied::default();
         match op {

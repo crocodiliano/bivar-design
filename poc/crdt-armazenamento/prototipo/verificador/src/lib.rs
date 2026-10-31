@@ -161,6 +161,7 @@ fn run_verifier(
         .arg(limits.blob_index.to_string())
         .arg(limits.blob_index_total.to_string())
         .arg(limits.depth.to_string())
+        .arg(limits.pieces.to_string())
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -256,6 +257,7 @@ pub fn fuzz_limits() -> Limits {
         blob_index: 1 << 20,
         blob_index_total: 8 << 20,
         depth: 10_000,
+        pieces: 100_000,
     }
 }
 

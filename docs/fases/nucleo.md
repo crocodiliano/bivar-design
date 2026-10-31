@@ -23,6 +23,7 @@
 - [ ] Um teste cria uma cadeia Forma → Traçado → Preenchimento → Saída, reordena Traçado e Preenchimento e confirma a nova ordem de avaliação.
 - [ ] Uma transação com 500 operações é desfeita com um único passo.
 - [ ] Tentar criar um ciclo é rejeitado com uma mensagem clara.
+- [ ] **Nomes que corromperiam a organização são recusados** (auditoria da 0.6, I11): um nome de parâmetro vazio, com `#` ou com o caractere 0x1F, e um nome de porta vazio ou com 0x1F, venham da interface, de um script ou de um colega.
 - [ ] Testes de propriedades: qualquer sequência aleatória de operações válidas seguida de "desfazer tudo" volta ao estado inicial.
 - [ ] Duas cópias do documento recebem operações concorrentes em ordens diferentes e terminam idênticas (prova de compatibilidade com CRDT, ADR-0005).
 - [ ] **"A última escrita vence", com aviso** (ADR-0019, decisão 3): duas cópias mudam o mesmo parâmetro ao mesmo tempo. Depois da junção, as duas mostram o mesmo valor, o mesmo aviso, e o histórico guarda o valor que perdeu.
@@ -63,6 +64,13 @@
 - [ ] **"Salvar cópia para enviar":** um texto com um marcador único, inserido de uma só vez, e uma imagem são apagados antes de salvar a cópia. Com o arquivo descomprimido do mesmo jeito que o programa o lê, o marcador não aparece em nenhum byte, e nenhum pedaço nem o hash da imagem apagada está na cópia. A biblioteca CRDT confere que o histórico da cópia não tem nenhuma operação anterior à cópia. A cópia começa um histórico novo.
 - [ ] **Pendências antes da cópia:** com um conflito ou um aviso ainda sem resolver no painel de conflitos, "Salvar cópia para enviar" avisa antes de gravar. Sem pendências, não há esse aviso.
 - [ ] **Aviso ao compartilhar:** "Salvar como" num arquivo com histórico mostra um aviso discreto sugerindo "Salvar cópia para enviar". O salvamento normal não mostra aviso.
+- [ ] **Coleção de compatibilidade** (auditoria da 0.6, item 6 e I8): o `bivar-doc` abre todos os arquivos de `tests/formato/` com o resultado registrado ao lado de cada um, diretamente ou por uma migração. A coleção só cresce: a checagem automática recusa mudar, renomear ou apagar um arquivo dela.
+- [ ] **Mapa de pedaços compacto** (auditoria da 0.6, I9; decisão do dono, 2026-10-31): o mapa dos pedaços de arquivos grandes que o programa guarda ao abrir usa uma estrutura compacta, com meta de **no máximo 50 bytes por pedaço**. A bateria de medidas mede isso. O protótipo usava 124 bytes por pedaço.
+- [ ] **Mensagens da cópia para enviar** (auditoria da 0.6, item 9):
+  - a mensagem diz que a cópia **não se junta com o original** e que, para colaborar, se compartilha o arquivo completo;
+  - o aviso de camadas ocultas mostra também o nome de cada objeto que está dentro delas;
+  - a documentação para o usuário avisa que o nome do arquivo e as datas que o sistema guarda fora do conteúdo não são removidos;
+  - **quando a importação de imagens existir:** a cópia remove os metadados das imagens (EXIF com GPS, câmera e data) ou avisa, para cada formato que não souber limpar.
 
 ### N.3 Renderização (`bivar-render`)
 

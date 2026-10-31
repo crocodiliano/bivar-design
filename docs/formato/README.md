@@ -49,8 +49,11 @@ O leitor confere estes limites **antes** de ler ou reservar memória para o cont
 | todos os registros de retrato e de atualizações juntos (os dados do documento) | 1 GiB |
 | um pedaço de arquivo grande | 32 bytes + 4 MiB |
 | um índice de arquivo grande | 8 MiB (cerca de 260 mil pedaços, ou 1 TB por arquivo grande) |
+| todos os índices de arquivos grandes juntos | 64 MiB (cerca de 2 milhões de pedaços citados) |
+| número de pedaços de arquivo grande | 2 milhões (cerca de 8 TB de arquivos grandes) |
 | uma marca de salvamento | 8 bytes |
 | número de registros | 50 milhões |
+| profundidade da árvore de camadas (conferida no documento, seção 5) | 10.000 níveis |
 
 **Os arquivos grandes** (imagem, vídeo, áudio) **não entram no 1 GiB:** eles têm os limites próprios do pedaço e do índice. O tamanho total do arquivo não tem limite.
 
@@ -85,12 +88,17 @@ O conteúdo dos registros de retrato e de atualizações é o formato binário d
   - `schema`: a versão da organização, hoje `2` (a 2 passou a guardar a marca de removido como entradas, com a hora da remoção). Um documento de outra versão é recusado, nunca lido "do jeito que der".
 - **árvore `tree`:** os nós. A ordem dos filhos é a ordem da pilha. O mapa de cada nó guarda:
   - `kind`;
-  - parâmetros como entradas `p:<nome>#<contador>.<cópia>` (16 dígitos hexadecimais cada número). O valor do parâmetro é o da **maior** chave;
-  - a marca de removido como entradas `removed#<contador>.<cópia>`: um número (segundos desde 1970, quando foi removido) quer dizer "removido", e `false` quer dizer "restaurado";
+  - parâmetros como **uma entrada por cópia**, com a chave `p:<nome>#<cópia>` (a cópia em 16 dígitos hexadecimais, em letra minúscula) e o valor `[contador, valor, vistos]`:
+    - `contador`: um inteiro, o maior contador visto mais 1;
+    - `valor`: o valor escrito, ou nulo (parâmetro apagado);
+    - `vistos`: um mapa, cópia (16 dígitos hexadecimais) → contador da entrada dessa cópia que a escrita viu.
+    - **O valor do parâmetro** é o da entrada com o maior contador; empatando, a maior cópia. **Há conflito aberto** quando outra entrada tem um contador maior que o que o vencedor anotou para aquela cópia em `vistos` (ou quando o vencedor não a anotou). Uma cópia só regrava a própria entrada; nunca apaga a de outra;
+    - **o nome de um parâmetro** não pode ser vazio nem ter `#` ou o caractere 0x1F (o leitor do Bivar recusa a operação; auditoria, I11). Uma chave que não termina em `#` seguido de 16 dígitos hexadecimais não é uma entrada;
+  - a marca de removido como entradas por cópia, com a chave `removed#<cópia>` e o mesmo valor `[contador, valor, vistos]`: um número (segundos desde 1970, quando foi removido) quer dizer "removido", e `false` quer dizer "restaurado";
   - `text`, para nós de texto.
-- **mapa `edges`:** uma conexão por chave, no texto `origem␟porta␟destino␟porta` (␟ é o caractere 0x1F).
+- **mapa `edges`:** uma conexão por chave (a identidade da conexão), com o valor no texto `origem␟porta␟destino␟porta` (␟ é o caractere 0x1F). A origem e o destino são identidades de nó no texto `contador@cópia` da Loro, em decimal. Um nome de porta não pode ser vazio nem ter o caractere 0x1F.
 - **mapa `copies`:** `<cópia>#vv` (a versão que essa cópia já viu) e `<cópia>#at` (quando, em segundos).
-- **mapa `checkpoints`:** marcos de tempo, com a chave `<segundos>.<cópia>.<operações>` e a versão naquele momento.
+- **mapa `checkpoints`:** pontos de confirmação, um por salvamento, com a chave `<segundos>.<cópia>.<contador>` (os três em 16 dígitos hexadecimais). A cópia e o contador são a identidade da própria operação que grava a chave: a versão até ela é um ponto onde a compactação pode cortar o histórico (ADR-0023).
 - **mapa `milestones`:** marcos nomeados, com o nome e a versão. **Nunca são limpos.**
 
 ## 6. Gravação

@@ -1,0 +1,9 @@
+doc_id: doc-e59fe43a8829d7ffd2f4b81215ff0e60
+nodes: 1
+roots: [NodeId("2@1")]
+edges: {}
+conflicts: []
+node 2@1: kind=image parent=None children=[] params={"blob": Str("aa1dafc8d9ae6f9a1ed6f16ebf0b9d9809821e46c48ce85fa64876df2db683fe")} text=None
+large file aa1dafc8d9ae6f9a1ed6f16ebf0b9d9809821e46c48ce85fa64876df2db683fe: Ok(4195304)
+edits after the last save: 0
+damaged: None

@@ -42,6 +42,10 @@ pub struct Limits {
     /// All large-file indexes together (64 MiB: about 2 million pieces,
     /// 8 TB of large files; owner, 2026-10-31, audit I9).
     pub blob_index_total: u64,
+    /// Pieces of large files in the file (2 million; owner, 2026-10-31,
+    /// audit I9): the map of pieces the program keeps took 124 bytes per
+    /// piece, so 50 million minimal pieces would take about 5.9 GB.
+    pub pieces: u64,
     /// Nesting of the layer tree (10,000 levels; owner, 2026-10-31, audit
     /// I4). Checked by the verifier; a merge never refuses for it, it warns.
     pub depth: u64,
@@ -55,6 +59,7 @@ impl Default for Limits {
             records: 50_000_000,
             blob_index: 8 << 20,
             blob_index_total: 64 << 20,
+            pieces: 2_000_000,
             depth: 10_000,
         }
     }
@@ -406,7 +411,7 @@ fn scan<R: Read + Seek>(
         fp: Sha256::new(),
     };
     s.fp.update(head);
-    let (mut records, mut doc_bytes) = (0u64, 0u64);
+    let (mut records, mut doc_bytes, mut index_bytes, mut pieces) = (0u64, 0u64, 0u64, 0u64);
     loop {
         let at = s.end;
         let next = read_next(r, at, file_len, limits, &mut s.fp)?;
@@ -417,6 +422,22 @@ fn scan<R: Read + Seek>(
                     what: "number of records",
                     limit: limits.records,
                     found: records,
+                });
+            }
+        }
+        if matches!(
+            next,
+            Next::Record {
+                kind: Kind::Chunk,
+                ..
+            } | Next::ChunkRef { .. }
+        ) {
+            pieces += 1;
+            if pieces > limits.pieces {
+                return Err(FileError::LimitExceeded {
+                    what: "pieces of large files",
+                    limit: limits.pieces,
+                    found: pieces,
                 });
             }
         }
@@ -456,16 +477,30 @@ fn scan<R: Read + Seek>(
                             return Err(FileError::Unreadable(format!("bad piece at {at}")));
                         }
                         let id: [u8; 32] = payload[..32].try_into().expect("32 bytes");
-                        s.chunks.insert(
-                            id,
-                            (at + RECORD_HEAD as u64 + 32, payload.len() as u64 - 32),
-                        );
+                        if keep {
+                            s.chunks.insert(
+                                id,
+                                (at + RECORD_HEAD as u64 + 32, payload.len() as u64 - 32),
+                            );
+                        }
                     }
                     Kind::BlobIndex => {
+                        // All indexes together are limited (I9): each index
+                        // alone is, but thousands of them were not.
+                        index_bytes += payload.len() as u64;
+                        if index_bytes > limits.blob_index_total {
+                            return Err(FileError::LimitExceeded {
+                                what: "large-file indexes (all together)",
+                                limit: limits.blob_index_total,
+                                found: index_bytes,
+                            });
+                        }
                         let (id, entry) = decode_blob_index(&payload).ok_or_else(|| {
                             FileError::Unreadable(format!("bad blob index at {at}"))
                         })?;
-                        s.blobs.insert(id, entry);
+                        if keep {
+                            s.blobs.insert(id, entry);
+                        }
                     }
                     Kind::SaveMark => s.report.edits_after_last_save = 0,
                 }
@@ -477,7 +512,10 @@ fn scan<R: Read + Seek>(
                 len,
                 end,
             } => {
-                s.chunks.insert(id, (data_at, len));
+                // Computing a fingerprint holds no map of pieces (I9).
+                if keep {
+                    s.chunks.insert(id, (data_at, len));
+                }
                 s.end = end;
             }
             Next::End => break,

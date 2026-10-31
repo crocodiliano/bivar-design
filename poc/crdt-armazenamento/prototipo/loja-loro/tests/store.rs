@@ -446,3 +446,49 @@ fn the_seeds_that_found_i1_stay_fixed() {
         nothing_lost_three_copies_compacted::<LoroStore>(seed);
     }
 }
+
+/// I11: a parameter name with '#' would read as another parameter's
+/// entries, and a port with 0x1F would cut its connection's fields: both
+/// are refused, so nothing is corrupted.
+#[test]
+fn names_that_would_corrupt_the_layout_are_refused() {
+    let mut s = LoroStore::new_document(1);
+    let mk = |s: &mut LoroStore| {
+        s.apply(&Op::CreateNode {
+            parent: None,
+            index: None,
+            kind: "shape".into(),
+        })
+        .unwrap()
+        .created
+        .unwrap()
+    };
+    let (a, b) = (mk(&mut s), mk(&mut s));
+    for bad in ["a#b", "", "x\u{1f}y"] {
+        let r = s.apply(&Op::SetParam {
+            node: a.clone(),
+            key: bad.into(),
+            value: Some(Value::Num(5.0)),
+        });
+        assert!(matches!(r, Err(OpError::Invalid(_))), "{bad:?}: {r:?}");
+    }
+    // The case the auditor showed: a#b written, then a.
+    s.apply(&Op::SetParam {
+        node: a.clone(),
+        key: "a".into(),
+        value: Some(Value::Num(1.0)),
+    })
+    .unwrap();
+    assert_eq!(s.param(&a, "a"), Some(Value::Num(1.0)));
+    let r = s.apply(&Op::Connect {
+        id: None,
+        edge: Edge {
+            from: a.clone(),
+            from_port: "out\u{1f}x".into(),
+            to: b.clone(),
+            to_port: "in".into(),
+        },
+    });
+    assert!(matches!(r, Err(OpError::Invalid(_))), "{r:?}");
+    assert!(s.edges().is_empty());
+}

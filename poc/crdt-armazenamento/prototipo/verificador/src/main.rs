@@ -6,7 +6,7 @@
 //!
 //! Arguments: path, memory limit (bytes), then the file limits: document
 //! record, document total, records, large-file index, all large-file
-//! indexes, depth. A tree deeper than the depth limit is answered
+//! indexes, depth, pieces. A tree deeper than the depth limit is answered
 //! `TOO_DEEP <depth>`: our own message, not the text of a crash (audit
 //! 2026-10-31, M3).
 
@@ -38,6 +38,7 @@ fn main() {
         blob_index: arg(&args, 6),
         blob_index_total: arg(&args, 7),
         depth: arg(&args, 8),
+        pieces: arg(&args, 9),
     };
     // Test hook: noise on the error output, more than a pipe holds, to
     // prove the program reads it while the verifier runs.

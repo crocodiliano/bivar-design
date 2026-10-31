@@ -238,6 +238,10 @@ pub struct HiddenLayer {
     pub name: Option<String>,
     /// How many layers are inside it (they go or stay with it).
     pub inside: usize,
+    /// What is inside it, in tree order: each object's `name` parameter, or
+    /// its kind in angle brackets when it has none. Shown with the warning,
+    /// so the owner sees what would go along (DeepSeek 4.1, 2026-10-31).
+    pub inside_names: Vec<String>,
 }
 
 fn is_hidden(node: &NodeState) -> bool {
@@ -259,25 +263,32 @@ pub fn hidden_layers(state: &State) -> Vec<HiddenLayer> {
                     Some(Value::Str(s)) => Some(s.clone()),
                     _ => None,
                 },
-                inside: count_inside(state, node),
+                inside_names: names_inside(state, node),
+                inside: 0,
             });
+            let last = out.last_mut().expect("just pushed");
+            last.inside = last.inside_names.len();
         }
         stack.extend(node.children.iter().rev());
     }
     out
 }
 
-/// How many layers are inside `node`, at any depth. With an explicit stack:
-/// no function that walks the tree may call itself (audit 2026-10-31, I4),
-/// or a deep tree overflows the program's stack.
-fn count_inside(state: &State, node: &NodeState) -> usize {
-    let mut count = 0;
-    let mut stack: Vec<&NodeId> = node.children.iter().collect();
+/// The layers inside `node`, at any depth, in tree order, by name (or kind).
+/// With an explicit stack: no function that walks the tree may call itself
+/// (audit 2026-10-31, I4), or a deep tree overflows the program's stack.
+fn names_inside(state: &State, node: &NodeState) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut stack: Vec<&NodeId> = node.children.iter().rev().collect();
     while let Some(c) = stack.pop() {
-        count += 1;
-        stack.extend(state.nodes[c].children.iter());
+        let n = &state.nodes[c];
+        out.push(match n.params.get("name") {
+            Some(Value::Str(s)) => s.clone(),
+            _ => format!("<{}>", n.kind),
+        });
+        stack.extend(n.children.iter().rev());
     }
-    count
+    out
 }
 
 /// Default limit on the nesting of the layer tree (owner, 2026-10-31).

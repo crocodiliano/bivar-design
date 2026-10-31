@@ -290,3 +290,92 @@ fn growth_and_compaction() {
     );
     let _ = std::fs::remove_file(&p);
 }
+
+/// Peak memory of this process so far (Windows or Linux), no `unsafe`.
+fn peak_memory() -> u64 {
+    if cfg!(windows) {
+        let out = std::process::Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-Command",
+                &format!("(Get-Process -Id {}).PeakWorkingSet64", std::process::id()),
+            ])
+            .output()
+            .expect("powershell runs");
+        String::from_utf8_lossy(&out.stdout)
+            .trim()
+            .parse()
+            .unwrap_or(0)
+    } else {
+        let status = std::fs::read_to_string("/proc/self/status").unwrap_or_default();
+        status
+            .lines()
+            .find_map(|l| l.strip_prefix("VmHWM:"))
+            .and_then(|v| v.trim().trim_end_matches("kB").trim().parse::<u64>().ok())
+            .map_or(0, |kb| kb * 1024)
+    }
+}
+
+/// I9: the worst case of the map of pieces the program builds when it
+/// opens a file: `BIVAR_PIECES` (default 5 million) pieces of 4 bytes each,
+/// all different, no index pointing at them. Run once to write the file,
+/// and the opening in a fresh process measures its peak memory:
+/// `cargo test --release -p bivar-poc-arquivo --test medidas pieces_map -- --ignored --nocapture`
+#[test]
+#[ignore = "measurement"]
+fn pieces_map_worst_case_memory() {
+    let n: u32 = std::env::var("BIVAR_PIECES")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(5_000_000);
+    let dir = std::env::temp_dir().join("bivar-poc-arquivo");
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join(format!("pedacos-{n}.bivar"));
+    if std::env::var("BIVAR_PIECES_OPEN").is_err() {
+        let mut s = S::new_document(1);
+        let snapshot = s.save();
+        let payloads: Vec<Vec<u8>> = (0..n)
+            .map(|i| {
+                let data = i.to_le_bytes();
+                let mut p = Sha256::digest(data).to_vec();
+                p.extend_from_slice(&data);
+                p
+            })
+            .collect();
+        let mut records: Vec<(u8, &[u8])> = vec![(1, &snapshot)];
+        records.extend(payloads.iter().map(|p| (3u8, p.as_slice())));
+        std::fs::write(&path, bivar_poc_arquivo::build_file_bytes(&records)).unwrap();
+        drop(records);
+        drop(payloads);
+        let out = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "pieces_map_worst_case_memory",
+                "--exact",
+                "--ignored",
+                "--nocapture",
+            ])
+            .env("BIVAR_PIECES_OPEN", "1")
+            .env("BIVAR_PIECES", n.to_string())
+            .output()
+            .unwrap();
+        let text = String::from_utf8_lossy(&out.stdout);
+        let line = text
+            .lines()
+            .find_map(|l| l.find("RESULT").map(|i| &l[i..]))
+            .unwrap_or_else(|| panic!("child: {text}{}", String::from_utf8_lossy(&out.stderr)));
+        println!("{line}");
+        let _ = std::fs::remove_file(&path);
+        return;
+    }
+    let before = peak_memory();
+    let t = Instant::now();
+    let (f, _, _) = DocFile::open::<S>(&path, 2).unwrap();
+    let open_s = t.elapsed().as_secs_f64();
+    let extra = peak_memory().saturating_sub(before);
+    println!(
+        "RESULT pieces={n} file_mb={:.0} open_s={open_s:.2} extra_memory_mb={:.0} per_piece_bytes={:.0}",
+        f.len() as f64 / 1_048_576.0,
+        extra as f64 / 1_048_576.0,
+        extra as f64 / f64::from(n)
+    );
+}

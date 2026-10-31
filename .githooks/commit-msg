@@ -23,3 +23,15 @@ EOF
         exit 1
     fi
 fi
+
+# The .bivar files every future version must open: only adding files to
+# tests/formato/ is allowed (owner, 2026-10-31). CI runs the same check.
+changed=$(git diff --cached --name-status --diff-filter=DMRTC -- tests/formato/)
+if [ -n "$changed" ]; then
+    cat >&2 <<EOF
+ERROR: this commit changes, renames or removes files in tests/formato/:
+$changed
+Only adding files is allowed there; a new format version comes in as new files.
+EOF
+    exit 1
+fi

@@ -1,0 +1,11 @@
+doc_id: doc-d65af2fc2864372f69ec3cdc0adcd4c0
+nodes: 4
+roots: [NodeId("2@1"), NodeId("8@1")]
+edges: {"e1.1": Edge { from: NodeId("4@1"), from_port: "out", to: NodeId("6@1"), to_port: "in" }}
+conflicts: []
+node 2@1: kind=group parent=None children=[NodeId("4@1"), NodeId("6@1")] params={} text=None
+node 4@1: kind=shape parent=Some(NodeId("2@1")) children=[] params={"name": Str("Açaí à brasileira — ótimo"), "x": Num(1.5)} text=None
+node 6@1: kind=shape parent=Some(NodeId("2@1")) children=[] params={} text=None
+node 8@1: kind=text parent=None children=[] params={} text=Some("Olá, mundo")
+edits after the last save: 0
+damaged: None

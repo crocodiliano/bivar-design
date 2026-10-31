@@ -183,7 +183,38 @@ impl<'a> Reader<'a> {
     }
 }
 
+/// Characters a parameter name may not have: `#` ends the name inside an
+/// entry key (`p:<name>#<copy>`), and 0x1F separates the fields of a stored
+/// connection. Allowed, `a#b` would read as `a`'s entries, and a port with
+/// 0x1F would cut its connection's fields (audit 2026-10-31, I11).
+pub const NAME_FORBIDDEN: [char; 2] = ['#', '\u{1f}'];
+
 impl Op {
+    /// Checks the names an operation stores: parameter names and ports are
+    /// not empty and have none of `NAME_FORBIDDEN`. Every store runs it
+    /// before applying anything, whatever the operation came from (the
+    /// interface, a script, a colleague).
+    pub fn validate(&self) -> Result<(), crate::OpError> {
+        let check = |what: &str, name: &str| {
+            if name.is_empty() || name.contains(NAME_FORBIDDEN) {
+                Err(crate::OpError::Invalid(format!(
+                    "{what} {name:?}: a name must not be empty nor contain '#' or the \
+                     character 0x1F"
+                )))
+            } else {
+                Ok(())
+            }
+        };
+        match self {
+            Op::SetParam { key, .. } => check("parameter", key),
+            Op::Connect { edge, .. } => {
+                check("port", &edge.from_port)?;
+                check("port", &edge.to_port)
+            }
+            _ => Ok(()),
+        }
+    }
+
     /// Serialized form: `bivar-op/<version>/` followed by the fields.
     pub fn encode(&self) -> String {
         let mut w = Writer(format!("bivar-op/{OP_FORMAT_VERSION}/"));

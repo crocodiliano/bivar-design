@@ -433,6 +433,9 @@ fn hidden_layers_are_listed_and_can_be_left_out() {
     assert_eq!(list[0].node, group);
     assert_eq!(list[0].name.as_deref(), Some("Rascunho"));
     assert_eq!(list[0].inside, 1, "the text inside goes or stays with it");
+    // What is inside is named in the warning (DeepSeek 4.1): the text has
+    // no name, so its kind is shown.
+    assert_eq!(list[0].inside_names, vec!["<text>".to_owned()]);
     assert_eq!((list[1].node.clone(), list[1].inside), (nested.clone(), 0));
 
     // Kept: they go along, still hidden.
@@ -678,4 +681,84 @@ fn the_copy_file_has_every_connection_between_nodes_it_keeps() {
     o.file.save_send_copy(&o.store, &dest, GO).unwrap();
     let (_, copy, _) = DocFile::open::<S>(&dest, 2).unwrap();
     assert_eq!(copy.state().edges.len(), expected);
+}
+
+/// Item 9 (O6, Gemini 4.1, DeepSeek 4.4): nothing in the copy carries an
+/// identity or a number from the original: not the session identities nor
+/// the copy names, in hex or decimal; not the node identities, also inside
+/// connections; not the document identity. Large session identities, so a
+/// short number cannot be found by chance.
+#[test]
+fn the_copy_carries_no_identity_or_number_of_the_original() {
+    let big = |n: u64| (1 << 60) | (bivar_poc_modelo::random_u64() >> 8) | n;
+    let path = fresh("identities");
+    let mut a = S::new_document(big(1));
+    a.set_copy_name(big(2));
+    Workload::new(31).run(&mut a, 200);
+    let mut b = a.fork_as(big(3));
+    b.set_copy_name(big(4));
+    Workload::new(32).run(&mut b, 100);
+    a.merge_from(&mut b).unwrap();
+    let mut f = DocFile::create(&path, &mut a).unwrap();
+    f.save(&mut a, "pc").unwrap();
+    let st = a.state();
+    assert!(st.edges.len() > 3, "test setup: few connections");
+    // Each secret in every form it could be written in.
+    let mut groups: Vec<Vec<String>> = Vec::new();
+    for id in [a.peer(), a.copy_name(), b.peer(), b.copy_name()] {
+        groups.push(vec![
+            format!("{id:x}"),
+            format!("{id:016x}"),
+            id.to_string(),
+        ]);
+    }
+    groups.extend(st.nodes.keys().map(|n| vec![n.0.clone()]));
+    groups.extend(st.edges.keys().map(|e| vec![e.clone()]));
+    groups.push(vec![st.doc_id.clone()]);
+    // Control: the working file has each secret in at least one form.
+    let working = views(&path);
+    for g in &groups {
+        assert!(
+            g.iter()
+                .any(|s| !found_in(&working, s.as_bytes()).is_empty()),
+            "control: {g:?}"
+        );
+    }
+    let secrets: Vec<String> = groups.into_iter().flatten().collect();
+    let dest = fresh("identities-copy");
+    f.save_send_copy(&a, &dest, GO).unwrap();
+    let copy = views(&dest);
+    for s in &secrets {
+        assert_eq!(
+            found_in(&copy, s.as_bytes()),
+            Vec::<&str>::new(),
+            "{s} in the copy"
+        );
+    }
+    // The numbers in the copy say nothing about what was removed before
+    // (Gemini 4.1): a document with the same visible content, plus 30
+    // nodes made and removed, gives a copy with the same numbers.
+    let counters = |p: &std::path::Path| -> Vec<String> {
+        let (_, c, _) = DocFile::open::<S>(p, 5).unwrap();
+        let mut v: Vec<String> = c
+            .state()
+            .nodes
+            .keys()
+            .map(|n| n.0.split('@').next().unwrap().to_owned())
+            .collect();
+        v.sort();
+        v
+    };
+    let mut busy = a.fork_as(big(5));
+    for _ in 0..30 {
+        let n = create(&mut busy, None, "shape");
+        busy.apply(&Op::RemoveNode { node: n }).unwrap();
+        busy.commit();
+    }
+    assert_eq!(busy.state(), a.state(), "test setup: same visible content");
+    let busy_path = fresh("identities-busy");
+    let busy_file = DocFile::create(&busy_path, &mut busy).unwrap();
+    let busy_dest = fresh("identities-busy-copy");
+    busy_file.save_send_copy(&busy, &busy_dest, GO).unwrap();
+    assert_eq!(counters(&dest), counters(&busy_dest));
 }

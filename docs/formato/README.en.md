@@ -49,8 +49,11 @@ A reader checks these limits **before** reading or reserving memory for a payloa
 | all snapshot and updates records together (the document data) | 1 GiB |
 | one large-file chunk | 32 bytes + 4 MiB |
 | one large-file index | 8 MiB (about 260,000 chunks, 1 TB per large file) |
+| all large-file indexes together | 64 MiB (about 2 million chunks referred to) |
+| number of large-file chunks | 2 million (about 8 TB of large files) |
 | one save mark | 8 bytes |
 | number of records | 50 million |
+| depth of the layer tree (checked in the document, section 5) | 10,000 levels |
 
 **Large files** (image, video, audio) **do not count in the 1 GiB:** they have their own chunk and index limits. The total file size has no limit.
 
@@ -82,15 +85,21 @@ Snapshot and updates payloads use the binary format of **Loro 1.17.1** (open lib
 
 - **map `meta`:**
   - `doc_id`: the document identity, random (`doc-` and 32 hex digits; it says nothing about who created it or when);
-  - `schema`: the layout version, now `2` (version 2 stores the removal mark as entries, with the removal time). A document of another version is refused, never read "as well as possible".
+  - `schema`: the layout version, now `3`. Version 2 stores the removal mark as entries, with the removal time; version 3 stores **one entry per copy**, not one per write (audit of 2026-10-31: every write left a deleted key that Loro keeps forever). A document of another version is refused, never read "as well as possible";
+  - `note:<key>`: notes of the file itself. Today only `note:replaced_file`, the fingerprint of the file a compaction replaced (section 6).
 - **tree `tree`:** the nodes. Children order is the stack order. Each node's map holds:
   - `kind`;
-  - parameters as entries `p:<name>#<counter>.<copy>` (16 hex digits each number). The parameter's value is the one with the **highest** key;
-  - the removal mark as entries `removed#<counter>.<copy>`: a number (seconds since 1970, when removed) means "removed", `false` means "restored";
+  - parameters as **one entry per copy**, keyed `p:<name>#<copy>` (the copy in 16 lowercase hex digits), with the value `[counter, value, seen]`:
+    - `counter`: an integer, the highest counter seen plus 1;
+    - `value`: the value written, or null (parameter cleared);
+    - `seen`: a map, copy (16 hex digits) → counter of that copy's entry the write saw.
+    - **The parameter's value** is the entry with the highest counter; on a tie, the highest copy. **A conflict is open** when another entry has a higher counter than the one the winner noted for that copy in `seen` (or the winner did not note it). A copy only rewrites its own entry; it never deletes another's;
+    - **a parameter name** is never empty and has no `#` and no character 0x1F (the Bivar reader refuses the operation; audit, I11). A key that does not end in `#` followed by 16 hex digits is not an entry;
+  - the removal mark as entries per copy, keyed `removed#<copy>`, with the same value `[counter, value, seen]`: a number (seconds since 1970, when removed) means "removed", `false` means "restored";
   - `text`, for text nodes.
-- **map `edges`:** one connection per key, as `from␟port␟to␟port` (␟ is character 0x1F).
+- **map `edges`:** one connection per key (the connection's identity), the value as `from␟port␟to␟port` (␟ is character 0x1F). From and to are node identities in Loro's text form `counter@copy`, in decimal. A port name is never empty and has no character 0x1F.
 - **map `copies`:** `<copy>#vv` (the version that copy has seen) and `<copy>#at` (when, in seconds).
-- **map `checkpoints`:** time checkpoints, keyed `<seconds>.<copy>.<ops>`, with the version at that moment.
+- **map `checkpoints`:** confirmation points, one per save, keyed `<seconds>.<copy>.<counter>` (all three in 16 hex digits). The copy and counter are the identity of the very operation that writes the key: the version up to it is a point where compaction can cut the history (ADR-0023, Portuguese).
 - **map `milestones`:** named milestones, with the name and the version. **Never cleaned.**
 
 ## 6. Writing

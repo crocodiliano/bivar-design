@@ -191,6 +191,24 @@ jobs:
           done
           exit $failed
 
+      # The .bivar files every future version must open (owner, 2026-10-31):
+      # files are only ever added to tests/formato/, never changed, renamed
+      # or deleted. A new format version comes in as new files.
+      - name: tests/formato only grows
+        env:
+          RANGE: ${{ steps.range.outputs.range }}
+        run: |
+          failed=0
+          for c in $(git rev-list --no-merges "$RANGE"); do
+            changed=$(git diff-tree --no-commit-id --root -r --name-status --diff-filter=DMRTC "$c" -- tests/formato/)
+            if [ -n "$changed" ]; then
+              echo "::error::Commit $c changes or removes files in tests/formato/ (only adding is allowed):"
+              echo "$changed"
+              failed=1
+            fi
+          done
+          exit $failed
+
       # Golden images change only with the owner's recorded approval
       # (CLAUDE.md section 6). Commits up to GOLDEN_BASELINE predate the rule.
       - name: Check owner approval for golden image changes
