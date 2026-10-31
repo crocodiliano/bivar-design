@@ -581,3 +581,83 @@ fn the_copy_carries_only_the_winning_value_of_each_parameter() {
     }
     assert!(!found_in(&v, b"final").is_empty());
 }
+
+/// Bytes of one large-file piece with a unique marker at the start.
+fn piece(marker: &[u8], seed: u8) -> Vec<u8> {
+    let mut p = image(seed, bivar_poc_arquivo::CHUNK_SIZE);
+    p[..marker.len()].copy_from_slice(marker);
+    p
+}
+
+/// I12: a piece two large files share goes into the copy once, and the
+/// copy reads back whole.
+#[test]
+fn a_piece_shared_by_two_large_files_goes_into_the_copy_once() {
+    let path = fresh("shared-piece");
+    let mut s = S::new_document(1);
+    let mut f = DocFile::create(&path, &mut s).unwrap();
+    let shared = piece(b"PEDACO-COMPARTILHADO-5e1f", 1);
+    let a: Vec<u8> = [shared.clone(), piece(b"SO-NO-A-71aa", 2)].concat();
+    let b: Vec<u8> = [shared, piece(b"SO-NO-B-0c3d", 3)].concat();
+    for data in [&a, &b] {
+        let h = f.put_blob(&data[..]).unwrap();
+        let n = create(&mut s, None, "image");
+        set(&mut s, &n, "blob", Value::Str(h));
+    }
+    f.save(&mut s, "pc").unwrap();
+    let dest = fresh("shared-piece-copy");
+    let report = f.save_send_copy(&s, &dest, GO).unwrap();
+    assert_eq!(report.large_files, 2);
+    let bytes = std::fs::read(&dest).unwrap();
+    let count = bytes
+        .windows(25)
+        .filter(|w| *w == b"PEDACO-COMPARTILHADO-5e1f")
+        .count();
+    assert_eq!(count, 1, "the shared piece is in the copy {count} times");
+    let (copy, _, _) = DocFile::open::<S>(&dest, 2).unwrap();
+    let mut out = Vec::new();
+    copy.read_blob(&sha_hex(&b), &mut out).unwrap();
+    assert_eq!(out, b);
+}
+
+/// I12: a damaged piece stops the copy; no file is left that would point
+/// at a piece it does not have.
+#[test]
+fn a_damaged_piece_stops_the_copy_and_leaves_no_file() {
+    let path = fresh("damaged-piece");
+    let mut s = S::new_document(1);
+    let mut f = DocFile::create(&path, &mut s).unwrap();
+    let data = piece(b"PEDACO-QUE-ESTRAGA-9d2b", 4);
+    let h = f.put_blob(&data[..]).unwrap();
+    let n = create(&mut s, None, "image");
+    set(&mut s, &n, "blob", Value::Str(h));
+    f.save(&mut s, "pc").unwrap();
+    drop(f);
+    let mut bytes = std::fs::read(&path).unwrap();
+    let at = bytes
+        .windows(23)
+        .position(|w| w == b"PEDACO-QUE-ESTRAGA-9d2b")
+        .unwrap();
+    bytes[at + 1000] ^= 0xff;
+    std::fs::write(&path, &bytes).unwrap();
+    let (f, s, _) = DocFile::open::<S>(&path, 2).unwrap();
+    let dest = fresh("damaged-piece-copy");
+    let got = f.save_send_copy(&s, &dest, GO);
+    assert!(got.is_err(), "{got:?}");
+    assert!(!dest.exists(), "a copy was left behind");
+}
+
+/// I12: a large file a node names but the file lacks is reported, not
+/// skipped in silence.
+#[test]
+fn a_missing_large_file_is_reported() {
+    let path = fresh("missing-large-file");
+    let mut s = S::new_document(1);
+    let f = DocFile::create(&path, &mut s).unwrap();
+    let n = create(&mut s, None, "image");
+    let absent = sha_hex(b"never stored");
+    set(&mut s, &n, "blob", Value::Str(absent.clone()));
+    let dest = fresh("missing-large-file-copy");
+    let report = f.save_send_copy(&s, &dest, GO).unwrap();
+    assert_eq!(report.missing_large_files, vec![absent]);
+}

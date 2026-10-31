@@ -6,7 +6,7 @@
 //! nothing already written, and a cut or damaged tail is simply ignored.
 //! Compaction writes a new file and replaces the old one in one rename.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
@@ -61,6 +61,10 @@ impl Default for Limits {
 }
 /// Edits reach the disk at most this long after being made (owner, 2026-10-29).
 pub const SYNC_EVERY: Duration = Duration::from_secs(1);
+
+/// The note a compaction leaves in the new document: the fingerprint of the
+/// file it replaced (I10).
+const REPLACED_NOTE: &str = "replaced_file";
 
 const RECORD_HEAD: usize = 9;
 const RECORD_TAIL: usize = 32;
@@ -134,6 +138,15 @@ pub enum FileError {
     /// without asking: the program tells the owner, who may keep it (and
     /// choose another name) or delete it with `discard_partial`.
     PartialLeftover(PathBuf),
+    /// A write failed (a full disk, a removed drive). The file went back to
+    /// the end of its last good record; the edits are still in memory and
+    /// the next save tries again. The program warns at once and offers to
+    /// save elsewhere (`save_as`). With `still_writable` false, even going
+    /// back failed: this session writes the file no more.
+    NotWritten {
+        cause: io::Error,
+        still_writable: bool,
+    },
 }
 
 impl std::fmt::Display for FileError {
@@ -660,6 +673,8 @@ pub struct OpenReport {
     pub read_only: Option<String>,
     /// A cut last write that was dropped (the crash case).
     pub dropped_tail: Option<String>,
+    /// Where the dropped bytes were kept (`<name>.estragado`), never deleted.
+    pub tail_kept_at: Option<PathBuf>,
     /// Damage in the middle: everything before it was opened, read-only.
     pub damaged_at: Option<String>,
     /// Updates written after the last save mark (they were kept).
@@ -687,6 +702,8 @@ pub struct DocFile {
     unsynced: bool,
     /// Running fingerprint: header, then each record's head and digest.
     fp: Sha256,
+    /// Test only: bytes of room left on a simulated full disk.
+    test_room: Option<u64>,
 }
 
 /// Windows: the writer shares the file for reading only, so a second
@@ -766,20 +783,7 @@ pub fn recover_from_backup(path: &Path) -> Result<Option<PathBuf>, FileError> {
         ));
     }
     let aside = if path.exists() {
-        let mut n = 0;
-        let aside = loop {
-            let mut s = path.as_os_str().to_owned();
-            s.push(if n == 0 {
-                ".estragado".to_owned()
-            } else {
-                format!(".estragado-{n}")
-            });
-            let p = PathBuf::from(s);
-            if !p.exists() {
-                break p;
-            }
-            n += 1;
-        };
+        let aside = aside_path(path);
         std::fs::rename(path, &aside)?;
         Some(aside)
     } else {
@@ -788,6 +792,25 @@ pub fn recover_from_backup(path: &Path) -> Result<Option<PathBuf>, FileError> {
     std::fs::rename(&backup, path)?;
     let _ = std::fs::remove_file(tmp_path(path));
     Ok(aside)
+}
+
+/// Where damaged bytes are kept instead of being deleted: `<name>.estragado`,
+/// numbered when that name is taken.
+fn aside_path(path: &Path) -> PathBuf {
+    let mut n = 0;
+    loop {
+        let mut s = path.as_os_str().to_owned();
+        s.push(if n == 0 {
+            ".estragado".to_owned()
+        } else {
+            format!(".estragado-{n}")
+        });
+        let p = PathBuf::from(s);
+        if !p.exists() {
+            return p;
+        }
+        n += 1;
+    }
 }
 
 fn tmp_path(path: &Path) -> PathBuf {
@@ -835,17 +858,26 @@ fn write_new_file(
     Ok(done?)
 }
 
-/// A large file carried into a new file: id, index, and its pieces' bytes.
-type KeptBlob = ([u8; 32], BlobEntry, Vec<Vec<u8>>);
+/// The large files a new file carries, and where their pieces are read.
+struct Carried<'a> {
+    from: &'a DocFile,
+    blobs: Vec<([u8; 32], BlobEntry)>,
+}
 
-/// Writes a fresh file (header, snapshot, the given blobs, a save mark with
-/// `saved_at`) at `target`, forced to disk. Used by `create`, compaction and
-/// the copy to send (which passes 0: no date).
+/// Writes a fresh file (header, snapshot, the carried large files, a save
+/// mark with `saved_at`) at `target`, forced to disk. Used by `create`,
+/// compaction and the copy to send (which passes 0: no date).
+///
+/// Large files are copied piece by piece from the source file (audit
+/// 2026-10-31, I12): never all in memory at once, each piece checked
+/// against its identity before it is written, and a piece shared by two
+/// large files written once. A damaged piece stops the writing: no new file
+/// is made that would point at a piece it does not have.
 fn write_fresh(
     target: &Path,
     version: u32,
     snapshot: &[u8],
-    blobs: &[KeptBlob],
+    carried: Option<&Carried>,
     saved_at: u64,
 ) -> io::Result<()> {
     let mut f = OpenOptions::new()
@@ -854,16 +886,35 @@ fn write_fresh(
         .open(target)?;
     f.write_all(&header(version))?;
     f.write_all(&encode_record(Kind::Snapshot, snapshot))?;
-    for (id, entry, data) in blobs {
-        for piece in data {
-            let mut payload = sha(&[piece]).to_vec();
-            payload.extend_from_slice(piece);
-            f.write_all(&encode_record(Kind::Chunk, &payload))?;
+    if let Some(c) = carried {
+        let mut src = open_reader(&c.from.path)?;
+        let mut written: HashSet<[u8; 32]> = HashSet::new();
+        for (id, entry) in &c.blobs {
+            for piece_id in &entry.chunks {
+                if !written.insert(*piece_id) {
+                    continue; // already in the new file
+                }
+                let &(at, len) = c.from.chunks.get(piece_id).ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::InvalidData, "a large-file piece is missing")
+                })?;
+                let mut piece = vec![0u8; len as usize];
+                src.seek(SeekFrom::Start(at))?;
+                src.read_exact(&mut piece)?;
+                if sha(&[&piece]) != *piece_id {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        format!("a piece of the large file {} is damaged", hex(id)),
+                    ));
+                }
+                let mut payload = piece_id.to_vec();
+                payload.extend_from_slice(&piece);
+                f.write_all(&encode_record(Kind::Chunk, &payload))?;
+            }
+            f.write_all(&encode_record(
+                Kind::BlobIndex,
+                &encode_blob_index(id, entry),
+            ))?;
         }
-        f.write_all(&encode_record(
-            Kind::BlobIndex,
-            &encode_blob_index(id, entry),
-        ))?;
     }
     f.write_all(&encode_record(Kind::SaveMark, &saved_at.to_le_bytes()))?;
     f.sync_all()
@@ -875,7 +926,7 @@ impl DocFile {
         if path.exists() {
             return Err(FileError::AlreadyExists);
         }
-        write_fresh(path, FORMAT_VERSION, &store.save(), &[], unix_now())?;
+        write_fresh(path, FORMAT_VERSION, &store.save(), None, unix_now())?;
         let (f, _, _) = DocFile::open::<S>(path, 0)?;
         let mut f = f;
         f.written_version = store.version();
@@ -904,9 +955,15 @@ impl DocFile {
         match Self::open_main::<S>(path, peer, limits, access, expect) {
             Ok((f, s, mut report)) => {
                 if has_backup {
-                    if f.writable && report.damaged_at.is_none() {
-                        // A compaction stopped after the swap: the new file
-                        // opens fine, so the safety copy can go now.
+                    // A compaction stopped after the swap: the new file opens
+                    // fine, so the safety copy can go now, but only if it is
+                    // the very file this one replaced (I10). Any other file
+                    // with that name (an old document, after the owner said no
+                    // to recovering it) is kept and reported.
+                    let replaced = s.note(REPLACED_NOTE);
+                    let is_the_old_file = fingerprint_file(&backup, limits)
+                        .is_ok_and(|fp| replaced.as_deref() == Some(hex(&fp).as_str()));
+                    if f.writable && report.damaged_at.is_none() && is_the_old_file {
                         let _ = std::fs::remove_file(&backup);
                     } else {
                         report.backup_available = Some(backup);
@@ -959,6 +1016,15 @@ impl DocFile {
             writable = false;
         }
         if s.torn && writable {
+            // The cut tail is kept aside, never just deleted (M4): it may be
+            // a complete record damaged later on the disk, not a cut write.
+            let mut tail = Vec::new();
+            file.seek(SeekFrom::Start(s.end))?;
+            file.read_to_end(&mut tail)?;
+            let aside = aside_path(path);
+            std::fs::write(&aside, &tail)?;
+            OpenOptions::new().write(true).open(&aside)?.sync_all()?;
+            report.tail_kept_at = Some(aside);
             file.set_len(s.end)?;
             file.sync_all()?;
         }
@@ -978,36 +1044,44 @@ impl DocFile {
             last_sync: Instant::now(),
             unsynced: false,
             fp,
+            test_room: None,
         };
         Ok((doc, store, report))
     }
 
-    /// The large files that `live` (hashes, in hex) still refers to, with
-    /// their pieces' bytes, to carry into a new file.
-    fn kept_blobs(
-        &self,
-        live: &std::collections::BTreeSet<String>,
-    ) -> Result<Vec<KeptBlob>, FileError> {
-        let mut blobs = Vec::new();
-        let mut f = open_reader(&self.path)?;
-        for (id, entry) in &self.blobs {
-            if !live.contains(&hex(id.as_slice())) {
-                continue; // no node refers to it any more
-            }
-            let mut data = Vec::new();
-            for c in &entry.chunks {
-                let &(at, len) = self
-                    .chunks
-                    .get(c)
-                    .ok_or_else(|| FileError::Unreadable("a large-file piece is missing".into()))?;
-                let mut piece = vec![0u8; len as usize];
-                f.seek(SeekFrom::Start(at))?;
-                f.read_exact(&mut piece)?;
-                data.push(piece);
-            }
-            blobs.push((*id, entry.clone(), data));
+    /// The large files that `live` (hashes, in hex) still refers to, to
+    /// carry into a new file; and the hashes `live` names that this file
+    /// has no large file for (reported, never skipped in silence).
+    fn carried(&self, live: &std::collections::BTreeSet<String>) -> (Carried<'_>, Vec<String>) {
+        let mut blobs: Vec<([u8; 32], BlobEntry)> = self
+            .blobs
+            .iter()
+            .filter(|(id, _)| live.contains(&hex(id.as_slice())))
+            .map(|(id, e)| (*id, e.clone()))
+            .collect();
+        blobs.sort_by_key(|(id, _)| *id);
+        let missing = live
+            .iter()
+            .filter(|h| !self.blobs.keys().any(|id| hex(id.as_slice()) == **h))
+            .cloned()
+            .collect();
+        (Carried { from: self, blobs }, missing)
+    }
+
+    /// Opens a file just written and reads every large file in it, each
+    /// piece checked: a new file is used only once it reads back whole.
+    fn reads_back_whole<S: Store>(path: &Path) -> Result<(), FileError> {
+        let (f, _, report) =
+            Self::open_main::<S>(path, 0, &Limits::default(), Access::ReadOnly, None)?;
+        if let Some(d) = report.damaged_at {
+            return Err(FileError::Unreadable(format!(
+                "the new file reads back damaged: {d}"
+            )));
         }
-        Ok(blobs)
+        for id in f.blobs.keys() {
+            f.read_blob(&hex(id.as_slice()), io::sink())?;
+        }
+        Ok(())
     }
 
     /// "Salvar cópia para enviar" (ADR-0019, decision 5): a new file at
@@ -1043,15 +1117,22 @@ impl DocFile {
         // Loro refuses u64::MAX as an author id.
         let peer = random_u64() >> 1;
         let (mut copy, _) = clean_copy(store, peer, drop_hidden);
-        let blobs = self.kept_blobs(&copy.blob_hashes())?;
+        let (carried, missing) = self.carried(&copy.blob_hashes());
         let snapshot = copy.save();
         write_new_file(dest, |p| {
-            write_fresh(p, FORMAT_VERSION, &snapshot, &blobs, 0)
+            write_fresh(p, FORMAT_VERSION, &snapshot, Some(&carried), 0)
         })?;
+        // The copy is reopened and read back whole before it is reported
+        // done; one that does not is removed (I12).
+        if let Err(e) = Self::reads_back_whole::<S>(dest) {
+            let _ = std::fs::remove_file(dest);
+            return Err(e);
+        }
         Ok(SendCopyReport {
             conflicts_left_behind: pending,
             hidden_layers_left_out: if drop_hidden { hidden.len() } else { 0 },
-            large_files: blobs.len(),
+            large_files: carried.blobs.len(),
+            missing_large_files: missing,
         })
     }
 
@@ -1066,9 +1147,25 @@ impl DocFile {
         if dest.exists() {
             return Err(FileError::AlreadyExists);
         }
-        self.append_changes(store)?;
-        self.sync()?;
-        write_new_file(dest, |p| std::fs::copy(&self.path, p).map(drop))?;
+        // Nothing is written to this file first: when its disk is full,
+        // this is how the owner saves elsewhere (owner, 2026-10-31). The new
+        // file is this one up to its last good record, plus the edits not
+        // yet written here, plus a save mark.
+        let pending = if store.version() == self.written_version {
+            None
+        } else {
+            Some(store.updates_since(&self.written_version)?)
+        };
+        let end = self.end;
+        write_new_file(dest, |p| {
+            let mut out = OpenOptions::new().write(true).create_new(true).open(p)?;
+            io::copy(&mut open_reader(&self.path)?.take(end), &mut out)?;
+            if let Some(bytes) = &pending {
+                out.write_all(&encode_record(Kind::Updates, bytes))?;
+            }
+            out.write_all(&encode_record(Kind::SaveMark, &unix_now().to_le_bytes()))?;
+            out.sync_all()
+        })?;
         Ok(SaveAsReport {
             suggest_send_copy: true,
         })
@@ -1115,13 +1212,57 @@ impl DocFile {
         }
         let rec = encode_record(kind, payload);
         let at = self.end;
-        self.file.seek(SeekFrom::Start(at))?;
-        self.file.write_all(&rec)?;
+        if let Err(e) = self.write_at(at, &rec) {
+            // A write that fails (a full disk, a removed drive) may leave
+            // part of the record behind: the file goes back to the end of
+            // the last good record before anything else is written, so a
+            // piece never stays in the middle (owner, 2026-10-31). The edits
+            // stay in memory and the next save writes them. If even going
+            // back fails, the file is not written again in this session.
+            if self
+                .file
+                .set_len(at)
+                .and_then(|()| self.file.sync_all())
+                .is_err()
+            {
+                self.writable = false;
+            }
+            return Err(FileError::NotWritten {
+                cause: e,
+                still_writable: self.writable,
+            });
+        }
         self.fp.update(&rec[..RECORD_HEAD]);
         self.fp.update(&rec[rec.len() - RECORD_TAIL..]);
         self.end += rec.len() as u64;
         self.unsynced = true;
         Ok(at)
+    }
+
+    fn write_at(&mut self, at: u64, rec: &[u8]) -> io::Result<()> {
+        self.file.seek(SeekFrom::Start(at))?;
+        if let Some(room) = self.test_room.as_mut() {
+            // Test hook: a disk with `room` bytes left. What fits is
+            // written for real, then the write fails as on a full disk.
+            let fits = rec.len().min(*room as usize);
+            self.file.write_all(&rec[..fits])?;
+            *room -= fits as u64;
+            if fits < rec.len() {
+                return Err(io::Error::new(
+                    io::ErrorKind::StorageFull,
+                    "no space left on the disk (test)",
+                ));
+            }
+            return Ok(());
+        }
+        self.file.write_all(rec)
+    }
+
+    /// Test hook: from now on the disk has only `bytes` of room; `None`
+    /// frees it again.
+    #[doc(hidden)]
+    pub fn test_disk_room(&mut self, bytes: Option<u64>) {
+        self.test_room = bytes;
     }
 
     /// Forces everything written so far to the disk.
@@ -1268,11 +1409,19 @@ impl DocFile {
     ) -> Result<DocFile, FileError> {
         self.append_changes(store)?;
         self.sync()?;
+        // The new file names the file it replaces: the safety copy left by
+        // an interrupted compaction is deleted only if it is that file (I10).
+        store.set_note(REPLACED_NOTE, &hex(&self.fingerprint()));
         let snapshot = store.compact(plan)?;
-        let blobs = self.kept_blobs(&store.blob_hashes())?;
+        let (carried, _missing) = self.carried(&store.blob_hashes());
         let tmp = tmp_path(&self.path);
         let _ = std::fs::remove_file(&tmp);
-        write_fresh(&tmp, FORMAT_VERSION, &snapshot, &blobs, unix_now())?;
+        // A damaged piece stops the compaction before anything is swapped;
+        // the old file stays (I12). A large file the document names but
+        // this file lacks was already missing: nothing more is lost.
+        write_fresh(&tmp, FORMAT_VERSION, &snapshot, Some(&carried), unix_now())?;
+        drop(carried);
+        Self::reads_back_whole::<S>(&tmp)?;
         crash_point("written");
         let path = self.path.clone();
         let backup = backup_path(&path);
@@ -1375,6 +1524,9 @@ pub struct SendCopyReport {
     pub hidden_layers_left_out: usize,
     /// Large files carried into the copy.
     pub large_files: usize,
+    /// Large files a node of the copy names but the original file lacks
+    /// (hashes). The program warns; the copy is written without them.
+    pub missing_large_files: Vec<String>,
 }
 
 /// The owner's answers to what "Salvar cópia para enviar" asks first.

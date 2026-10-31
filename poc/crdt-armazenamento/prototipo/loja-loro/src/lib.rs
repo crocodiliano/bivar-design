@@ -1536,6 +1536,21 @@ impl<M: ParamMode> Store for LoroStore<M> {
         self.copy = copy;
     }
 
+    fn note(&self, key: &str) -> Option<String> {
+        match self.doc.get_map("meta").get(&format!("note:{key}"))? {
+            ValueOrContainer::Value(LoroValue::String(s)) => Some(s.to_string()),
+            _ => None,
+        }
+    }
+
+    fn set_note(&mut self, key: &str, value: &str) {
+        self.doc
+            .get_map("meta")
+            .insert(&format!("note:{key}"), value)
+            .expect("meta map");
+        self.doc.commit();
+    }
+
     fn history_dump(&mut self) -> String {
         self.doc.commit();
         format!(

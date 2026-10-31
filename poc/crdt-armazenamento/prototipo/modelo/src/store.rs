@@ -144,6 +144,10 @@ pub trait Store: Sized {
     /// identity.
     fn copy_name(&self) -> u64;
     fn set_copy_name(&mut self, copy: u64);
+    /// A note the file layer keeps inside the document (for example, which
+    /// file a compaction replaced). Not part of the visible state.
+    fn note(&self, key: &str) -> Option<String>;
+    fn set_note(&mut self, key: &str, value: &str);
     /// The whole history decoded as text, the way the program reads it.
     fn history_dump(&mut self) -> String;
     fn history_peers(&mut self) -> BTreeSet<String>;

@@ -146,6 +146,13 @@ fn a_cut_last_write_is_dropped_and_everything_before_stays() {
         let (f, back, report) = DocFile::open::<S>(&path, 2).unwrap();
         assert_eq!(back.state(), before, "cut at {cut}");
         assert!(report.dropped_tail.is_some(), "cut at {cut}");
+        // The dropped bytes are kept aside, never deleted (M4).
+        let aside = report.tail_kept_at.clone().expect("kept aside");
+        assert_eq!(
+            std::fs::read(&aside).unwrap(),
+            original[len_before as usize..cut as usize]
+        );
+        std::fs::remove_file(&aside).unwrap();
         // The cut part was removed from the file, so it can grow again.
         assert_eq!(f.len(), len_before);
         drop(f);
@@ -675,4 +682,115 @@ fn a_damaged_main_file_with_a_safety_copy_offers_recovery_and_keeps_both() {
     let (_, back, _) = DocFile::open::<S>(&path, 2).unwrap();
     assert_eq!(back.state(), expected);
     let _ = std::fs::remove_file(aside);
+}
+
+/// A full disk in the middle of a write (owner, 2026-10-31): the file goes
+/// back to the end of its last good record, the edits stay in memory, and
+/// once there is room again the next save writes them all. Tried with the
+/// disk filling at several points of the record.
+#[test]
+fn a_full_disk_loses_no_edit_and_leaves_no_piece_behind() {
+    for room in [0u64, 1, 9, 40, 300] {
+        let (path, mut f, mut s) = new_file(&format!("full-disk-{room}"));
+        f.save(&mut s, "pc-1").unwrap();
+        let good_end = f.len();
+        let x = create(&mut s, "shape");
+        for i in 0..20 {
+            set(&mut s, &x, "x", Value::Num(f64::from(i)));
+        }
+        f.test_disk_room(Some(room));
+        match f.append_changes(&mut s) {
+            Err(FileError::NotWritten {
+                still_writable: true,
+                ..
+            }) => {}
+            other => panic!("room {room}: {other:?}"),
+        }
+        // Nothing half-written on the disk: back to the last good record.
+        assert_eq!(f.len(), good_end, "room {room}");
+        assert_eq!(
+            std::fs::metadata(&path).unwrap().len(),
+            good_end,
+            "room {room}"
+        );
+        // More edits while the disk is full; they wait in memory too.
+        set(&mut s, &x, "y", Value::Num(7.0));
+        assert!(f.append_changes(&mut s).is_err());
+        // Room again: the next save writes everything.
+        f.test_disk_room(None);
+        f.save(&mut s, "pc-1").unwrap();
+        let state = s.state();
+        drop(f);
+        let (_, back, report) = DocFile::open::<S>(&path, 2).unwrap();
+        assert_eq!(back.state(), state, "room {room}");
+        assert_eq!(report.dropped_tail, None, "room {room}: {report:?}");
+    }
+}
+
+/// With the disk full, the owner saves elsewhere: everything, including
+/// the edits the full disk refused, is in the new file.
+#[test]
+fn with_a_full_disk_everything_can_be_saved_elsewhere() {
+    let (_, mut f, mut s) = new_file("full-disk-elsewhere");
+    f.save(&mut s, "pc-1").unwrap();
+    let x = create(&mut s, "shape");
+    set(&mut s, &x, "name", Value::Str("only in memory".into()));
+    f.test_disk_room(Some(0));
+    assert!(f.append_changes(&mut s).is_err());
+    let elsewhere = fresh("full-disk-elsewhere-saved");
+    f.save_as(&mut s, &elsewhere).unwrap();
+    let (_, back, report) = DocFile::open::<S>(&elsewhere, 3).unwrap();
+    assert_eq!(back.state(), s.state());
+    assert_eq!(report.damaged_at, None);
+}
+
+/// M4: a complete last record that was damaged later (a bit flipped on the
+/// disk) is dropped like a cut write, but its bytes are kept aside.
+#[test]
+fn a_damaged_last_record_is_kept_aside_not_deleted() {
+    let (path, mut f, mut s) = new_file("flipped-tail");
+    f.save(&mut s, "pc-1").unwrap();
+    let good_end = f.len() as usize;
+    let x = create(&mut s, "shape");
+    set(&mut s, &x, "color", Value::Str("blue".into()));
+    f.append_changes(&mut s).unwrap();
+    drop(f);
+    let mut bytes = std::fs::read(&path).unwrap();
+    let flip = good_end + 12; // inside the last record's content
+    bytes[flip] ^= 0x01;
+    std::fs::write(&path, &bytes).unwrap();
+    let (f, _, report) = DocFile::open::<S>(&path, 2).unwrap();
+    assert!(report.dropped_tail.is_some(), "{report:?}");
+    let aside = report.tail_kept_at.clone().expect("kept aside");
+    assert_eq!(std::fs::read(&aside).unwrap(), bytes[good_end..]);
+    assert!(aside.to_string_lossy().contains(".estragado"));
+    assert_eq!(f.len() as usize, good_end);
+    std::fs::remove_file(&aside).unwrap();
+}
+
+/// I10, the auditor's four steps: a compaction dies after moving the old
+/// file aside; the owner does not recover it; a new document is created
+/// with the same name; opening it must not delete the old document.
+#[test]
+fn a_safety_copy_that_is_not_the_replaced_file_is_never_deleted() {
+    let (path, mut f, mut s) = new_file("not-the-replaced-file");
+    f.save(&mut s, "pc-1").unwrap();
+    drop(f);
+    // 1. The compaction died right after "backup": only the safety copy.
+    let backup = backup_path(&path);
+    let _ = std::fs::remove_file(&backup);
+    std::fs::rename(&path, &backup).unwrap();
+    let old = std::fs::read(&backup).unwrap();
+    // 2. Opening offers recovery; the owner says no.
+    assert!(matches!(
+        DocFile::open::<S>(&path, 2),
+        Err(FileError::RecoverFromBackup { .. })
+    ));
+    // 3. A new document with the same name.
+    let mut other = S::new_document(5);
+    drop(DocFile::create(&path, &mut other).unwrap());
+    // 4. Opening it keeps the old document and says so.
+    let (_, _, report) = DocFile::open::<S>(&path, 6).unwrap();
+    assert_eq!(report.backup_available.as_ref(), Some(&backup));
+    assert_eq!(std::fs::read(&backup).unwrap(), old);
 }
