@@ -1,0 +1,282 @@
+﻿cargo.exe :     Finished `release` profile [optimized] target(s) in 0.33s
+No A:\Projetos\Bivar\poc\crdt-armazenamento\medir-tudo.ps1:117 caractere:1
++ & cargo test --release --manifest-path $manifest --workspace --no-run ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (    Finished `r...get(s) in 0.33s:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  Executable unittests src\lib.rs 
+(poc\crdt-armazenamento\prototipo\target\release\deps\bivar_poc_arquivo-75f7df2d460eb39b.exe)
+  Executable tests\copia.rs (poc\crdt-armazenamento\prototipo\target\release\deps\copia-cea39a9b67a17555.exe)
+  Executable tests\disco.rs (poc\crdt-armazenamento\prototipo\target\release\deps\disco-4cc3615014b78f83.exe)
+  Executable tests\formato.rs (poc\crdt-armazenamento\prototipo\target\release\deps\formato-1b0767eb7af8f19a.exe)
+  Executable tests\medidas.rs (poc\crdt-armazenamento\prototipo\target\release\deps\medidas-c77be01d53aac4e6.exe)
+  Executable unittests src\lib.rs 
+(poc\crdt-armazenamento\prototipo\target\release\deps\bivar_poc_cadeia-ef419d2e6842c139.exe)
+  Executable tests\chain.rs (poc\crdt-armazenamento\prototipo\target\release\deps\chain-ace789dc8ad64f9a.exe)
+  Executable unittests src\lib.rs 
+(poc\crdt-armazenamento\prototipo\target\release\deps\bivar_poc_loja_loro-a2139d32c3a83b9a.exe)
+  Executable tests\compaction.rs (poc\crdt-armazenamento\prototipo\target\release\deps\compaction-1970acf67ce71c47.exe)
+  Executable tests\entries.rs (poc\crdt-armazenamento\prototipo\target\release\deps\entries-1de24814ebdbde07.exe)
+  Executable tests\growth.rs (poc\crdt-armazenamento\prototipo\target\release\deps\growth-cbc2af4fb7acd8a3.exe)
+  Executable tests\loro_assumptions.rs 
+(poc\crdt-armazenamento\prototipo\target\release\deps\loro_assumptions-7b83b0fd9a847267.exe)
+  Executable tests\measure.rs (poc\crdt-armazenamento\prototipo\target\release\deps\measure-3e07812ded910ce3.exe)
+  Executable tests\store.rs (poc\crdt-armazenamento\prototipo\target\release\deps\store-515c019b504e4e6f.exe)
+  Executable tests\tie_break.rs (poc\crdt-armazenamento\prototipo\target\release\deps\tie_break-a1fb3f050ae90dd4.exe)
+  Executable unittests src\lib.rs 
+(poc\crdt-armazenamento\prototipo\target\release\deps\bivar_poc_modelo-5101b1392f3ee311.exe)
+  Executable unittests src\lib.rs 
+(poc\crdt-armazenamento\prototipo\target\release\deps\bivar_poc_verificador-6983f7a41272f2e7.exe)
+  Executable unittests src\main.rs 
+(poc\crdt-armazenamento\prototipo\target\release\deps\bivar_poc_verificador-55f53b25d211fd71.exe)
+  Executable tests\copias.rs (poc\crdt-armazenamento\prototipo\target\release\deps\copias-b08cde58db2a637d.exe)
+  Executable tests\entrada.rs (poc\crdt-armazenamento\prototipo\target\release\deps\entrada-d3ec87c69fc96fc3.exe)
+  Executable tests\fuzz_replay.rs 
+(poc\crdt-armazenamento\prototipo\target\release\deps\fuzz_replay-2aa5c5d3c089dfd4.exe)
+### ops_100k_entries 
+   Compiling bivar-poc-loja-loro v0.0.0 (A:\Projetos\Bivar\poc\crdt-armazenamento\prototipo\loja-loro)
+    Finished `release` profile [optimized] target(s) in 7.76s
+     Running tests\measure.rs (poc\crdt-armazenamento\prototipo\target\release\deps\measure-317a31bb2419bf36.exe)
+
+running 1 test
+test ops_100k_entries ... RESULT Loro (entries) ops_100k_median_seconds=1.430 all=[1.3999155, 1.4301088, 1.4396788]
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 4.38s
+
+### merge_entries 
+    Finished `release` profile [optimized] target(s) in 0.29s
+     Running tests\measure.rs (poc\crdt-armazenamento\prototipo\target\release\deps\measure-317a31bb2419bf36.exe)
+
+running 1 test
+test merge_entries ... RESULT Loro (entries) merged_file_bytes=686007
+RESULT Loro (entries) merge_10k_plus_10k_median_seconds=0.336 all=[0.3273747, 0.3364111, 0.3364883]
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 1.71s
+
+### build_1m_entries 
+    Finished `release` profile [optimized] target(s) in 0.28s
+     Running tests\measure.rs (poc\crdt-armazenamento\prototipo\target\release\deps\measure-317a31bb2419bf36.exe)
+
+running 1 test
+test build_1m_entries ... RESULT Loro (entries) build_1m_seconds=30.5 file_bytes=33796625
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 34.00s
+
+### open_1m_entries 
+    Finished `release` profile [optimized] target(s) in 0.29s
+     Running tests\measure.rs (poc\crdt-armazenamento\prototipo\target\release\deps\measure-317a31bb2419bf36.exe)
+
+running 1 test
+test open_1m_entries ... RESULT Loro (entries) open_1m_load_seconds=0.017 first_full_read_seconds=2.64 total=2.65 extra_memory_mb=226 visible_nodes=101424
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 3.17s
+
+### hidden_index_deep 
+    Finished `release` profile [optimized] target(s) in 0.28s
+     Running tests\measure.rs (poc\crdt-armazenamento\prototipo\target\release\deps\measure-317a31bb2419bf36.exe)
+
+running 1 test
+test hidden_index_deep ... RESULT hidden_index depth=10000 per_read_without_index_ms=962.5 per_read_with_index_us=1.1 rebuild_deep_ms=0.0 rebuild_100k_ops_doc_ms=0.0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 98.76s
+
+### verification_cost_on_a_large_document 
+    Finished `release` profile [optimized] target(s) in 0.31s
+     Running tests\entrada.rs (poc\crdt-armazenamento\prototipo\target\release\deps\entrada-d3ec87c69fc96fc3.exe)
+
+running 1 test
+test verification_cost_on_a_large_document ... RESULT open trusted (this computer saved it): Trusted in 0.11 s
+System.Management.Automation.RemoteException
+thread 'verification_cost_on_a_large_document' (51108) panicked at verificador\tests\entrada.rs:562:37:
+called `Result::unwrap()` on an `Err` value: Refused(TooSlow)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    verification_cost_on_a_large_document
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 21 filtered out; finished in 60.65s
+
+error: test failed, to rerun pass `-p bivar-poc-verificador --test entrada`
+### two_copy_compaction_size 
+   Compiling bivar-poc-loja-loro v0.0.0 (A:\Projetos\Bivar\poc\crdt-armazenamento\prototipo\loja-loro)
+    Finished `release` profile [optimized] target(s) in 4.80s
+     Running tests\growth.rs (poc\crdt-armazenamento\prototipo\target\release\deps\growth-c9ff6de286aeff1c.exe)
+
+running 1 test
+test two_copy_compaction_size ... RESULT two_copy_compaction bytes_before=658179 bytes_after=14607 compact_s=0.036
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 4.27s
+
+### small_merge_vs_history 
+    Finished `release` profile [optimized] target(s) in 0.30s
+     Running tests\growth.rs (poc\crdt-armazenamento\prototipo\target\release\deps\growth-c9ff6de286aeff1c.exe)
+
+running 1 test
+test small_merge_vs_history ... RESULT small_merge history_writes=100000 merge_100_plus_100_ms_median=2.4 all=[2.3219, 2.4358, 3.0483] file_bytes=848298
+RESULT small_merge history_writes=300000 merge_100_plus_100_ms_median=2.8 all=[2.7262, 2.7561, 2.9282000000000004] file_bytes=2595997
+RESULT small_merge history_writes=1000000 merge_100_plus_100_ms_median=2.9 all=[2.8022, 2.8795, 3.1123000000000003] file_bytes=8924269
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 64.89s
+
+### pieces_map_worst_case_memory 
+    Finished `release` profile [optimized] target(s) in 0.30s
+     Running tests\medidas.rs (poc\crdt-armazenamento\prototipo\target\release\deps\medidas-c77be01d53aac4e6.exe)
+
+running 1 test
+System.Management.Automation.RemoteException
+thread 'pieces_map_worst_case_memory' (5840) panicked at arquivo\tests\medidas.rs:365:32:
+child: 
+running 1 test
+test pieces_map_worst_case_memory ... FAILED
+System.Management.Automation.RemoteException
+failures:
+System.Management.Automation.RemoteException
+failures:
+    pieces_map_worst_case_memory
+System.Management.Automation.RemoteException
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 13.62s
+System.Management.Automation.RemoteException
+System.Management.Automation.RemoteException
+thread 'pieces_map_worst_case_memory' (63308) panicked at arquivo\tests\medidas.rs:372:50:
+called `Result::unwrap()` on an `Err` value: LimitExceeded { what: "pieces of large files", limit: 2000000, found: 2000001 }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+System.Management.Automation.RemoteException
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test pieces_map_worst_case_memory ... FAILED
+
+failures:
+
+failures:
+    pieces_map_worst_case_memory
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 21.62s
+
+error: test failed, to rerun pass `-p bivar-poc-arquivo --test medidas`
+### sync_cost %TEMP%\bivar-medidas
+    Finished `release` profile [optimized] target(s) in 0.30s
+     Running tests\medidas.rs (poc\crdt-armazenamento\prototipo\target\release\deps\medidas-c77be01d53aac4e6.exe)
+
+running 1 test
+test sync_cost ... RESULT %TEMP%\bivar-medidas sync_ms median=0.34 p95=0.46 max=0.72
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.04s
+
+### autosave_pause %TEMP%\bivar-medidas
+    Finished `release` profile [optimized] target(s) in 0.29s
+     Running tests\medidas.rs (poc\crdt-armazenamento\prototipo\target\release\deps\medidas-c77be01d53aac4e6.exe)
+
+running 1 test
+test autosave_pause ... RESULT %TEMP%\bivar-medidas autosave_on_interface_thread_ms max=1.09 median=0.99 (limit 16) writer_thread_worst_sync_ms=0.7 edit_frame_ms_median=0.52
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 11.33s
+
+### growth_and_compaction %TEMP%\bivar-medidas
+    Finished `release` profile [optimized] target(s) in 0.30s
+     Running tests\medidas.rs (poc\crdt-armazenamento\prototipo\target\release\deps\medidas-c77be01d53aac4e6.exe)
+
+running 1 test
+test growth_and_compaction ... RESULT %TEMP%\bivar-medidas growth ops=200000 removals=10103 visible_nodes=19924 file_before_mb=5.4 purged=6441 history_trimmed=true file_after_mb=2.7 compact_s=1.86 open_after_s=0.04
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 9.37s
+
+### sync_cost A:\Projetos\Bivar\poc\crdt-armazenamento\prototipo\resultados\tmp-hd
+    Finished `release` profile [optimized] target(s) in 0.30s
+     Running tests\medidas.rs (poc\crdt-armazenamento\prototipo\target\release\deps\medidas-c77be01d53aac4e6.exe)
+
+running 1 test
+test sync_cost ... RESULT A:\Projetos\Bivar\poc\crdt-armazenamento\prototipo\resultados\tmp-hd sync_ms median=23.24 p95=39.95 max=90.17
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 2.31s
+
+### autosave_pause A:\Projetos\Bivar\poc\crdt-armazenamento\prototipo\resultados\tmp-hd
+    Finished `release` profile [optimized] target(s) in 0.29s
+     Running tests\medidas.rs (poc\crdt-armazenamento\prototipo\target\release\deps\medidas-c77be01d53aac4e6.exe)
+
+running 1 test
+test autosave_pause ... RESULT A:\Projetos\Bivar\poc\crdt-armazenamento\prototipo\resultados\tmp-hd autosave_on_interface_thread_ms max=1.22 median=0.97 (limit 16) writer_thread_worst_sync_ms=37.0 edit_frame_ms_median=0.53
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 11.40s
+
+### growth_and_compaction A:\Projetos\Bivar\poc\crdt-armazenamento\prototipo\resultados\tmp-hd
+    Finished `release` profile [optimized] target(s) in 0.30s
+     Running tests\medidas.rs (poc\crdt-armazenamento\prototipo\target\release\deps\medidas-c77be01d53aac4e6.exe)
+
+running 1 test
+test growth_and_compaction ... RESULT A:\Projetos\Bivar\poc\crdt-armazenamento\prototipo\resultados\tmp-hd growth ops=200000 removals=10103 visible_nodes=19924 file_before_mb=5.4 purged=6441 history_trimmed=true file_after_mb=2.7 compact_s=1.89 open_after_s=0.04
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 10.35s
+
+### verification_of_a_file_with_2_gb_of_large_files A:\Projetos\Bivar\poc\crdt-armazenamento\prototipo\resultados\tmp-hd
+    Finished `release` profile [optimized] target(s) in 0.30s
+     Running tests\entrada.rs (poc\crdt-armazenamento\prototipo\target\release\deps\entrada-d3ec87c69fc96fc3.exe)
+
+running 1 test
+test verification_of_a_file_with_2_gb_of_large_files ... RESULT verify_2gb verified_s=0.04
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 21 filtered out; finished in 12.89s
+
+### blob_2gb A:\Projetos\Bivar\poc\crdt-armazenamento\prototipo\resultados\tmp-hd
+    Finished `release` profile [optimized] target(s) in 0.30s
+     Running tests\medidas.rs (poc\crdt-armazenamento\prototipo\target\release\deps\medidas-c77be01d53aac4e6.exe)
+
+running 1 test
+test blob_2gb ... RESULT A:\Projetos\Bivar\poc\crdt-armazenamento\prototipo\resultados\tmp-hd blob_2gb write_and_save_s=13.6 open_s=0.01 read_and_check_s=4.1 param_change_save_ms=20.0 param_change_growth_bytes=319
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 17.93s
+
+Bateria de medidas da 0.6, 2026-10-31 05:31 (levou 6.5 min; código: d972e0d, com alterações ainda sem commit)
+
+Medida                                                         Valor          Limite      Anterior       Situacao
+------                                                         -----          ------      --------       --------
+100 mil operações                                              1.43 s         5 s         1.537 s        ok      
+Junção de 10 mil + 10 mil operações                            0.336 s        1 s         0.324 s        ok      
+Gerar o documento de 1 milhão de operações                     30.5 s         -           30.9 s         ok      
+Tamanho desse documento                                        33796625 bytes -           35951885 bytes ok      
+Abrir e ler 1 milhão de operações                              2.65 s         3 s         2.46 s         ok      
+Memória para abrir e ler 1 milhão de operações                 226 MB         1024 MB     229 MB         ok      
+Ler um nó a 10 mil níveis, com o índice                        1.1 µs         -           1.2 µs         ok      
+Abrir arquivo deste computador (1 milhão de operações)         0.11 s         -           0.11 s         ok      
+Duas cópias, 100 mil escritas: arquivo depois da compactação   14607 bytes    65536 bytes -              ok      
+Junção de 100 + 100 com 1 milhão de escritas no histórico      2.9 ms         -           -              ok      
+Forçar gravação no disco, mediana (SSD C:)                     0.34 ms        -           0.34 ms        ok      
+Pausa do salvamento automático, pior caso (SSD C:)             1.09 ms        16 ms       1.06 ms        ok      
+Arquivo depois da compactação, 200 mil operações (SSD C:)      2.7 MB         -           3.1 MB         ok      
+Tempo de compactar (SSD C:)                                    1.86 s         -           1.04 s         PIOROU  
+Forçar gravação no disco, mediana (HD A:)                      23.24 ms       -           18.79 ms       ok      
+Pausa do salvamento automático, pior caso (HD A:)              1.22 ms        16 ms       1.04 ms        ok      
+Arquivo depois da compactação, 200 mil operações (HD A:)       2.7 MB         -           3.1 MB         ok      
+Tempo de compactar (HD A:)                                     1.89 s         -           1.01 s         PIOROU  
+Verificar arquivo de fora com 2 GB de arquivos grandes (HD A:) 0.04 s         60 s        -              ok      
+Arquivo grande de 2 GB: guardar (HD A:)                        13.6 s         -           12.9 s         ok      
+Arquivo grande de 2 GB: abrir o documento (HD A:)              0.01 s         -           0.01 s         ok      
+Arquivo grande de 2 GB: ler e conferir (HD A:)                 4.1 s          -           4.3 s          ok      
+
+
+
+Pulado:
+  - Arquivo grande de 2 GB (SSD C:): só 5.3 GB livres, mínimo 6 GB
+Falhas:
+  - verification_cost_on_a_large_document: o teste falhou
+  - Abrir arquivo de fora, com verificação: sem resultado
+  - pieces_map_worst_case_memory: o teste falhou
+  - Mapa de pedaços: bytes por pedaço (5 milhões de pedaços mínimos): sem resultado
+Acima do limite: 0. Pioraram mais de 25%: 2. Medidas que falharam: 4.
