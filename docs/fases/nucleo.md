@@ -31,7 +31,10 @@
   - **2.000 cenários com duas cópias e 2.000 com três**, gerados ao acaso com a mistura de operações da 0.6;
   - **cada intenção de cada cópia**, anotada pelo próprio gerador e não lida da biblioteca, aparece no documento final ou num aviso;
   - **as cópias terminam idênticas**, sem nó duplicado e sem ciclo;
-  - **o teste é obrigatório na compilação automática** com um número menor de cenários. Os 2.000 rodam antes de fechar a entrega e antes de aceitar qualquer versão nova da Loro.
+  - **o teste é obrigatório na compilação automática** com um número menor de cenários. Os 2.000 rodam antes de fechar a entrega e antes de aceitar qualquer versão nova da Loro;
+  - **sempre em duas versões: sem e com uma compactação no meio** (decisão do dono, 2026-10-31). Na versão com compactação, o histórico é cortado de verdade no meio do trabalho, e o teste confere que o corte aconteceu;
+  - **as sementes que já acharam um defeito viram testes fixos** (por exemplo, as 35 que acharam o I1 na auditoria da 0.6), para o defeito nunca voltar sem ninguém ver;
+  - **o registro de cada rodada mostra quantos cenários rodaram** e quantos falharam.
 - [ ] **Regra de desempate da Loro travada** (ADR-0021): um teste falha se a Loro mudar a forma de escolher a "última escrita" entre duas escritas simultâneas, porque a detecção de escrita simultânea do Bivar reproduz essa regra.
 - [ ] **Só um crate depende da biblioteca CRDT** (ADR-0019, decisão 7): uma checagem automática na compilação confere isso, como na prova da 0.6. O resto do programa usa as operações do ADR-0002, sem tipos da biblioteca.
 - [ ] **Contingência avaliada** (ADR-0019, decisão 7): com a N.1 pronta, o dono decide se dispara a versão de uma pessoa só. A decisão fica registrada.
