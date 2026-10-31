@@ -1785,8 +1785,15 @@ impl<M: ParamMode> Store for LoroStore<M> {
         } else {
             HashSet::new()
         };
+        // Every node a live connection touches, once: checking each removed
+        // node against every connection took 82 s on 1 million operations
+        // (measured 2026-10-31, when the verifier started running this plan).
+        let connected: HashSet<NodeId> = self
+            .edges()
+            .into_values()
+            .flat_map(|e| [e.from, e.to])
+            .collect();
         let tree = self.tree();
-        let edges = self.edges();
         let mut plan = CompactionPlan {
             trim_before: trim.map(|v| v.encode()),
             cut_off,
@@ -1826,11 +1833,7 @@ impl<M: ParamMode> Store for LoroStore<M> {
                 plan.kept_for_conflicts.push(node_id(t));
                 continue;
             }
-            let ids: HashSet<NodeId> = branch.iter().map(|n| node_id(*n)).collect();
-            if edges
-                .values()
-                .any(|e| ids.contains(&e.from) || ids.contains(&e.to))
-            {
+            if branch.iter().any(|n| connected.contains(&node_id(*n))) {
                 continue;
             }
             plan.purge.push(node_id(t));

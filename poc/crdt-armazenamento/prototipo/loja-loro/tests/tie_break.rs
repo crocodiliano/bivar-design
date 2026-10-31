@@ -123,3 +123,51 @@ fn concurrent_moves_follow_the_same_rule() {
         assert_eq!(a.parent(&x), Some(Some(winner.clone())), "peers {pa}/{pb}");
     }
 }
+
+/// The other half of the rule (audit 2026-10-31, M11: only the tie of
+/// Lamport times was tested): the move with the higher Lamport time wins,
+/// even from the copy with the lower identity.
+#[test]
+fn a_concurrent_move_with_a_higher_lamport_time_wins_whatever_the_peer() {
+    let mk = |s: &mut bivar_poc_loja_loro::EntriesStore| {
+        s.apply(&Op::CreateNode {
+            parent: None,
+            index: None,
+            kind: "shape".into(),
+        })
+        .unwrap()
+        .created
+        .unwrap()
+    };
+    let mut a = bivar_poc_loja_loro::EntriesStore::new_document(1);
+    let (p1, p2, x) = (mk(&mut a), mk(&mut a), mk(&mut a));
+    a.commit();
+    let mut b = a.fork_as(1_000_000); // the higher identity
+    // a works more before moving: its move gets the higher Lamport time.
+    for i in 0..10 {
+        a.apply(&Op::SetParam {
+            node: p1.clone(),
+            key: "x".into(),
+            value: Some(bivar_poc_modelo::Value::Num(f64::from(i))),
+        })
+        .unwrap();
+        a.commit();
+    }
+    a.apply(&Op::MoveNode {
+        node: x.clone(),
+        parent: Some(p1.clone()),
+        index: 0,
+    })
+    .unwrap();
+    a.commit();
+    b.apply(&Op::MoveNode {
+        node: x.clone(),
+        parent: Some(p2.clone()),
+        index: 0,
+    })
+    .unwrap();
+    b.commit();
+    sync(&mut a, &mut b);
+    assert!(last_write_order(12, 1) > last_write_order(2, 1_000_000));
+    assert_eq!(a.parent(&x), Some(Some(p1)), "the higher Lamport time lost");
+}

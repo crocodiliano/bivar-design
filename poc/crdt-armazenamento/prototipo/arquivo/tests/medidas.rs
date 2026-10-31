@@ -369,7 +369,14 @@ fn pieces_map_worst_case_memory() {
     }
     let before = peak_memory();
     let t = Instant::now();
-    let (f, _, _) = DocFile::open::<S>(&path, 2).unwrap();
+    // Above the 2 million pieces allowed: the limit is raised, as the owner
+    // could in the settings, to measure the map itself.
+    let raised = bivar_poc_arquivo::Limits {
+        pieces: u64::MAX,
+        ..Default::default()
+    };
+    let (f, _, _) =
+        DocFile::open_with::<S>(&path, 2, &raised, bivar_poc_arquivo::Access::Write, None).unwrap();
     let open_s = t.elapsed().as_secs_f64();
     let extra = peak_memory().saturating_sub(before);
     println!(
