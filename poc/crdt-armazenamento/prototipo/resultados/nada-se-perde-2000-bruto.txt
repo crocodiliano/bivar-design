@@ -1,0 +1,6 @@
+test clean_copy_has_no_history_and_nothing_removed ... ok
+test nothing_is_lost_silently_three_copies ... SCENARIOS ran=2000 seeds=1..=2000 failed=0
+test nothing_is_lost_silently_three_copies_with_a_compaction ... SCENARIOS ran=2000 seeds=1..=2000 failed=0
+test nothing_is_lost_silently_two_copies ... SCENARIOS ran=2000 seeds=1..=2000 failed=0
+test nothing_is_lost_silently_two_copies_with_a_compaction ... SCENARIOS ran=2000 seeds=1..=2000 failed=0
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 150.65s

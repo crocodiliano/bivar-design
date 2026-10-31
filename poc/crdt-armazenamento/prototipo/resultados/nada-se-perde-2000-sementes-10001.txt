@@ -1,0 +1,3 @@
+test nothing_is_lost_silently_three_copies_with_a_compaction ... SCENARIOS ran=2000 seeds=10001..=12000 failed=0
+test nothing_is_lost_silently_two_copies_with_a_compaction ... SCENARIOS ran=2000 seeds=10001..=12000 failed=0
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 97.68s

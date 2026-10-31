@@ -67,11 +67,32 @@ pub struct Mirror {
     children: HashMap<Option<NodeId>, Vec<NodeId>>,
     texts: Vec<NodeId>,
     text_slot: HashMap<NodeId, usize>,
-    text_len: HashMap<NodeId, usize>,
+    /// Each text node's content as this copy wrote it (exact until a merge).
+    text: HashMap<NodeId, Vec<char>>,
     edges: Vec<String>,
 }
 
 impl Mirror {
+    /// The generator's view rebuilt from a document, to keep working after
+    /// a merge brought in the other copies' changes.
+    pub fn from_state(st: &State) -> Self {
+        let mut m = Mirror::default();
+        let mut stack: Vec<(Option<NodeId>, NodeId)> =
+            st.roots.iter().rev().map(|r| (None, r.clone())).collect();
+        while let Some((parent, id)) = stack.pop() {
+            let node = &st.nodes[&id];
+            m.add(id.clone(), parent, node.kind == "text");
+            if let Some(t) = &node.text {
+                m.text.insert(id.clone(), t.chars().collect());
+            }
+            for c in node.children.iter().rev() {
+                stack.push((Some(id.clone()), c.clone()));
+            }
+        }
+        m.edges = st.edges.keys().cloned().collect();
+        m
+    }
+
     fn add(&mut self, id: NodeId, parent: Option<NodeId>, text: bool) {
         self.slot.insert(id.clone(), self.nodes.len());
         self.nodes.push(id.clone());
@@ -83,7 +104,7 @@ impl Mirror {
         if text {
             self.text_slot.insert(id.clone(), self.texts.len());
             self.texts.push(id.clone());
-            self.text_len.insert(id, 0);
+            self.text.insert(id, Vec::new());
         }
     }
 
@@ -106,7 +127,7 @@ impl Mirror {
                 self.text_slot.insert(last, i);
             }
         }
-        self.text_len.remove(id);
+        self.text.remove(id);
     }
 
     fn is_in_subtree(&self, node: &NodeId, root: &NodeId) -> bool {
@@ -150,6 +171,13 @@ pub struct Intents {
     pub last_place: HashMap<NodeId, Option<NodeId>>,
     pub removed: HashSet<NodeId>,
     pub created: HashSet<NodeId>,
+    /// Text runs this copy inserted and did not delete itself (unique only
+    /// with `checking`).
+    pub text_runs: HashMap<NodeId, Vec<String>>,
+    /// Connections this copy made and did not undo itself.
+    pub connected: HashSet<String>,
+    /// Connections this copy undid.
+    pub disconnected: HashSet<String>,
 }
 
 pub struct Workload {
@@ -157,6 +185,9 @@ pub struct Workload {
     pub mirror: Mirror,
     pub counts: HashMap<OpKind, usize>,
     pub intents: Intents,
+    /// With `checking`: the seed, which makes inserted text runs unique.
+    unique_text: Option<u64>,
+    runs: u64,
 }
 
 impl Workload {
@@ -171,7 +202,17 @@ impl Workload {
             mirror,
             counts: HashMap::new(),
             intents: Intents::default(),
+            unique_text: None,
+            runs: 0,
         }
+    }
+
+    /// For the "nothing is lost" scenarios: inserted text runs are unique,
+    /// so each one can be looked for after the merge. The operations drawn
+    /// are the same as without it.
+    pub fn checking(mut self, seed: u64) -> Self {
+        self.unique_text = Some(seed);
+        self
     }
 
     fn pick_kind(&mut self) -> OpKind {
@@ -225,7 +266,7 @@ impl Workload {
             }
             OpKind::EditText if !m.texts.is_empty() => {
                 let node = m.texts[rng.below(m.texts.len())].clone();
-                let len = m.text_len[&node];
+                let len = m.text[&node].len();
                 if len > 0 && rng.below(10) < 3 {
                     let pos = rng.below(len);
                     let del = (1 + rng.below(5)).min(len - pos);
@@ -235,20 +276,57 @@ impl Workload {
                         len: del,
                     })
                     .expect("delete text");
-                    *self.mirror.text_len.get_mut(&node).expect("text") -= del;
+                    // A run this copy deleted part of is no longer its wish.
+                    let before: String = self.mirror.text[&node].iter().collect();
+                    if let Some(runs) = self.intents.text_runs.get_mut(&node) {
+                        runs.retain(|r| {
+                            before
+                                .find(r.as_str())
+                                .is_none_or(|at| at + r.len() <= pos || at >= pos + del)
+                        });
+                    }
+                    self.mirror
+                        .text
+                        .get_mut(&node)
+                        .expect("text")
+                        .drain(pos..pos + del);
                 } else {
                     let pos = rng.below(len + 1);
                     let n = 1 + rng.below(8);
-                    let text: String = (0..n)
+                    let mut text: String = (0..n)
                         .map(|_| (b'a' + rng.below(26) as u8) as char)
                         .collect();
+                    // Unique runs, so a check can find each one: the seed
+                    // and a counter, never drawn from the generator (the
+                    // measured workload stays the same without them).
+                    if let Some(seed) = self.unique_text {
+                        // A run this copy splits by inserting inside it is
+                        // no longer whole, by its own action.
+                        let before: String = self.mirror.text[&node].iter().collect();
+                        if let Some(runs) = self.intents.text_runs.get_mut(&node) {
+                            runs.retain(|r| {
+                                before
+                                    .find(r.as_str())
+                                    .is_none_or(|at| pos <= at || pos >= at + r.len())
+                            });
+                        }
+                        self.runs += 1;
+                        text = format!("{{{seed:x}.{}{text}}}", self.runs);
+                        self.intents
+                            .text_runs
+                            .entry(node.clone())
+                            .or_default()
+                            .push(text.clone());
+                    }
+                    let chars: Vec<char> = text.chars().collect();
                     s.apply(&Op::InsertText {
                         node: node.clone(),
                         pos,
                         text,
                     })
                     .expect("insert text");
-                    *self.mirror.text_len.get_mut(&node).expect("text") += n;
+                    let t = self.mirror.text.get_mut(&node).expect("text");
+                    t.splice(pos..pos, chars);
                 }
                 kind
             }
@@ -283,13 +361,17 @@ impl Workload {
                     .expect("connect")
                     .edge
                     .expect("id");
-                self.mirror.edges.push(id);
+                self.mirror.edges.push(id.clone());
+                self.intents.connected.insert(id);
                 kind
             }
             OpKind::Disconnect if !m.edges.is_empty() => {
                 let i = rng.below(m.edges.len());
                 let id = self.mirror.edges.swap_remove(i);
-                s.apply(&Op::Disconnect { id }).expect("disconnect");
+                s.apply(&Op::Disconnect { id: id.clone() })
+                    .expect("disconnect");
+                self.intents.connected.remove(&id);
+                self.intents.disconnected.insert(id);
                 kind
             }
             OpKind::Reorder if !m.is_empty() => {
@@ -442,6 +524,47 @@ pub fn check_intents<S: Store>(s: &S, side: &Intents, report: &MergeReport, who:
             S::NAME
         );
     }
+    // Audit 2026-10-31, I2: text, connections and removals too.
+    for (node, runs) in &side.text_runs {
+        if s.parent(node).is_none() {
+            assert!(
+                side.removed.contains(node) || hidden(node) || lost_move(node),
+                "{} {who}: text edits of {node} vanished with their node",
+                S::NAME
+            );
+            continue;
+        }
+        let text = s.text(node).unwrap_or_default();
+        for run in runs {
+            assert!(
+                text.contains(run.as_str()),
+                "{} {who}: text {run:?} inserted in {node} lost silently (now {text:?})",
+                S::NAME
+            );
+        }
+    }
+    let edges = s.edges();
+    for id in &side.connected {
+        assert!(
+            edges.contains_key(id),
+            "{} {who}: connection {id} lost silently",
+            S::NAME
+        );
+    }
+    for id in &side.disconnected {
+        assert!(
+            !edges.contains_key(id),
+            "{} {who}: connection {id} came back after being undone",
+            S::NAME
+        );
+    }
+    for node in &side.removed {
+        assert!(
+            s.parent(node).is_none(),
+            "{} {who}: removed node {node} came back",
+            S::NAME
+        );
+    }
 }
 
 /// Runs `f` for seeds BIVAR_SEED_START..=BIVAR_SEEDS (default 1..=6). With
@@ -454,45 +577,112 @@ pub fn for_each_seed(f: impl Fn(u64) + std::panic::RefUnwindSafe) {
             .unwrap_or(default)
     };
     let (start, seeds) = (env("BIVAR_SEED_START", 1), env("BIVAR_SEEDS", 6));
+    // The count is printed, so a record shows how many scenarios ran (audit
+    // 2026-10-31: the old records did not).
+    let mut ran = 0u64;
     if std::env::var("BIVAR_COUNT").is_err() {
-        (start..=seeds).for_each(f);
+        for s in start..=seeds {
+            f(s);
+            ran += 1;
+        }
+        println!("SCENARIOS ran={ran} seeds={start}..={seeds}");
         return;
     }
     let failed: Vec<u64> = (start..=seeds)
-        .filter(|s| std::panic::catch_unwind(|| f(*s)).is_err())
+        .filter(|s| {
+            ran += 1;
+            std::panic::catch_unwind(|| f(*s)).is_err()
+        })
         .collect();
+    println!(
+        "SCENARIOS ran={ran} seeds={start}..={seeds} failed={}",
+        failed.len()
+    );
     assert!(
         failed.is_empty(),
-        "{} of {seeds} seeds failed: {failed:?}",
+        "{} of {ran} seeds failed: {failed:?}",
         failed.len()
     );
 }
 
 /// Two copies, 300 base operations, 150 on each side, checked both ways.
 pub fn nothing_lost_two_copies<S: Store>(seed: u64) {
+    two_copies::<S>(seed, false);
+}
+
+/// The same, with a compaction (history cut by re-rooting) in the middle:
+/// 75 operations on each side, a merge, the copies confirm in turn, `a`
+/// cuts its history, then 75 more on each side (owner, 2026-10-31).
+pub fn nothing_lost_two_copies_compacted<S: Store>(seed: u64) {
+    two_copies::<S>(seed, true);
+}
+
+const DAY: u64 = 24 * 3600;
+
+/// Cuts `a`'s history and checks the cut happened and changed nothing
+/// visible.
+fn cut_history<S: Store>(a: &mut S, seed: u64) {
+    let plan = a.plan_compaction(40 * DAY, 30 * DAY, false);
+    assert!(
+        plan.trim_before.is_some(),
+        "{} seed {seed}: nothing to cut: {plan:?}",
+        S::NAME
+    );
+    let state = a.state();
+    let before = a.history_dump().len();
+    a.compact(&plan).expect("compaction");
+    assert_eq!(
+        a.state(),
+        state,
+        "{} seed {seed}: the cut changed the document",
+        S::NAME
+    );
+    assert!(
+        a.history_dump().len() < before,
+        "{} seed {seed}: history not cut",
+        S::NAME
+    );
+}
+
+fn two_copies<S: Store>(seed: u64, compact: bool) {
     let mut a = S::new_document(1);
     let mut w = Workload::new(seed);
     w.run(&mut a, 300);
     let mut b = a.fork_as(2);
-    let mut wa = Workload::with_mirror(seed * 1000 + 1, w.mirror.clone());
-    let mut wb = Workload::with_mirror(seed * 1000 + 2, w.mirror.clone());
-    wa.run(&mut a, 150);
-    wb.run(&mut b, 150);
-    let (ra, rb) = sync(&mut a, &mut b);
-    assert_tree_is_sound(&a.state());
-    for (rep, label) in [(&ra, "report on a"), (&rb, "report on b")] {
-        check_intents(
-            &a,
-            &wa.intents,
-            rep,
-            &format!("seed {seed}, a's edits, {label}"),
-        );
-        check_intents(
-            &a,
-            &wb.intents,
-            rep,
-            &format!("seed {seed}, b's edits, {label}"),
-        );
+    let rounds: &[usize] = if compact { &[75, 75] } else { &[150] };
+    let mut mirror = w.mirror.clone();
+    for (round, ops) in rounds.iter().enumerate() {
+        let tag = seed * 1000 + 10 * round as u64;
+        let mut wa = Workload::with_mirror(tag + 1, mirror.clone()).checking(tag + 1);
+        let mut wb = Workload::with_mirror(tag + 2, mirror.clone()).checking(tag + 2);
+        wa.run(&mut a, *ops);
+        wb.run(&mut b, *ops);
+        let (ra, rb) = sync(&mut a, &mut b);
+        assert_tree_is_sound(&a.state());
+        let check = |s: &S, when: &str| {
+            for (rep, label) in [(&ra, "report on a"), (&rb, "report on b")] {
+                for (intents, who) in [(&wa.intents, "a"), (&wb.intents, "b")] {
+                    check_intents(
+                        s,
+                        intents,
+                        rep,
+                        &format!("seed {seed}, round {round}{when}, {who}'s edits, {label}"),
+                    );
+                }
+            }
+        };
+        check(&a, "");
+        if compact && round == 0 {
+            for at in [1, 2] {
+                a.record_seen("a", at);
+                b.merge_from(&mut a).expect("merge");
+                b.record_seen("b", at);
+                a.merge_from(&mut b).expect("merge");
+            }
+            cut_history(&mut a, seed);
+            check(&a, " after the cut");
+        }
+        mirror = Mirror::from_state(&a.state());
     }
 }
 
@@ -500,27 +690,65 @@ pub fn nothing_lost_two_copies<S: Store>(seed: u64) {
 /// the copy that did the merges. Copies that receive already-merged
 /// changes rely on conflict records stored in the document (phase 0.7).
 pub fn nothing_lost_three_copies<S: Store>(seed: u64) {
+    three_copies::<S>(seed, false);
+}
+
+/// The same, with a compaction in the middle (see the two-copy one).
+pub fn nothing_lost_three_copies_compacted<S: Store>(seed: u64) {
+    three_copies::<S>(seed, true);
+}
+
+fn three_copies<S: Store>(seed: u64, compact: bool) {
     let mut a = S::new_document(1);
     let mut w = Workload::new(seed);
     w.run(&mut a, 300);
     let mut b = a.fork_as(2);
     let mut c = a.fork_as(3);
-    let mut wa = Workload::with_mirror(seed * 1000 + 1, w.mirror.clone());
-    let mut wb = Workload::with_mirror(seed * 1000 + 2, w.mirror.clone());
-    let mut wc = Workload::with_mirror(seed * 1000 + 3, w.mirror.clone());
-    wa.run(&mut a, 100);
-    wb.run(&mut b, 100);
-    wc.run(&mut c, 100);
-    let ab = a.merge_from(&mut b).expect("merge");
-    let ac = a.merge_from(&mut c).expect("merge");
-    b.merge_from(&mut a).expect("merge");
-    c.merge_from(&mut a).expect("merge");
-    assert_eq!(a.state(), b.state());
-    assert_eq!(a.state(), c.state());
-    assert_tree_is_sound(&a.state());
-    let on_a = merged(&[&ab, &ac]);
-    for (intents, who) in [(&wa.intents, "a"), (&wb.intents, "b"), (&wc.intents, "c")] {
-        check_intents(&a, intents, &on_a, &format!("seed {seed}, {who}'s edits"));
+    let rounds: &[usize] = if compact { &[50, 50] } else { &[100] };
+    let mut mirror = w.mirror.clone();
+    for (round, ops) in rounds.iter().enumerate() {
+        let tag = seed * 1000 + 10 * round as u64;
+        let mut wa = Workload::with_mirror(tag + 1, mirror.clone()).checking(tag + 1);
+        let mut wb = Workload::with_mirror(tag + 2, mirror.clone()).checking(tag + 2);
+        let mut wc = Workload::with_mirror(tag + 3, mirror.clone()).checking(tag + 3);
+        wa.run(&mut a, *ops);
+        wb.run(&mut b, *ops);
+        wc.run(&mut c, *ops);
+        let ab = a.merge_from(&mut b).expect("merge");
+        let ac = a.merge_from(&mut c).expect("merge");
+        b.merge_from(&mut a).expect("merge");
+        c.merge_from(&mut a).expect("merge");
+        assert_eq!(a.state(), b.state());
+        assert_eq!(a.state(), c.state());
+        assert_tree_is_sound(&a.state());
+        let on_a = merged(&[&ab, &ac]);
+        let check = |s: &S, when: &str| {
+            for (intents, who) in [(&wa.intents, "a"), (&wb.intents, "b"), (&wc.intents, "c")] {
+                check_intents(
+                    s,
+                    intents,
+                    &on_a,
+                    &format!("seed {seed}, round {round}{when}, {who}'s edits"),
+                );
+            }
+        };
+        check(&a, "");
+        if compact && round == 0 {
+            for at in [1, 2] {
+                a.record_seen("a", at);
+                b.merge_from(&mut a).expect("merge");
+                b.record_seen("b", at);
+                c.merge_from(&mut b).expect("merge");
+                c.record_seen("c", at);
+                a.merge_from(&mut c).expect("merge");
+                b.merge_from(&mut a).expect("merge");
+            }
+            cut_history(&mut a, seed);
+            check(&a, " after the cut");
+            b.merge_from(&mut a).expect("merge");
+            c.merge_from(&mut a).expect("merge");
+        }
+        mirror = Mirror::from_state(&a.state());
     }
 }
 

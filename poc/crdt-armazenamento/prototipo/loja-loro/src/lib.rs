@@ -32,7 +32,9 @@ use loro::{
 /// part 4). A layout change always raises it, so an older file is refused
 /// instead of being read wrong (a file of layout 1 opened silently wrong
 /// before this was raised).
-pub const SCHEMA_VERSION: i64 = 2;
+/// 3: one entry per copy instead of one per write (audit 2026-10-31, item 3:
+/// every write left a deleted key that Loro keeps forever).
+pub const SCHEMA_VERSION: i64 = 3;
 
 const SEP: char = '\u{1f}';
 
@@ -55,12 +57,19 @@ pub trait ParamMode {
 /// concurrent writes; the Bivar detects them by reproducing Loro's rule.
 pub struct Register;
 
-/// One entry per write, key `p:<name>#<counter>.<peer>` (both 16 hex
-/// digits). A write removes only the entries it sees and adds its own with
-/// counter = highest seen + 1, so concurrent writes leave several entries,
-/// visible on every copy. The Bivar picks the winner: the highest key, that
-/// is the highest counter, then the highest peer. No Loro rule involved.
-/// Clearing a parameter is an entry with no value.
+/// One entry per copy, key `p:<name>#<copy>` (16 hex digits), value
+/// `[counter, value, seen]`. A write rewrites only its own copy's entry,
+/// with counter = highest seen + 1 and `seen` = the counter of every other
+/// copy's entry it saw. Nobody deletes another copy's entry: a delete racing
+/// with that copy's new write to the same key could win in Loro and drop
+/// the write silently. So no write leaves a deleted key behind, and a
+/// parameter has at most one entry per copy that ever wrote it.
+///
+/// The winner is the highest counter, then the highest copy; no Loro rule
+/// involved. Another copy's entry the winner had not seen is a concurrent
+/// write, visible on every copy. Clearing a parameter is an entry with no
+/// value. Two sessions with the same copy name write the same key; that is
+/// found from the history on merging (`same_key_writes`).
 pub struct Entries;
 
 impl ParamMode for Register {
@@ -84,6 +93,16 @@ pub struct LoroStore<M: ParamMode = Entries> {
     visible: std::cell::RefCell<HashMap<TreeID, bool>>,
     /// Off only to measure the old way (walking up to the root).
     use_index: bool,
+    /// The copy name in entry keys: stable across sessions of the same file
+    /// on the same computer (kept outside the file, in the list of trusted
+    /// files), unlike the Loro peer id, which is new for every session.
+    /// Defaults to the peer id.
+    copy: u64,
+    /// Connections this session has made: with the session identity (never
+    /// reused, I6), each new connection gets an identity of its own. The
+    /// old one came from the operation count, which repeats inside one
+    /// transaction and after a compaction (audit 2026-10-31, I1).
+    edges_made: u64,
 }
 
 /// Parameters and the removal mark as one register each (compared and set
@@ -131,42 +150,144 @@ fn unix_now() -> u64 {
 /// Key prefix of the removal mark's entries (entries mode).
 const REMOVED_PREFIX: &str = "removed#";
 
-/// All entries under `prefix`, sorted so the winner is last.
-fn raw_entries(meta: &LoroMap, prefix: &str) -> Vec<(String, LoroValue)> {
-    let mut out: Vec<(String, LoroValue)> = meta
-        .keys()
-        .filter(|k| k.starts_with(prefix))
-        .filter_map(|k| match meta.get(&k) {
-            Some(ValueOrContainer::Value(v)) => Some((k.to_string(), v)),
+/// One copy's entry of a parameter or of the removal mark (layout 3).
+struct Entry {
+    copy: u64,
+    counter: u64,
+    value: LoroValue,
+    /// Counter of each other copy's entry this write had seen.
+    seen: HashMap<u64, u64>,
+}
+
+/// An entry's stored form `[counter, value, seen]`, decoded.
+fn decode_entry(key: &str, prefix: &str, v: &LoroValue) -> Option<Entry> {
+    let copy = u64::from_str_radix(key.strip_prefix(prefix)?, 16).ok()?;
+    let LoroValue::List(parts) = v else {
+        return None;
+    };
+    let [LoroValue::I64(counter), value, LoroValue::Map(seen)] = parts.as_slice() else {
+        return None;
+    };
+    let seen = seen
+        .iter()
+        .filter_map(|(c, n)| match n {
+            LoroValue::I64(n) => Some((u64::from_str_radix(c, 16).ok()?, *n as u64)),
             _ => None,
         })
         .collect();
-    out.sort_by(|a, b| a.0.cmp(&b.0));
+    Some(Entry {
+        copy,
+        counter: *counter as u64,
+        value: value.clone(),
+        seen,
+    })
+}
+
+/// The value inside a stored entry (layout 3), or the value itself (a
+/// register). Reading history needs this: an op holds the stored form.
+fn entry_value(v: &LoroValue) -> &LoroValue {
+    match v {
+        LoroValue::List(parts) if parts.len() == 3 => &parts[1],
+        other => other,
+    }
+}
+
+/// All entries under `prefix`, sorted so the winner is last.
+fn entries(meta: &LoroMap, prefix: &str) -> Vec<Entry> {
+    let mut out: Vec<Entry> = meta
+        .keys()
+        .filter(|k| k.starts_with(prefix))
+        .filter_map(|k| match meta.get(&k) {
+            Some(ValueOrContainer::Value(v)) => decode_entry(&k, prefix, &v),
+            _ => None,
+        })
+        .collect();
+    out.sort_by_key(|e| (e.counter, e.copy));
     out
 }
 
-/// Writes one entry under `prefix`: removes only the entries this copy
-/// sees, then adds its own with counter = highest seen + 1.
-fn write_entry(meta: &LoroMap, prefix: &str, value: LoroValue, peer: u64) -> Result<(), OpError> {
-    let seen = raw_entries(meta, prefix);
-    let counter = seen
-        .iter()
-        .filter_map(|(k, _)| k.get(prefix.len()..prefix.len() + 16))
-        .filter_map(|c| u64::from_str_radix(c, 16).ok())
-        .max()
-        .map_or(0, |c| c + 1);
-    for (k, _) in &seen {
-        meta.delete(k).map_err(lib_err)?;
+/// All entries under `prefix` as `(copy, value)`, sorted so the winner is
+/// last.
+fn raw_entries(meta: &LoroMap, prefix: &str) -> Vec<(u64, LoroValue)> {
+    entries(meta, prefix)
+        .into_iter()
+        .map(|e| (e.copy, e.value))
+        .collect()
+}
+
+/// Every entry of a node, grouped by prefix (`p:<name>#`, `removed#`), each
+/// group sorted so the winner is last. One pass over the keys: reading a
+/// node with many parameters one prefix at a time cost the square of their
+/// number (184 ms for 1,000 parameters, measured 2026-10-31).
+fn entries_by_prefix(meta: &LoroMap) -> BTreeMap<String, Vec<Entry>> {
+    let mut out: BTreeMap<String, Vec<Entry>> = BTreeMap::new();
+    for k in meta.keys() {
+        if !(k.starts_with("p:") || k.starts_with(REMOVED_PREFIX)) {
+            continue;
+        }
+        let Some(prefix) = k.len().checked_sub(16).and_then(|n| k.get(..n)) else {
+            continue;
+        };
+        if !prefix.ends_with('#') {
+            continue;
+        }
+        if let Some(ValueOrContainer::Value(v)) = meta.get(&k)
+            && let Some(e) = decode_entry(&k, prefix, &v)
+        {
+            out.entry(prefix.to_owned()).or_default().push(e);
+        }
     }
-    meta.insert(&format!("{prefix}{counter:016x}.{peer:016x}"), value)
+    for group in out.values_mut() {
+        group.sort_by_key(|e| (e.counter, e.copy));
+    }
+    out
+}
+
+/// Values of the entries the winner (the last one) had not seen:
+/// concurrent writes still open. Empty when there is no conflict.
+fn unseen_of(sorted: &[Entry]) -> Vec<LoroValue> {
+    let Some((winner, rest)) = sorted.split_last() else {
+        return Vec::new();
+    };
+    rest.iter()
+        .filter(|e| winner.seen.get(&e.copy).is_none_or(|n| *n < e.counter))
+        .map(|e| e.value.clone())
+        .collect()
+}
+
+/// `unseen_of` for the entries under one prefix.
+fn unseen_values(meta: &LoroMap, prefix: &str) -> Vec<LoroValue> {
+    unseen_of(&entries(meta, prefix))
+}
+
+/// Writes this copy's entry under `prefix`: counter = highest seen + 1, and
+/// it records every other entry it saw. Never deletes another copy's entry.
+fn write_entry(meta: &LoroMap, prefix: &str, value: LoroValue, copy: u64) -> Result<(), OpError> {
+    let all = entries(meta, prefix);
+    let counter = all.iter().map(|e| e.counter + 1).max().unwrap_or(0);
+    let seen: HashMap<String, LoroValue> = all
+        .iter()
+        .filter(|e| e.copy != copy)
+        .map(|e| (format!("{:016x}", e.copy), LoroValue::I64(e.counter as i64)))
+        .collect();
+    let stored = LoroValue::List(
+        vec![
+            LoroValue::I64(counter as i64),
+            value,
+            LoroValue::Map(seen.into()),
+        ]
+        .into(),
+    );
+    meta.insert(&format!("{prefix}{copy:016x}"), stored)
         .map_err(lib_err)
 }
 
-/// All entries of one parameter, sorted so the winner is last.
-fn param_entries(meta: &LoroMap, key: &str) -> Vec<(String, Option<Value>)> {
+/// All entries of one parameter as `(copy, value)`, sorted so the winner is
+/// last.
+fn param_entries(meta: &LoroMap, key: &str) -> Vec<(u64, Option<Value>)> {
     raw_entries(meta, &format!("p:{key}#"))
         .into_iter()
-        .map(|(k, v)| (k, from_loro(&v)))
+        .map(|(c, v)| (c, from_loro(&v)))
         .collect()
 }
 
@@ -243,11 +364,14 @@ fn target(t: &Touch) -> Option<String> {
 
 impl<M: ParamMode> LoroStore<M> {
     fn wrap(doc: LoroDoc) -> Self {
+        let copy = doc.peer_id();
         let mut s = LoroStore {
             doc,
             mode: std::marker::PhantomData,
             visible: std::cell::RefCell::new(HashMap::new()),
             use_index: true,
+            copy,
+            edges_made: 0,
         };
         s.rebuild_hidden();
         s
@@ -299,26 +423,23 @@ impl<M: ParamMode> LoroStore<M> {
         out
     }
 
-    /// A conflict still on the node: two entries left by concurrent writes
-    /// to a parameter or to the removal mark. Never cleaned (owner's rule).
+    /// A conflict still on the node: an entry of a parameter or of the
+    /// removal mark that the winning write had not seen. Never cleaned
+    /// (owner's rule).
     fn has_open_conflict(&self, t: TreeID) -> bool {
         let Ok(meta) = self.tree().get_meta(t) else {
             return false;
         };
-        let mut counts: HashMap<String, usize> = HashMap::new();
-        for key in meta.keys() {
-            if let Some((name, _)) = key.split_once('#') {
-                *counts.entry(name.to_owned()).or_default() += 1;
-            }
-        }
-        counts.values().any(|c| *c > 1)
+        entries_by_prefix(&meta)
+            .values()
+            .any(|group| !unseen_of(group).is_empty())
     }
 
-    /// Entries mode: a parameter touched by this merge that now has more
-    /// than one entry was written concurrently. The document itself shows
-    /// it, so every copy finds the same thing; no history comparison and no
-    /// Loro rule. The remove/restore flag is still a Loro register and keeps
-    /// the history-based detection.
+    /// Entries mode: a parameter (or removal mark) touched by this merge
+    /// with an entry the winner had not seen was written concurrently. The
+    /// document itself shows it, so every copy finds the same thing; no
+    /// history comparison and no Loro rule. Two sessions with the same copy
+    /// name are found apart (`same_key_writes`).
     fn entry_conflicts(&self, local: &[Touch], remote: &[Touch]) -> Vec<ConcurrentWrite> {
         let touched: BTreeSet<(NodeId, String)> = local
             .iter()
@@ -373,15 +494,14 @@ impl<M: ParamMode> LoroStore<M> {
             let Ok(meta) = self.tree().get_meta(t).map_err(lib_err) else {
                 continue;
             };
-            let mut entries = raw_entries(&meta, REMOVED_PREFIX);
-            let Some((_, last)) = entries.pop() else {
+            let Some((_, last)) = raw_entries(&meta, REMOVED_PREFIX).pop() else {
                 continue;
             };
             let kept = word(&last);
             // Two copies that both removed (or both restored) lost nothing.
-            let lost: Vec<Value> = entries
+            let lost: Vec<Value> = unseen_values(&meta, REMOVED_PREFIX)
                 .iter()
-                .map(|(_, v)| word(v))
+                .map(word)
                 .filter(|v| *v != kept)
                 .collect();
             if !lost.is_empty() {
@@ -393,19 +513,124 @@ impl<M: ParamMode> LoroStore<M> {
                 });
             }
         }
+        // Each node's entries read once (`touched` is sorted by node).
+        let mut groups: Option<(NodeId, BTreeMap<String, Vec<Entry>>)> = None;
         for (node, key) in touched {
-            let Ok(meta) = self.meta(&node) else { continue };
-            let mut entries = param_entries(&meta, &key);
-            if entries.len() < 2 {
+            if groups.as_ref().is_none_or(|(n, _)| *n != node) {
+                let Ok(meta) = self.meta(&node) else { continue };
+                groups = Some((node.clone(), entries_by_prefix(&meta)));
+            }
+            let Some((_, by_prefix)) = &groups else {
+                continue;
+            };
+            let Some(group) = by_prefix.get(&format!("p:{key}#")) else {
+                continue;
+            };
+            let kept = group.last().and_then(|e| from_loro(&e.value));
+            let lost: Vec<Value> = unseen_of(group).iter().filter_map(from_loro).collect();
+            if lost.is_empty() {
                 continue;
             }
-            let kept = entries.pop().and_then(|e| e.1);
-            let lost = entries.into_iter().filter_map(|e| e.1).collect();
             out.push(ConcurrentWrite {
                 node,
                 key,
                 kept,
                 lost,
+            });
+        }
+        out
+    }
+
+    /// Two sessions with the same copy name write the same entry key, and
+    /// Loro keeps one write in silence. Found here from the history: the
+    /// last incoming write to a key had not seen the last local write to
+    /// that key. The losing value comes from the history, so it is reported,
+    /// never dropped (owner's rule, 2026-10-31).
+    fn same_key_writes(&self, local: &JsonSchema, remote: &JsonSchema) -> Vec<ConcurrentWrite> {
+        type Key = (TreeID, String);
+        let entry_ops = |schema: &JsonSchema, with_past: bool| {
+            let mut last: HashMap<Key, (u64, ID, LoroValue, VersionVector)> = HashMap::new();
+            for change in &schema.changes {
+                let past = if with_past {
+                    change_past(&self.doc, change)
+                } else {
+                    VersionVector::default()
+                };
+                for op in &change.ops {
+                    let ContainerID::Normal {
+                        peer,
+                        counter,
+                        container_type: ContainerType::Map,
+                    } = op.container
+                    else {
+                        continue;
+                    };
+                    let JsonOpContent::Map(loro::JsonMapOp::Insert { key, value }) = &op.content
+                    else {
+                        continue;
+                    };
+                    if !(key.starts_with("p:") || key.starts_with(REMOVED_PREFIX)) {
+                        continue;
+                    }
+                    let tick = (op.counter - change.id.counter) as u64;
+                    let order = change.lamport as u64 + tick;
+                    let k = (TreeID::new(peer, counter), key.clone());
+                    if last.get(&k).is_none_or(|(o, ..)| *o <= order) {
+                        let id = ID::new(change.id.peer, op.counter);
+                        last.insert(k, (order, id, value.clone(), past.clone()));
+                    }
+                }
+            }
+            last
+        };
+        let mine = entry_ops(local, false);
+        let theirs = entry_ops(remote, true);
+        let word = |v: &LoroValue| {
+            Value::Str(
+                if matches!(v, LoroValue::Bool(true) | LoroValue::I64(_)) {
+                    "removed"
+                } else {
+                    "restored"
+                }
+                .into(),
+            )
+        };
+        let mut out = Vec::new();
+        for ((t, key), (_, my_id, my_value, _)) in &mine {
+            let Some((_, _, their_value, their_past)) = theirs.get(&(*t, key.clone())) else {
+                continue;
+            };
+            if their_past.includes_id(*my_id) || my_value == their_value {
+                continue;
+            }
+            let Ok(meta) = self.tree().get_meta(*t) else {
+                continue;
+            };
+            let now = match meta.get(key) {
+                Some(ValueOrContainer::Value(v)) => v,
+                _ => continue,
+            };
+            let lost = if now == *my_value {
+                their_value
+            } else {
+                my_value
+            };
+            let node = node_id(*t);
+            out.push(if key.starts_with(REMOVED_PREFIX) {
+                ConcurrentWrite {
+                    kept: Some(word(entry_value(&now))),
+                    lost: vec![word(entry_value(lost))],
+                    key: detect::REMOVED_KEY.into(),
+                    node,
+                }
+            } else {
+                let name = param_name(key).unwrap_or_default().to_owned();
+                ConcurrentWrite {
+                    kept: self.param(&node, &name),
+                    lost: from_loro(entry_value(lost)).into_iter().collect(),
+                    key: name,
+                    node,
+                }
             });
         }
         out
@@ -578,7 +803,7 @@ impl<M: ParamMode> LoroStore<M> {
             } else {
                 LoroValue::Bool(false)
             };
-            return write_entry(&meta, REMOVED_PREFIX, v, self.doc.peer_id());
+            return write_entry(&meta, REMOVED_PREFIX, v, self.copy);
         }
         meta.insert("removed", removed).map_err(lib_err)
     }
@@ -621,6 +846,100 @@ impl<M: ParamMode> LoroStore<M> {
             _ if self.doc.is_shallow() => OpError::HistoryTrimmed,
             other => lib_err(other),
         }
+    }
+
+    /// Runs `look` on this copy moved back to `version`, then returns to the
+    /// latest version, also when `look` fails or panics. While moved back
+    /// the copy cannot be edited (Loro refuses edits on an old version) nor
+    /// saved (`look` gets a shared borrow, and saving needs `&mut`).
+    pub fn at_version<T>(
+        &self,
+        version: &Frontiers,
+        look: impl FnOnce(&Self) -> T,
+    ) -> Result<T, OpError> {
+        /// Returns the document to the latest version when dropped.
+        struct Back<'a> {
+            doc: &'a LoroDoc,
+            visible: &'a std::cell::RefCell<HashMap<TreeID, bool>>,
+        }
+        impl Drop for Back<'_> {
+            fn drop(&mut self) {
+                self.doc.checkout_to_latest();
+                if let Ok(mut v) = self.visible.try_borrow_mut() {
+                    v.clear();
+                }
+            }
+        }
+        self.doc.commit();
+        let back = Back {
+            doc: &self.doc,
+            visible: &self.visible,
+        };
+        self.doc.checkout(version).map_err(|e| self.trim_err(e))?;
+        self.visible.borrow_mut().clear();
+        let out = look(self);
+        drop(back);
+        Ok(out)
+    }
+
+    /// Whether every change of `history` that `point` (one operation, with
+    /// version `at`) does not contain came after it: made by a copy that had
+    /// received `point`. A change made beside it, by a copy that had not
+    /// received it yet, makes the point unusable as the root of the kept
+    /// history (ADR-0023, re-rooting; owner's case, 2026-10-31).
+    fn everything_after_comes_after(
+        &self,
+        history: &JsonSchema,
+        point: ID,
+        at: &VersionVector,
+    ) -> bool {
+        history.changes.iter().all(|c| {
+            let last = c.ops.last().map_or(c.id.counter, |op| op.counter);
+            if at.includes_id(ID::new(c.id.peer, last)) {
+                return true; // all of it is before the point
+            }
+            if c.id.peer == point.peer && c.id.counter <= point.counter {
+                return true; // the point's own change, continued after it
+            }
+            change_past(&self.doc, c).includes_id(point)
+        })
+    }
+
+    /// The document with its history cut at `point` (one operation): the
+    /// version at `point` becomes the root, and every later change is
+    /// replayed on it. Loro 1.17.1 cuts a history with several copies only
+    /// back to a point it finds from the latest heads, which it does not
+    /// find (locked by `tests/loro_assumptions.rs`). The state at `point`
+    /// alone (`StateOnly`, which also works on a document already cut) is a
+    /// document whose history starts at `point`. Checked before it is used:
+    /// the same document, and a history that starts at `point`.
+    fn reroot(&self, point: &Frontiers) -> Result<Vec<u8>, OpError> {
+        let err = |e: loro::LoroEncodeError| OpError::Library(e.to_string());
+        let root = self
+            .doc
+            .export(ExportMode::state_only(Some(point)))
+            .map_err(err)?;
+        let doc = LoroDoc::from_snapshot(&root).map_err(lib_err)?;
+        let since = self
+            .doc
+            .frontiers_to_vv(point)
+            .ok_or_else(|| OpError::Library("cut point not in the history".into()))?;
+        let later = self.doc.export(ExportMode::updates(&since)).map_err(err)?;
+        doc.import(&later).map_err(lib_err)?;
+        if doc.get_deep_value() != self.doc.get_deep_value()
+            || doc.oplog_vv() != self.doc.oplog_vv()
+            || doc.shallow_since_frontiers() != *point
+        {
+            return Err(OpError::Library(
+                "re-rooting changed the document; compaction refused".into(),
+            ));
+        }
+        doc.export(ExportMode::Snapshot).map_err(err)
+    }
+
+    /// Whether this copy is showing the latest version (not moved back).
+    pub fn is_at_latest(&self) -> bool {
+        !self.doc.is_detached()
     }
 
     fn node_of_container(&self, cid: &ContainerID) -> Option<NodeId> {
@@ -666,7 +985,9 @@ impl<M: ParamMode> LoroStore<M> {
                     ) => {
                         let node = node_id(TreeID::new(*peer, *counter));
                         let (key, value) = match m {
-                            loro::JsonMapOp::Insert { key, value } => (key.as_str(), Some(value)),
+                            loro::JsonMapOp::Insert { key, value } => {
+                                (key.as_str(), Some(entry_value(value)))
+                            }
                             loro::JsonMapOp::Delete { key } => (key.as_str(), None),
                         };
                         let flag = key == "removed" || key.starts_with(REMOVED_PREFIX);
@@ -806,7 +1127,7 @@ impl<M: ParamMode> Store for LoroStore<M> {
                 let meta = self.meta(node)?;
                 if M::ENTRIES {
                     let v = value.clone().map_or(LoroValue::Null, to_loro);
-                    write_entry(&meta, &format!("p:{key}#"), v, self.doc.peer_id())?;
+                    write_entry(&meta, &format!("p:{key}#"), v, self.copy)?;
                 } else {
                     let k = format!("p:{key}");
                     match value {
@@ -819,9 +1140,13 @@ impl<M: ParamMode> Store for LoroStore<M> {
             Op::Connect { id, edge } => {
                 self.meta(&edge.from)?;
                 self.meta(&edge.to)?;
-                let id = id
-                    .clone()
-                    .unwrap_or_else(|| format!("e{}.{:x}", self.doc.len_ops(), self.doc.peer_id()));
+                let id = match id {
+                    Some(id) => id.clone(),
+                    None => {
+                        self.edges_made += 1;
+                        format!("e{:x}.{}", self.doc.peer_id(), self.edges_made)
+                    }
+                };
                 self.doc
                     .get_map("edges")
                     .insert(&id, encode_edge(edge))
@@ -885,6 +1210,10 @@ impl<M: ParamMode> Store for LoroStore<M> {
 
     fn is_removed(&self, id: &NodeId) -> bool {
         tree_id(id).is_ok_and(|t| self.flag_removed(t))
+    }
+
+    fn is_stored(&self, id: &NodeId) -> bool {
+        tree_id(id).is_ok_and(|t| self.exists(t))
     }
 
     fn kind(&self, id: &NodeId) -> Option<String> {
@@ -952,26 +1281,34 @@ impl<M: ParamMode> Store for LoroStore<M> {
                 children: children.iter().map(|c| node_id(*c)).collect(),
                 ..NodeState::default()
             };
-            // Entries mode: keys sort so the last entry of each name wins.
-            let mut keys: Vec<String> = meta.keys().map(|k| k.to_string()).collect();
-            keys.sort();
-            for key in keys {
-                match (key.as_str(), meta.get(&key)) {
+            for key in meta.keys() {
+                match (key.as_ref(), meta.get(&key)) {
                     ("kind", Some(ValueOrContainer::Value(LoroValue::String(s)))) => {
                         ns.kind = s.to_string();
                     }
                     ("text", Some(ValueOrContainer::Container(Container::Text(txt)))) => {
                         ns.text = Some(txt.to_string());
                     }
-                    (k, Some(ValueOrContainer::Value(v))) => {
-                        if let Some(name) = param_name(k) {
-                            match from_loro(&v) {
-                                Some(v) => ns.params.insert(name.to_owned(), v),
-                                None => ns.params.remove(name), // a cleared entry
-                            };
+                    (k, Some(ValueOrContainer::Value(v))) if !M::ENTRIES => {
+                        if let (Some(name), Some(v)) = (param_name(k), from_loro(&v)) {
+                            ns.params.insert(name.to_owned(), v);
                         }
                     }
                     _ => {}
+                }
+            }
+            // Entries mode: the winning entry of each parameter; a cleared
+            // parameter's winner has no value.
+            if M::ENTRIES {
+                for (prefix, group) in entries_by_prefix(&meta) {
+                    let Some(name) = param_name(&prefix) else {
+                        continue;
+                    };
+                    if let Some(winner) = group.last()
+                        && let Some(v) = from_loro(&winner.value)
+                    {
+                        ns.params.insert(name.to_owned(), v);
+                    }
                 }
             }
             for c in children {
@@ -1051,18 +1388,13 @@ impl<M: ParamMode> Store for LoroStore<M> {
                 cut.set_end(ID::new(*peer, b));
             }
         }
-        let frontiers = other.doc.vv_to_frontiers(&cut);
-        let then = match other.doc.fork_at(&frontiers) {
-            Ok(d) => d,
-            // Loro has no `fork_at` for a compacted (shallow) document; a
-            // copy moved back in time gives the same view.
-            Err(_) => {
-                let d = other.doc.fork();
-                d.checkout(&frontiers).map_err(|e| self.trim_err(e))?;
-                d
-            }
-        };
-        visible_before.extend(detect::visible_touched(&Self::wrap(then), &remote_plain));
+        // Everything in `cut` is here now, so this copy moved back to `cut`
+        // shows it. Moving back costs only the difference; building that
+        // version apart (`fork_at`) cost time in proportion to the whole
+        // history (278 ms per small merge at 1 million writes, 2026-10-31).
+        let frontiers = self.doc.vv_to_frontiers(&cut);
+        let then = self.at_version(&frontiers, |s| detect::visible_touched(s, &remote_plain))?;
+        visible_before.extend(then);
         // A local write counts only if the last incoming write to the same
         // target had not seen it.
         let mut remote_past: HashMap<String, VersionVector> = HashMap::new();
@@ -1079,12 +1411,15 @@ impl<M: ParamMode> Store for LoroStore<M> {
         let local: Vec<Touch> = local.into_iter().map(|x| x.0).collect();
         let remote: Vec<Touch> = remote.into_iter().map(|x| x.0).collect();
         let tree = self.tree();
+        let concurrent_writes = if M::ENTRIES {
+            let mut all = self.entry_conflicts(&local, &remote);
+            all.extend(self.same_key_writes(&local_json, &remote_json));
+            all
+        } else {
+            detect::concurrent_writes(self, &local, &remote)
+        };
         Ok(MergeReport {
-            concurrent_writes: if M::ENTRIES {
-                self.entry_conflicts(&local, &remote)
-            } else {
-                detect::concurrent_writes(self, &local, &remote)
-            },
+            concurrent_writes,
             lost_moves: detect::lost_moves(self, &local, &remote, |n| {
                 tree.fractional_index(tree_id(n).ok()?)
             }),
@@ -1107,8 +1442,27 @@ impl<M: ParamMode> Store for LoroStore<M> {
                 )));
             }
         }
+        // Audit 2026-10-31, I6: a session never reuses an identity the
+        // history already has.
+        let used = doc.oplog_vv();
+        let mut peer = peer;
+        while used.get(&peer).is_some() {
+            peer = random_u64();
+        }
         doc.set_peer_id(peer).map_err(lib_err)?;
         Ok(Self::wrap(doc))
+    }
+
+    fn peer(&self) -> u64 {
+        self.doc.peer_id()
+    }
+
+    fn copy_name(&self) -> u64 {
+        self.copy
+    }
+
+    fn set_copy_name(&mut self, copy: u64) {
+        self.copy = copy;
     }
 
     fn history_dump(&mut self) -> String {
@@ -1163,26 +1517,30 @@ impl<M: ParamMode> Store for LoroStore<M> {
 
     fn record_seen(&mut self, copy: &str, now: u64) {
         self.doc.commit();
+        // The checkpoint is this one operation: a version with one head,
+        // which a compaction can cut at (ADR-0023, re-rooting). Its key
+        // names the operation: time, peer, counter.
+        let peer = self.doc.peer_id();
+        let counter = self.doc.oplog_vv().get(&peer).copied().unwrap_or(0);
+        self.doc
+            .get_map("checkpoints")
+            .insert(
+                &format!("{now:016x}.{peer:016x}.{counter:016x}"),
+                LoroValue::Bool(true),
+            )
+            .expect("checkpoints map");
+        self.doc.commit();
+        debug_assert!(self.doc.oplog_vv().includes_id(ID::new(peer, counter)));
+        // What this copy has seen, the checkpoint included. Each copy writes
+        // only its own keys, so these never conflict.
         let vv = self.doc.oplog_vv().encode();
-        // Each copy writes only its own keys, so these never conflict.
         let copies = self.doc.get_map("copies");
         copies
-            .insert(&format!("{copy}#vv"), LoroValue::from(vv.clone()))
+            .insert(&format!("{copy}#vv"), LoroValue::from(vv))
             .expect("copies map");
         copies
             .insert(&format!("{copy}#at"), now as i64)
             .expect("copies map");
-        self.doc
-            .get_map("checkpoints")
-            .insert(
-                &format!(
-                    "{now:016x}.{:016x}.{:016x}",
-                    self.doc.peer_id(),
-                    self.doc.len_ops()
-                ),
-                LoroValue::from(vv),
-            )
-            .expect("checkpoints map");
         self.doc.commit();
     }
 
@@ -1228,24 +1586,64 @@ impl<M: ParamMode> Store for LoroStore<M> {
             let m = self.doc.get_map("milestones");
             m.keys().filter_map(|k| map_vv(&m, &k)).collect()
         };
-        // Trim point: the latest time checkpoint older than the retention
-        // that every holder has seen and that no milestone needs.
-        let cps = self.doc.get_map("checkpoints");
         let start = self.history_start();
-        let trim = cps
+        let latest = self.doc.oplog_vv();
+        // The kept history, decoded once: for the trim point and removals.
+        let history = self.json_between(&start, &latest).ok();
+
+        // Trim point: the latest checkpoint older than the retention that
+        // every holder has seen, that no milestone needs, and that every
+        // later change comes after (no change made beside it, without having
+        // seen it): only such a point can be the root of the kept history.
+        let cps = self.doc.get_map("checkpoints");
+        let mut candidates: Vec<(u64, ID, VersionVector)> = cps
             .keys()
             .filter_map(|k| {
-                let time = u64::from_str_radix(k.get(..16)?, 16).ok()?;
-                Some((time, map_vv(&cps, &k)?))
+                let mut it = k.split('.');
+                let time = u64::from_str_radix(it.next()?, 16).ok()?;
+                let peer = u64::from_str_radix(it.next()?, 16).ok()?;
+                let counter = u64::from_str_radix(it.next()?, 16).ok()?;
+                let id = ID::new(peer, i32::try_from(counter).ok()?);
+                if !latest.includes_id(id) {
+                    return None;
+                }
+                let vv = self.doc.frontiers_to_vv(&Frontiers::from(id))?;
+                Some((time, id, vv))
             })
-            .filter(|(time, vv)| {
+            .filter(|(time, _, vv)| {
                 *time <= cutoff
                     && vv_le(vv, &ack)
                     && milestones.iter().all(|m| vv_le(vv, m))
                     && !vv_le(vv, &start)
             })
-            .max_by_key(|(time, _)| *time)
-            .map(|(_, vv)| vv);
+            .collect();
+        candidates.sort_by_key(|(time, id, _)| (*time, id.peer, id.counter));
+        let mut why_not = None;
+        let trim = match &history {
+            None => {
+                why_not = Some("the kept history could not be read".to_owned());
+                None
+            }
+            Some(h) => {
+                let found = candidates
+                    .iter()
+                    .rev()
+                    .find(|(_, id, vv)| self.everything_after_comes_after(h, *id, vv))
+                    .map(|(_, _, vv)| vv.clone());
+                if found.is_none() {
+                    why_not = Some(if candidates.is_empty() {
+                        "no saved point older than the kept period has been seen by every \
+                         known copy (and comes before every milestone)"
+                            .to_owned()
+                    } else {
+                        "at every such point, some copy was editing without having received it \
+                         yet, so no single point comes before everything kept"
+                            .to_owned()
+                    });
+                }
+                found
+            }
+        };
         let cut_off = match &trim {
             Some(t) => known
                 .iter()
@@ -1255,30 +1653,31 @@ impl<M: ParamMode> Store for LoroStore<M> {
             None => Vec::new(),
         };
 
-        // When each removal happened, from the kept history.
+        // Each removal, from the kept history. Without proof that every
+        // holder received a removal, the node is not cleaned (I3): a removal
+        // not found in the kept history, or a history that cannot be read,
+        // blocks the cleaning.
         let mut removal_op: HashMap<TreeID, ID> = HashMap::new();
-        if let Ok(all) = self.json_between(&start, &self.doc.oplog_vv()) {
-            for change in &all.changes {
-                for op in &change.ops {
-                    let ContainerID::Normal {
-                        peer,
-                        counter,
-                        container_type: ContainerType::Map,
-                    } = op.container
-                    else {
-                        continue;
-                    };
-                    if let JsonOpContent::Map(loro::JsonMapOp::Insert {
-                        key,
-                        value: LoroValue::I64(_),
-                    }) = &op.content
-                        && key.starts_with(REMOVED_PREFIX)
-                    {
-                        removal_op.insert(
-                            TreeID::new(peer, counter),
-                            ID::new(change.id.peer, op.counter),
-                        );
-                    }
+        for change in history.iter().flat_map(|h| &h.changes) {
+            for op in &change.ops {
+                let ContainerID::Normal {
+                    peer,
+                    counter,
+                    container_type: ContainerType::Map,
+                } = op.container
+                else {
+                    continue;
+                };
+                // The node's metadata map has the node's own identity
+                // (locked by a test: `tests/loro_assumptions.rs`).
+                if let JsonOpContent::Map(loro::JsonMapOp::Insert { key, value }) = &op.content
+                    && matches!(entry_value(value), LoroValue::I64(_))
+                    && key.starts_with(REMOVED_PREFIX)
+                {
+                    removal_op.insert(
+                        TreeID::new(peer, counter),
+                        ID::new(change.id.peer, op.counter),
+                    );
                 }
             }
         }
@@ -1287,6 +1686,7 @@ impl<M: ParamMode> Store for LoroStore<M> {
         let mut plan = CompactionPlan {
             trim_before: trim.map(|v| v.encode()),
             cut_off,
+            trim_refused: why_not,
             ..CompactionPlan::default()
         };
         for t in tree.nodes() {
@@ -1305,12 +1705,10 @@ impl<M: ParamMode> Store for LoroStore<M> {
             if removed_at > cutoff {
                 continue;
             }
-            // Every holder has seen the removal (or it is older than the kept
-            // history, so everyone has).
-            if let Some(id) = removal_op.get(&t)
-                && !ack.includes_id(*id)
-            {
-                continue;
+            // Proof that every holder has seen the removal.
+            match removal_op.get(&t) {
+                Some(id) if ack.includes_id(*id) => {}
+                _ => continue,
             }
             let branch = self.branch(t);
             if branch.iter().any(|n| self.has_open_conflict(*n)) {
@@ -1341,18 +1739,20 @@ impl<M: ParamMode> Store for LoroStore<M> {
         let bytes = match &plan.trim_before {
             Some(v) => {
                 let vv = VersionVector::decode(v).map_err(lib_err)?;
-                let f = self.doc.vv_to_frontiers(&vv);
-                self.doc
-                    .export(ExportMode::ShallowSnapshot(std::borrow::Cow::Owned(f)))
+                self.reroot(&self.doc.vv_to_frontiers(&vv))?
             }
-            None => self.doc.export(ExportMode::Snapshot),
-        }
-        .map_err(|e| OpError::Library(e.to_string()))?;
+            None => self
+                .doc
+                .export(ExportMode::Snapshot)
+                .map_err(|e| OpError::Library(e.to_string()))?,
+        };
         // Continue from exactly what was written.
-        let peer = self.doc.peer_id();
+        let (peer, copy, edges_made) = (self.doc.peer_id(), self.copy, self.edges_made);
         let doc = LoroDoc::from_snapshot(&bytes).map_err(lib_err)?;
         doc.set_peer_id(peer).map_err(lib_err)?;
         *self = Self::wrap(doc);
+        self.copy = copy;
+        self.edges_made = edges_made;
         Ok(bytes)
     }
 
@@ -1366,24 +1766,20 @@ impl<M: ParamMode> Store for LoroStore<M> {
             let Ok(meta) = tree.get_meta(t) else {
                 continue;
             };
-            let mut counts: BTreeMap<String, Vec<LoroValue>> = BTreeMap::new();
-            for key in meta.keys() {
-                if let Some((name, _)) = key.split_once('#')
-                    && let Some(ValueOrContainer::Value(v)) = meta.get(&key)
-                {
-                    // Removals at different times all mean "removed".
-                    let v = match v {
-                        LoroValue::I64(_) => LoroValue::Bool(true),
-                        other => other,
-                    };
-                    counts.entry(name.to_owned()).or_default().push(v);
-                }
-            }
-            for (name, values) in counts {
+            // Removals at different times all mean "removed".
+            let norm = |v: LoroValue| match v {
+                LoroValue::I64(_) => LoroValue::Bool(true),
+                other => other,
+            };
+            for (prefix, group) in entries_by_prefix(&meta) {
+                let Some(winner) = group.last() else {
+                    continue;
+                };
+                let winner = norm(winner.value.clone());
                 // Two copies that wrote the same value lost nothing.
-                let first = &values[0];
-                if values.len() > 1 && values.iter().any(|v| v != first) {
-                    let name = name.strip_prefix("p:").unwrap_or(&name);
+                if unseen_of(&group).into_iter().any(|v| norm(v) != winner) {
+                    let name = prefix.trim_end_matches('#');
+                    let name = name.strip_prefix("p:").unwrap_or(name);
                     out.push(format!("{}.{name}", node_id(t)));
                 }
             }
@@ -1402,14 +1798,94 @@ impl<M: ParamMode> Store for LoroStore<M> {
             let Ok(meta) = tree.get_meta(t) else {
                 continue;
             };
+            // Every copy's entry, not only the winner: a value that lost a
+            // concurrent write keeps its large file until the conflict goes.
             for key in meta.keys() {
                 if param_name(&key) == Some("blob")
-                    && let Some(ValueOrContainer::Value(LoroValue::String(s))) = meta.get(&key)
+                    && let Some(ValueOrContainer::Value(v)) = meta.get(&key)
+                    && let LoroValue::String(s) = entry_value(&v)
                 {
                     out.insert(s.to_string());
                 }
             }
         }
         out
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn doc_with_history() -> (EntriesStore, Frontiers, NodeId) {
+        let mut s = EntriesStore::new_document(1);
+        let n = s
+            .apply(&Op::CreateNode {
+                parent: None,
+                index: None,
+                kind: "shape".into(),
+            })
+            .unwrap()
+            .created
+            .unwrap();
+        s.commit();
+        let old = s.doc.oplog_frontiers();
+        s.apply(&Op::SetParam {
+            node: n.clone(),
+            key: "x".into(),
+            value: Some(Value::Num(2.0)),
+        })
+        .unwrap();
+        s.commit();
+        (s, old, n)
+    }
+
+    #[test]
+    fn a_look_back_shows_the_old_version_then_returns() {
+        let (s, old, n) = doc_with_history();
+        let then = s.at_version(&old, |v| v.param(&n, "x")).unwrap();
+        assert_eq!(then, None);
+        assert!(s.is_at_latest());
+        assert_eq!(s.param(&n, "x"), Some(Value::Num(2.0)));
+    }
+
+    #[test]
+    fn a_look_back_that_fails_still_returns_to_the_latest_version() {
+        let (s, old, n) = doc_with_history();
+        let r: Result<Result<(), &str>, OpError> = s.at_version(&old, |_| Err("failed"));
+        assert_eq!(r, Ok(Err("failed")));
+        assert!(s.is_at_latest());
+        assert_eq!(s.param(&n, "x"), Some(Value::Num(2.0)));
+    }
+
+    #[test]
+    fn a_look_back_that_panics_still_returns_to_the_latest_version() {
+        let (mut s, old, n) = doc_with_history();
+        let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            s.at_version(&old, |_| panic!("in the middle"))
+        }));
+        assert!(r.is_err());
+        assert!(s.is_at_latest());
+        assert_eq!(s.param(&n, "x"), Some(Value::Num(2.0)));
+        // Still editable, and the edit is saved.
+        s.apply(&Op::SetParam {
+            node: n.clone(),
+            key: "x".into(),
+            value: Some(Value::Num(3.0)),
+        })
+        .unwrap();
+        let back = EntriesStore::load(&s.save(), 2).unwrap();
+        assert_eq!(back.param(&n, "x"), Some(Value::Num(3.0)));
+    }
+
+    #[test]
+    fn nothing_can_be_edited_while_moved_back() {
+        let (s, old, _) = doc_with_history();
+        let edit = s
+            .at_version(&old, |v| v.doc.get_map("meta").insert("k", 1))
+            .unwrap();
+        assert!(edit.is_err(), "an edit on an old version went through");
+        assert!(s.is_at_latest());
+        assert!(s.doc.get_map("meta").get("k").is_none());
     }
 }

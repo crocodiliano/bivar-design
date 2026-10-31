@@ -1,0 +1,18 @@
+RESULT um-param-junta-no-fim-entradas mode=Loro (entries) build_s=8.2 merges_s=0.0 last_merge_ms=0.0 bytes_before=1994883 bytes_after_parallel_confirm=1995423 bytes_after_in_turn=1995696 bytes_after_all_history_cut=1060513
+RESULT open crescimento-um-param-junta-no-fim-entradas-antes.bin load_ms=5.4 first_read_ms=3.3 extra_memory_mb=15.4 nodes=1
+RESULT open crescimento-um-param-junta-no-fim-entradas-depois.bin load_ms=4.4 first_read_ms=0.1 extra_memory_mb=14.1 nodes=1
+RESULT um-param-junta-no-fim-registro mode=Loro (register) build_s=0.5 merges_s=0.0 last_merge_ms=0.0 bytes_before=412405 bytes_after_parallel_confirm=412975 bytes_after_in_turn=413233 bytes_after_all_history_cut=798
+RESULT open crescimento-um-param-junta-no-fim-registro-antes.bin load_ms=1.1 first_read_ms=0.0 extra_memory_mb=0.8 nodes=1
+RESULT open crescimento-um-param-junta-no-fim-registro-depois.bin load_ms=0.4 first_read_ms=0.0 extra_memory_mb=0.2 nodes=1
+RESULT um-param-junta-a-cada-100-entradas mode=Loro (entries) build_s=126.9 merges_s=108.1 last_merge_ms=225.3 bytes_before=2024357 bytes_after_parallel_confirm=2024864 bytes_after_in_turn=2025139 bytes_after_all_history_cut=1060680
+RESULT open crescimento-um-param-junta-a-cada-100-entradas-antes.bin load_ms=5.6 first_read_ms=3.4 extra_memory_mb=15.4 nodes=1
+RESULT open crescimento-um-param-junta-a-cada-100-entradas-depois.bin load_ms=4.1 first_read_ms=0.1 extra_memory_mb=14.1 nodes=1
+RESULT um-param-junta-a-cada-100-registro mode=Loro (register) build_s=20.7 merges_s=20.5 last_merge_ms=40.2 bytes_before=415834 bytes_after_parallel_confirm=416355 bytes_after_in_turn=416624 bytes_after_all_history_cut=798
+RESULT open crescimento-um-param-junta-a-cada-100-registro-antes.bin load_ms=1.2 first_read_ms=0.0 extra_memory_mb=0.8 nodes=1
+RESULT open crescimento-um-param-junta-a-cada-100-registro-depois.bin load_ms=0.4 first_read_ms=0.0 extra_memory_mb=0.1 nodes=1
+RESULT mil-params-junta-a-cada-100-entradas mode=Loro (entries) build_s=185.4 merges_s=161.8 last_merge_ms=341.3 bytes_before=2642244 bytes_after_parallel_confirm=2642911 bytes_after_in_turn=2643184 bytes_after_all_history_cut=975512
+RESULT open crescimento-mil-params-junta-a-cada-100-entradas-antes.bin load_ms=6.5 first_read_ms=4.2 extra_memory_mb=16.1 nodes=1
+RESULT open crescimento-mil-params-junta-a-cada-100-entradas-depois.bin load_ms=4.3 first_read_ms=1.3 extra_memory_mb=13.8 nodes=1
+RESULT mil-params-junta-a-cada-100-registro mode=Loro (register) build_s=25.8 merges_s=25.4 last_merge_ms=48.8 bytes_before=590701 bytes_after_parallel_confirm=591173 bytes_after_in_turn=591443 bytes_after_all_history_cut=12855
+RESULT open crescimento-mil-params-junta-a-cada-100-registro-antes.bin load_ms=1.4 first_read_ms=0.8 extra_memory_mb=1.2 nodes=1
+RESULT open crescimento-mil-params-junta-a-cada-100-registro-depois.bin load_ms=0.4 first_read_ms=0.8 extra_memory_mb=0.4 nodes=1

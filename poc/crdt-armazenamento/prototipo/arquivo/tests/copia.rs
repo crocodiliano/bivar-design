@@ -544,3 +544,40 @@ fn save_as_keeps_the_history_and_suggests_the_copy_for_sending() {
         "never overwrites"
     );
 }
+
+/// One entry per copy keeps each copy's last value, also after another
+/// copy overwrote it (owner's condition, 2026-10-31): the copy to send
+/// carries only the winning value of each parameter.
+#[test]
+fn the_copy_carries_only_the_winning_value_of_each_parameter() {
+    const OLD: &str = "VALOR-ANTIGO-de-outra-copia-9f3a";
+    const CONFLICT: &str = "VALOR-QUE-PERDEU-num-conflito-7c1e";
+    let path = fresh("winner-only");
+    let mut a = S::new_document(1);
+    let n = create(&mut a, None, "shape");
+    let m = create(&mut a, None, "shape");
+    a.commit();
+    let mut b = a.fork_as(2);
+    // a's value, then overwritten by b after seeing it: a's entry keeps it.
+    set(&mut a, &n, "name", Value::Str(OLD.into()));
+    b.merge_from(&mut a).unwrap();
+    set(&mut b, &n, "name", Value::Str("final".into()));
+    // A concurrent write that lost (an open conflict).
+    set(&mut a, &m, "name", Value::Str(CONFLICT.into()));
+    set(&mut b, &m, "name", Value::Str("won".into()));
+    a.merge_from(&mut b).unwrap();
+    let working = DocFile::create(&path, &mut a).unwrap();
+    // Control: the working file does hold both.
+    let v = views(&path);
+    assert!(!found_in(&v, OLD.as_bytes()).is_empty());
+    assert!(!found_in(&v, CONFLICT.as_bytes()).is_empty());
+    let dest = fresh("winner-only-copy");
+    let kept_conflict = a.param(&m, "name");
+    working.save_send_copy(&a, &dest, GO).unwrap();
+    let v = views(&dest);
+    assert_eq!(found_in(&v, OLD.as_bytes()), Vec::<&str>::new());
+    if kept_conflict != Some(Value::Str(CONFLICT.into())) {
+        assert_eq!(found_in(&v, CONFLICT.as_bytes()), Vec::<&str>::new());
+    }
+    assert!(!found_in(&v, b"final").is_empty());
+}

@@ -40,7 +40,7 @@ fn saved_file(name: &str, trust: &TrustStore) -> PathBuf {
     Workload::new(3).run(&mut s, 300);
     let mut f = DocFile::create(&path, &mut s).unwrap();
     f.save(&mut s, "pc-1").unwrap();
-    trust.remember(&path, &f.fingerprint()).unwrap();
+    trust.remember(&path, &f.fingerprint(), 7).unwrap();
     path
 }
 
@@ -410,7 +410,7 @@ fn verification_cost_on_a_large_document() {
     let mut f = DocFile::create(&path, &mut s).unwrap();
     f.save(&mut s, "pc-1").unwrap();
     let t = trust("big");
-    t.remember(&path, &f.fingerprint()).unwrap();
+    t.remember(&path, &f.fingerprint(), 7).unwrap();
     drop(f);
     drop(s);
     for (label, list) in [

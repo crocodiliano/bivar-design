@@ -524,10 +524,21 @@ pub enum Access {
 }
 
 /// Local, outside any document: the fingerprints of the files this computer
-/// wrote last. A file never vouches for itself (owner's condition,
-/// 2026-10-30): trust comes only from this list, by path and fingerprint.
+/// wrote last, and the copy name each was written with. A file never
+/// vouches for itself (owner's condition, 2026-10-30): trust comes only from
+/// this list, by path and fingerprint. The copy name is reused only for a
+/// trusted file; any other file (copied, duplicated, restored from a backup,
+/// changed by another computer) opens with a new copy name, so two sessions
+/// never write the same entry keys without knowing (owner, 2026-10-31).
 pub struct TrustStore {
     list: PathBuf,
+}
+
+/// One line of the list: fingerprint, copy name, path.
+struct Noted {
+    fingerprint: String,
+    copy: Option<u64>,
+    path: String,
 }
 
 impl TrustStore {
@@ -542,24 +553,40 @@ impl TrustStore {
             .into_owned()
     }
 
-    fn read(&self) -> Vec<(String, String)> {
+    fn read(&self) -> Vec<Noted> {
         std::fs::read_to_string(&self.list)
             .unwrap_or_default()
             .lines()
-            .filter_map(|l| l.split_once('\t'))
-            .map(|(fp, p)| (fp.to_owned(), p.to_owned()))
+            .filter_map(|l| {
+                let mut it = l.splitn(3, '\t');
+                let fingerprint = it.next()?.to_owned();
+                let copy = u64::from_str_radix(it.next()?, 16).ok();
+                let path = it.next()?.to_owned();
+                Some(Noted {
+                    fingerprint,
+                    copy,
+                    path,
+                })
+            })
             .collect()
     }
 
-    /// Notes that this computer just wrote `path` with this fingerprint.
-    pub fn remember(&self, path: &Path, fingerprint: &[u8; 32]) -> io::Result<()> {
+    /// Notes that this computer just wrote `path` with this fingerprint, as
+    /// copy `copy`.
+    pub fn remember(&self, path: &Path, fingerprint: &[u8; 32], copy: u64) -> io::Result<()> {
         let key = Self::key(path);
-        let mut entries: Vec<(String, String)> =
-            self.read().into_iter().filter(|(_, p)| *p != key).collect();
-        entries.push((hex(fingerprint), key));
+        let mut entries: Vec<Noted> = self.read().into_iter().filter(|n| n.path != key).collect();
+        entries.push(Noted {
+            fingerprint: hex(fingerprint),
+            copy: Some(copy),
+            path: key,
+        });
         let text: String = entries
             .iter()
-            .map(|(fp, p)| format!("{fp}\t{p}\n"))
+            .map(|n| {
+                let copy = n.copy.map(|c| format!("{c:016x}")).unwrap_or_default();
+                format!("{}\t{copy}\t{}\n", n.fingerprint, n.path)
+            })
             .collect();
         if let Some(dir) = self.list.parent() {
             std::fs::create_dir_all(dir)?;
@@ -572,14 +599,23 @@ impl TrustStore {
     /// The fingerprint this computer noted when it last wrote `path`.
     pub fn fingerprint_for(&self, path: &Path) -> Option<[u8; 32]> {
         let key = Self::key(path);
-        let (fp, _) = self.read().into_iter().find(|(_, p)| *p == key)?;
-        hex_to_id(&fp)
+        let n = self.read().into_iter().find(|n| n.path == key)?;
+        hex_to_id(&n.fingerprint)
     }
 
     /// Whether this computer was the last to write `path`, exactly as it is.
     pub fn is_trusted(&self, path: &Path, fingerprint: &[u8; 32]) -> bool {
+        self.copy_for(path, fingerprint).is_some()
+    }
+
+    /// The copy name `path` was written with, if this computer was the last
+    /// to write it, exactly as it is.
+    pub fn copy_for(&self, path: &Path, fingerprint: &[u8; 32]) -> Option<u64> {
         let (key, fp) = (Self::key(path), hex(fingerprint));
-        self.read().iter().any(|(f, p)| *p == key && *f == fp)
+        self.read()
+            .into_iter()
+            .find(|n| n.path == key && n.fingerprint == fp)?
+            .copy
     }
 }
 

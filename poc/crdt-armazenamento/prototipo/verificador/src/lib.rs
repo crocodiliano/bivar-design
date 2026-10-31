@@ -15,7 +15,7 @@ use bivar_poc_arquivo::{
     Access, DocFile, FileError, Limits, OpenReport, TrustStore, fingerprint_file,
 };
 use bivar_poc_loja_loro::EntriesStore;
-use bivar_poc_modelo::Store;
+use bivar_poc_modelo::{Store, random_u64};
 
 /// Limits of the verifier process (owner, 2026-10-30).
 #[derive(Clone, Copy, Debug)]
@@ -100,8 +100,13 @@ pub fn open_checked<S: Store>(
     // still exactly what was written (checked before the document library
     // sees it). Otherwise it goes through the verifier like any other.
     if let Some(noted) = trust.fingerprint_for(path) {
-        match DocFile::open_with(path, peer, limits, Access::Write, Some(noted)) {
-            Ok((f, s, r)) => return Ok((f, s, r, How::Trusted)),
+        match DocFile::open_with::<S>(path, peer, limits, Access::Write, Some(noted)) {
+            Ok((f, mut s, r)) => {
+                // The same copy as last time on this computer, unless the
+                // list has no name for it (then a new one).
+                s.set_copy_name(trust.copy_for(path, &noted).unwrap_or_else(random_u64));
+                return Ok((f, s, r, How::Trusted));
+            }
             Err(FileError::ChangedSinceCheck) => {}
             Err(e) => return Err(e.into()),
         }
@@ -111,7 +116,9 @@ pub fn open_checked<S: Store>(
     fingerprint_file(path, limits)?;
     let checked = run_verifier(verifier, path, limits, vlimits)?;
     // Opened only if it is still the file the verifier read.
-    let (f, s, r) = DocFile::open_with(path, peer, limits, Access::Write, Some(checked))?;
+    let (f, mut s, r) = DocFile::open_with::<S>(path, peer, limits, Access::Write, Some(checked))?;
+    // Not the file this computer wrote last: another copy, with a new name.
+    s.set_copy_name(random_u64());
     Ok((f, s, r, How::Verified))
 }
 

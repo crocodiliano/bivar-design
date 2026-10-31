@@ -1,0 +1,18 @@
+RESULT um-param-junta-no-fim-entradas mode=Loro (entries) build_s=0.7 merges_s=0.0 last_merge_ms=0.0 bytes_before=732552 bytes_after=834 compact_s=0.02
+RESULT open crescimento-um-param-junta-no-fim-entradas-antes.bin load_ms=2.1 first_read_ms=0.1 extra_memory_mb=1.6 nodes=1
+RESULT open crescimento-um-param-junta-no-fim-entradas-depois.bin load_ms=0.5 first_read_ms=0.0 extra_memory_mb=0.2 nodes=1
+RESULT um-param-junta-no-fim-registro mode=Loro (register) build_s=0.5 merges_s=0.0 last_merge_ms=0.0 bytes_before=412405 bytes_after=799 compact_s=0.00
+RESULT open crescimento-um-param-junta-no-fim-registro-antes.bin load_ms=1.1 first_read_ms=0.0 extra_memory_mb=0.8 nodes=1
+RESULT open crescimento-um-param-junta-no-fim-registro-depois.bin load_ms=0.5 first_read_ms=0.0 extra_memory_mb=0.2 nodes=1
+RESULT um-param-junta-a-cada-100-entradas mode=Loro (entries) build_s=1.1 merges_s=0.6 last_merge_ms=0.6 bytes_before=828555 bytes_after=847 compact_s=0.04
+RESULT open crescimento-um-param-junta-a-cada-100-entradas-antes.bin load_ms=3.2 first_read_ms=0.0 extra_memory_mb=2.5 nodes=1
+RESULT open crescimento-um-param-junta-a-cada-100-entradas-depois.bin load_ms=0.5 first_read_ms=0.0 extra_memory_mb=0.2 nodes=1
+RESULT um-param-junta-a-cada-100-registro mode=Loro (register) build_s=0.7 merges_s=0.5 last_merge_ms=0.5 bytes_before=415834 bytes_after=799 compact_s=0.00
+RESULT open crescimento-um-param-junta-a-cada-100-registro-antes.bin load_ms=1.3 first_read_ms=0.0 extra_memory_mb=0.9 nodes=1
+RESULT open crescimento-um-param-junta-a-cada-100-registro-depois.bin load_ms=0.5 first_read_ms=0.0 extra_memory_mb=0.2 nodes=1
+RESULT mil-params-junta-a-cada-100-entradas mode=Loro (entries) build_s=3.9 merges_s=2.1 last_merge_ms=2.2 bytes_before=657804 bytes_after=14607 compact_s=0.02
+RESULT open crescimento-mil-params-junta-a-cada-100-entradas-antes.bin load_ms=2.4 first_read_ms=1.7 extra_memory_mb=2.6 nodes=1
+RESULT open crescimento-mil-params-junta-a-cada-100-entradas-depois.bin load_ms=0.7 first_read_ms=2.7 extra_memory_mb=1.2 nodes=1
+RESULT mil-params-junta-a-cada-100-registro mode=Loro (register) build_s=1.0 merges_s=0.7 last_merge_ms=0.7 bytes_before=590701 bytes_after=12854 compact_s=0.01
+RESULT open crescimento-mil-params-junta-a-cada-100-registro-antes.bin load_ms=1.4 first_read_ms=0.7 extra_memory_mb=1.2 nodes=1
+RESULT open crescimento-mil-params-junta-a-cada-100-registro-depois.bin load_ms=0.7 first_read_ms=0.7 extra_memory_mb=0.4 nodes=1

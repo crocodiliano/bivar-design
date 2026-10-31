@@ -2,7 +2,9 @@
 
 use bivar_poc_loja_loro::EntriesStore as LoroStore;
 use bivar_poc_modelo::testkit::{
-    assert_tree_is_sound, for_each_seed, nothing_lost_three_copies, nothing_lost_two_copies, sync,
+    assert_tree_is_sound, for_each_seed, nothing_lost_three_copies,
+    nothing_lost_three_copies_compacted, nothing_lost_two_copies,
+    nothing_lost_two_copies_compacted, sync,
 };
 use bivar_poc_modelo::{Document, Edge, NodeId, Op, OpError, Store, Value, clean_copy};
 
@@ -367,4 +369,80 @@ fn nothing_is_lost_silently_two_copies() {
 #[test]
 fn nothing_is_lost_silently_three_copies() {
     for_each_seed(nothing_lost_three_copies::<LoroStore>);
+}
+
+#[test]
+fn nothing_is_lost_silently_two_copies_with_a_compaction() {
+    for_each_seed(nothing_lost_two_copies_compacted::<LoroStore>);
+}
+
+#[test]
+fn nothing_is_lost_silently_three_copies_with_a_compaction() {
+    for_each_seed(nothing_lost_three_copies_compacted::<LoroStore>);
+}
+
+/// I1: the copy to send has every connection of the original, each between
+/// the copies of the same two nodes.
+#[test]
+fn the_clean_copy_keeps_every_connection() {
+    let mut a = LoroStore::new_document(1);
+    let nodes: Vec<NodeId> = (0..6)
+        .map(|_| {
+            a.apply(&Op::CreateNode {
+                parent: None,
+                index: None,
+                kind: "shape".into(),
+            })
+            .unwrap()
+            .created
+            .unwrap()
+        })
+        .collect();
+    for i in 0..5 {
+        a.apply(&Op::Connect {
+            id: None,
+            edge: Edge {
+                from: nodes[i].clone(),
+                from_port: "out".into(),
+                to: nodes[i + 1].clone(),
+                to_port: "in".into(),
+            },
+        })
+        .unwrap();
+    }
+    a.commit();
+    let (copy, ids) = clean_copy(&a, 9, false);
+    let mut want: Vec<(NodeId, NodeId)> = a
+        .edges()
+        .values()
+        .map(|e| (ids[&e.from].clone(), ids[&e.to].clone()))
+        .collect();
+    let mut got: Vec<(NodeId, NodeId)> = copy
+        .edges()
+        .values()
+        .map(|e| (e.from.clone(), e.to.clone()))
+        .collect();
+    want.sort();
+    got.sort();
+    assert_eq!(got.len(), 5, "{got:?}");
+    assert_eq!(got, want);
+}
+
+/// Seeds that failed with a compaction in the middle before the connection
+/// identity fix (I1, 2026-10-31): a connection made after the cut took the
+/// identity of an undone one. Fixed tests, so it never comes back unseen.
+const I1_SEEDS_TWO: [u64; 24] = [
+    30, 38, 282, 514, 567, 583, 701, 849, 976, 1024, 1048, 1172, 1182, 1229, 1296, 1314, 1338,
+    1451, 1535, 1726, 1767, 1788, 1951, 1963,
+];
+const I1_SEEDS_THREE: [u64; 11] = [219, 325, 668, 801, 1038, 1117, 1264, 1462, 1864, 1903, 1996];
+
+#[test]
+fn the_seeds_that_found_i1_stay_fixed() {
+    for seed in I1_SEEDS_TWO {
+        nothing_lost_two_copies_compacted::<LoroStore>(seed);
+    }
+    for seed in I1_SEEDS_THREE {
+        nothing_lost_three_copies_compacted::<LoroStore>(seed);
+    }
 }

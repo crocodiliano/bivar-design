@@ -104,6 +104,9 @@ pub trait Store: Sized {
     fn stored_parent(&self, id: &NodeId) -> Option<Option<NodeId>>;
     /// Whether the node itself is marked removed.
     fn is_removed(&self, id: &NodeId) -> bool;
+    /// Whether the node is still stored (removed or not); false once a
+    /// compaction has cleaned it.
+    fn is_stored(&self, id: &NodeId) -> bool;
     fn kind(&self, id: &NodeId) -> Option<String>;
     fn param(&self, id: &NodeId, key: &str) -> Option<Value>;
     fn text(&self, id: &NodeId) -> Option<String>;
@@ -117,7 +120,19 @@ pub trait Store: Sized {
     fn merge_from(&mut self, other: &mut Self) -> Result<MergeReport, OpError>;
 
     fn save(&mut self) -> Vec<u8>;
+    /// Opens a saved document as a new session with identity `peer`. An
+    /// identity already in the document's history is never reused (two
+    /// different changes with the same identity and number would make one
+    /// of them be taken as already known and dropped): another is drawn.
     fn load(bytes: &[u8], peer: u64) -> Result<Self, OpError>;
+    /// This session's identity (see `load`).
+    fn peer(&self) -> u64;
+    /// The copy name in parameter entries: stable across sessions of the
+    /// same file on the same computer, new for any other copy (kept in the
+    /// list of trusted files, never in the file). Defaults to the session
+    /// identity.
+    fn copy_name(&self) -> u64;
+    fn set_copy_name(&mut self, copy: u64);
     /// The whole history decoded as text, the way the program reads it.
     fn history_dump(&mut self) -> String;
     fn history_peers(&mut self) -> BTreeSet<String>;
@@ -181,6 +196,9 @@ pub struct CompactionPlan {
     pub trim_before: Option<Vec<u8>>,
     /// Known copies that could no longer merge after this compaction.
     pub cut_off: Vec<String>,
+    /// Why the history cannot be cut now, when `trim_before` is `None`
+    /// (shown to the owner with the plan).
+    pub trim_refused: Option<String>,
 }
 
 /// A random number from the operating system's seed for hash tables (no
