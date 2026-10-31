@@ -661,3 +661,21 @@ fn a_missing_large_file_is_reported() {
     let report = f.save_send_copy(&s, &dest, GO).unwrap();
     assert_eq!(report.missing_large_files, vec![absent]);
 }
+
+/// I1, checked on the file itself: the copy has every connection whose two
+/// ends go into it, opened from disk.
+#[test]
+fn the_copy_file_has_every_connection_between_nodes_it_keeps() {
+    let o = original("connections");
+    let st = o.store.state();
+    let expected = st
+        .edges
+        .values()
+        .filter(|e| st.nodes.contains_key(&e.from) && st.nodes.contains_key(&e.to))
+        .count();
+    assert!(expected > 3, "test setup: only {expected} connections");
+    let dest = fresh("connections-copy");
+    o.file.save_send_copy(&o.store, &dest, GO).unwrap();
+    let (_, copy, _) = DocFile::open::<S>(&dest, 2).unwrap();
+    assert_eq!(copy.state().edges.len(), expected);
+}

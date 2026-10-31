@@ -1767,6 +1767,21 @@ impl<M: ParamMode> Store for LoroStore<M> {
                 }
             }
         }
+        // Nodes already marked removed where the kept history starts (a
+        // compacted document only), read on that version.
+        let removed_at_start: HashSet<TreeID> = if self.doc.is_shallow() {
+            let start = self.doc.shallow_since_frontiers();
+            self.at_version(&start, |s| {
+                s.tree()
+                    .nodes()
+                    .into_iter()
+                    .filter(|t| s.exists(*t) && s.flag_removed(*t))
+                    .collect()
+            })
+            .unwrap_or_default()
+        } else {
+            HashSet::new()
+        };
         let tree = self.tree();
         let edges = self.edges();
         let mut plan = CompactionPlan {
@@ -1791,10 +1806,17 @@ impl<M: ParamMode> Store for LoroStore<M> {
             if removed_at > cutoff {
                 continue;
             }
-            // Proof that every holder has seen the removal.
-            match removal_op.get(&t) {
-                Some(id) if ack.includes_id(*id) => {}
-                _ => continue,
+            // Proof that every holder has seen the removal: its operation in
+            // the kept history and in what each holder confirmed; or, for a
+            // removal older than the kept history, the node already removed
+            // where that history starts (every copy that can still merge has
+            // all of that). Anything else blocks the cleaning (I3).
+            let proven = match removal_op.get(&t) {
+                Some(id) => ack.includes_id(*id),
+                None => removed_at_start.contains(&t),
+            };
+            if !proven {
+                continue;
             }
             let branch = self.branch(t);
             if branch.iter().any(|n| self.has_open_conflict(*n)) {

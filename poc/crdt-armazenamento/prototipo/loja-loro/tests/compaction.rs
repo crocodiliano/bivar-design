@@ -251,3 +251,44 @@ fn a_connection_made_after_a_compaction_replaces_none() {
         assert_eq!(after.get(id), Some(e), "connection {id} replaced");
     }
 }
+
+fn unix_now() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+}
+
+/// The auditor's suspicion: a removal older than the kept history (the cut
+/// came after it, while it was too recent to clean) must still be cleaned
+/// later, not found missing and kept forever, and never cleaned without
+/// proof. The proof: the node was already removed where the kept history
+/// starts, so every copy that can still merge has the removal.
+#[test]
+fn a_removal_older_than_the_kept_history_is_cleaned_on_proof() {
+    let (mut a, mut b, _) = two_busy_copies();
+    let gone = create(&mut a);
+    sync(&mut a, &mut b);
+    a.apply(&Op::RemoveNode { node: gone.clone() }).unwrap();
+    a.commit();
+    sync(&mut a, &mut b);
+    // Confirmations right after the removal, with old times: the cut can
+    // go past the removal, which is too recent to clean (today).
+    confirm_in_turn(&mut a, &mut b, 1);
+    confirm_in_turn(&mut a, &mut b, 2);
+    let tomorrow = unix_now() + DAY;
+    let plan = a.plan_compaction(tomorrow, 30 * DAY, false);
+    assert!(plan.trim_before.is_some(), "{plan:?}");
+    assert!(!plan.purge.contains(&gone), "{plan:?}");
+    a.compact(&plan).unwrap();
+    assert!(a.is_stored(&gone));
+    // 31 days later: the removal is no longer in the kept history, and the
+    // node is cleaned on the proof from where that history starts.
+    let later = unix_now() + 31 * DAY;
+    let plan = a.plan_compaction(later, 30 * DAY, false);
+    assert!(plan.purge.contains(&gone), "{plan:?}");
+    a.compact(&plan).unwrap();
+    assert!(!a.is_stored(&gone), "not cleaned");
+    // The other copy still merges.
+    sync(&mut a, &mut b);
+}

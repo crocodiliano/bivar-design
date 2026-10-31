@@ -97,7 +97,7 @@ fn save_and_reopen_keep_the_document() {
 /// the format does not define, even with a correct digest, is damage. What
 /// came before opens read-only, with a message; nothing after it is used.
 #[test]
-fn an_injected_record_of_an_unknown_kind_is_refused() {
+fn an_injected_record_of_an_unknown_kind_stops_the_reading_there() {
     let (path, mut f, mut s) = new_file("injected");
     f.save(&mut s, "pc-1").unwrap();
     let before = s.state();
@@ -162,32 +162,29 @@ fn a_cut_last_write_is_dropped_and_everything_before_stays() {
 
 #[test]
 fn damage_in_the_middle_opens_what_it_can_read_only() {
+    // M1: the byte flipped is inside an updates record in the middle (the
+    // fifth of ten), never the snapshot, and the only answer accepted is
+    // "opened read-only, with everything before the damage".
     let (path, mut f, mut s) = new_file("damaged");
     let x = create(&mut s, "shape");
+    let mut ends = Vec::new();
+    let mut states = Vec::new();
     for i in 0..10 {
         set(&mut s, &x, "x", Value::Num(i as f64));
         f.append_changes(&mut s).unwrap();
+        ends.push(f.len() as usize);
+        states.push(s.state());
     }
-    let first_update_end = f.len();
     drop(f);
     let mut bytes = std::fs::read(&path).unwrap();
-    // Flip one byte inside the first records, well before the end.
-    let at = (first_update_end as usize) / 2;
-    bytes[at] ^= 0x5a;
+    let fifth = ends[3]; // where the fifth updates record starts
+    bytes[fifth + 12] ^= 0x5a; // past its 9-byte head: inside its content
     std::fs::write(&path, &bytes).unwrap();
-    match DocFile::open::<S>(&path, 2) {
-        Ok((f, _, report)) => {
-            assert!(!f.is_writable());
-            assert!(
-                report.damaged_at.is_some() || report.dropped_tail.is_some(),
-                "{report:?}"
-            );
-        }
-        Err(e) => assert!(
-            matches!(e, FileError::Unreadable(_) | FileError::Document(_)),
-            "{e:?}"
-        ),
-    }
+    let (f, back, report) = DocFile::open::<S>(&path, 2).unwrap();
+    assert!(!f.is_writable());
+    assert!(report.damaged_at.is_some(), "{report:?}");
+    assert!(report.read_only.is_some(), "{report:?}");
+    assert_eq!(back.state(), states[3], "everything before the damage");
 }
 
 #[test]
@@ -378,9 +375,16 @@ fn milestones_and_open_conflicts_are_never_cleaned() {
     c.record_seen("pc-1", now());
     // The latest checkpoint is after the milestone: history stops there.
     let plan = c.plan_compaction(now() + 31 * DAY, RETENTION, false);
-    let trim = plan.trim_before.expect("an older checkpoint qualifies");
+    let trim = plan
+        .trim_before
+        .clone()
+        .expect("an older checkpoint qualifies");
     let milestone = c.version_of_milestone("Versão enviada ao cliente");
     assert!(vv_within(&trim, &milestone));
+    // The effect, not only the plan: after compacting, the milestone's
+    // version is still in the kept history.
+    c.compact(&plan).unwrap();
+    assert!(c.updates_since(&milestone).is_ok());
 }
 
 #[test]
@@ -592,7 +596,12 @@ fn a_copy_made_while_writing_always_opens() {
 }
 
 #[test]
-fn killing_during_compaction_leaves_the_old_file_or_the_new_one() {
+/// The process is killed at random moments of a loop that compacts again
+/// and again: most kills land while writing, some during the swap. The swap
+/// itself is covered step by step by
+/// `dying_at_each_step_of_the_swap_never_loses_the_document` (M2: the old
+/// name promised more).
+fn killing_at_random_moments_of_repeated_compactions_leaves_a_whole_file() {
     let (path, mut f, mut s) = new_file("kill-compact");
     f.save(&mut s, "pc-1").unwrap();
     drop(f);

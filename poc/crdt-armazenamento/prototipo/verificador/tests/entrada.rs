@@ -115,16 +115,55 @@ fn trust_lives_only_outside_the_file() {
 
 #[test]
 fn a_file_swapped_after_the_check_is_not_opened() {
+    // M2: the file really is swapped between the verification and the
+    // opening, the way another program could do it.
     let t = trust("swap");
     let path = saved_file("swap", &t);
     let other = fresh("swap-other");
     let mut s = S::new_document(5);
     let mut f = DocFile::create(&other, &mut s).unwrap();
     f.save(&mut s, "pc-1").unwrap();
-    let wrong = f.fingerprint();
     drop(f);
-    let r = DocFile::open_with::<S>(&path, 2, &Limits::default(), Access::Write, Some(wrong));
-    assert!(matches!(r, Err(FileError::ChangedSinceCheck)));
+    let checked = bivar_poc_verificador::verify(
+        &path,
+        Path::new(VERIFIER),
+        &Limits::default(),
+        &VerifyLimits::default(),
+    )
+    .unwrap();
+    let original = std::fs::read(&path).unwrap();
+    std::fs::copy(&other, &path).unwrap(); // swapped
+    let r = DocFile::open_with::<S>(&path, 2, &Limits::default(), Access::Write, Some(checked));
+    assert!(
+        matches!(r, Err(FileError::ChangedSinceCheck)),
+        "{:?}",
+        r.err()
+    );
+    // Swapped back, the same check lets it in.
+    std::fs::write(&path, &original).unwrap();
+    let r = DocFile::open_with::<S>(&path, 2, &Limits::default(), Access::Write, Some(checked));
+    assert!(r.is_ok(), "{:?}", r.err());
+}
+
+/// A verifier that writes more than a pipe holds (a panic with a full
+/// backtrace, for example) is not left waiting for a reader and refused as
+/// too slow: the program reads its output while it runs (audit 2026-10-31,
+/// suspicion).
+#[test]
+fn a_verifier_writing_a_lot_is_not_taken_for_a_slow_one() {
+    let t = trust("noise");
+    let path = saved_file("noise", &t);
+    let copy = fresh("noise-copy");
+    std::fs::copy(&path, &copy).unwrap();
+    let v = VerifyLimits {
+        time: Duration::from_secs(20),
+        test_noise: Some(4 << 20),
+        ..VerifyLimits::default()
+    };
+    assert_eq!(
+        open_with(&copy, &t, &Limits::default(), &v).unwrap(),
+        How::Verified
+    );
 }
 
 #[test]

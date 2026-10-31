@@ -116,15 +116,27 @@ pub fn open_checked<S: Store>(
             Err(e) => return Err(e.into()),
         }
     }
-    // Reads only the file's structure (no document library): limits that
-    // fail here are reported before starting the verifier.
-    fingerprint_file(path, limits)?;
-    let checked = run_verifier(verifier, path, limits, vlimits)?;
+    let checked = verify(path, verifier, limits, vlimits)?;
     // Opened only if it is still the file the verifier read.
     let (f, mut s, r) = DocFile::open_with::<S>(path, peer, limits, Access::Write, Some(checked))?;
     // Not the file this computer wrote last: another copy, with a new name.
     s.set_copy_name(random_u64());
     Ok((f, s, r, How::Verified))
+}
+
+/// The verification alone: the file's structure is read without the
+/// document library (limits that fail here are reported before starting the
+/// verifier), then the verifier process reads all of it. Returns the
+/// fingerprint of what the verifier read; the file is opened only if it
+/// still has that fingerprint.
+pub fn verify(
+    path: &Path,
+    verifier: &Path,
+    limits: &Limits,
+    vlimits: &VerifyLimits,
+) -> Result<[u8; 32], CheckError> {
+    fingerprint_file(path, limits)?;
+    run_verifier(verifier, path, limits, vlimits)
 }
 
 fn run_verifier(
