@@ -28,9 +28,13 @@ param(
 $ErrorActionPreference = 'Continue'
 # Todo número fica ligado a um commit (auditoria de 2026-10-31, O1): com
 # alterações sem commit, a bateria não roda, a não ser com -Rascunho.
-if ((& git -C $PSScriptRoot status --porcelain 2>$null) -and -not $Rascunho) {
-    Write-Host "Há alterações sem commit. Faça o commit antes de medir (ou use -Rascunho, que não vale como registro)."
-    exit 1
+$commit = (& git -C $PSScriptRoot rev-parse --short HEAD 2>$null)
+if (& git -C $PSScriptRoot status --porcelain 2>$null) {
+    if (-not $Rascunho) {
+        Write-Host "Há alterações sem commit. Faça o commit antes de medir (ou use -Rascunho, que não vale como registro)."
+        exit 1
+    }
+    $commit = "$commit, com alterações ainda sem commit (rascunho)"
 }
 $proto = Join-Path $PSScriptRoot 'prototipo'
 $manifest = Join-Path $proto 'Cargo.toml'
@@ -166,8 +170,8 @@ $linhas = foreach ($b in $bateria) {
 }
 
 $tabela = $linhas | Format-Table -AutoSize -Wrap | Out-String -Width 220
-$commit = (& git -C $PSScriptRoot rev-parse --short HEAD 2>$null)
-if (& git -C $PSScriptRoot status --porcelain 2>$null) { $commit = "$commit, com alterações ainda sem commit" }
+# O commit e o estado foram lidos no início (a bateria grava os próprios
+# arquivos durante a rodada, e lê-los aqui marcava toda rodada como suja).
 $resumo = @("Bateria de medidas da 0.6, $($inicio.ToString('yyyy-MM-dd HH:mm')) (levou $([math]::Round(((Get-Date) - $inicio).TotalMinutes, 1)) min; código: $commit)", $tabela)
 if ($script:pulados) { $resumo += 'Pulado:'; $resumo += $script:pulados | ForEach-Object { "  - $_" } }
 if ($falhas) { $resumo += 'Falhas:'; $resumo += $falhas | ForEach-Object { "  - $_" } }
