@@ -68,6 +68,10 @@ pub struct MergeReport {
     pub lost_moves: Vec<LostMove>,
     /// Nodes one copy edited while another removed them (or an ancestor).
     pub hidden_by_removal: Vec<NodeId>,
+    /// The layer tree is now nested deeper than `MAX_DEPTH`: moves made on
+    /// two copies, each within the limit, can add up. A merge never refuses
+    /// for it; the program warns (owner, 2026-10-31).
+    pub too_deep: Option<usize>,
 }
 
 impl MergeReport {
@@ -75,6 +79,7 @@ impl MergeReport {
         self.concurrent_writes.is_empty()
             && self.lost_moves.is_empty()
             && self.hidden_by_removal.is_empty()
+            && self.too_deep.is_none()
     }
 }
 
@@ -112,6 +117,12 @@ pub trait Store: Sized {
     fn text(&self, id: &NodeId) -> Option<String>;
     fn edges(&self) -> BTreeMap<String, Edge>;
     fn state(&self) -> State;
+    /// Decodes everything the document holds: every node, removed or not,
+    /// with all its data; every top-level part; the whole kept history. The
+    /// library decodes parts on first use, so the verifier calls this and a
+    /// bomb anywhere goes off there (audit 2026-10-31, B1). Returns how many
+    /// bytes of text and values it read, so nothing is skipped as unused.
+    fn read_everything(&self) -> usize;
 
     fn text_anchor(&self, id: &NodeId, pos: usize) -> Option<Anchor>;
     fn anchor_pos(&self, id: &NodeId, anchor: &Anchor) -> Option<usize>;
@@ -252,11 +263,72 @@ pub fn hidden_layers(state: &State) -> Vec<HiddenLayer> {
     out
 }
 
+/// How many layers are inside `node`, at any depth. With an explicit stack:
+/// no function that walks the tree may call itself (audit 2026-10-31, I4),
+/// or a deep tree overflows the program's stack.
 fn count_inside(state: &State, node: &NodeState) -> usize {
-    node.children
-        .iter()
-        .map(|c| 1 + count_inside(state, &state.nodes[c]))
-        .sum()
+    let mut count = 0;
+    let mut stack: Vec<&NodeId> = node.children.iter().collect();
+    while let Some(c) = stack.pop() {
+        count += 1;
+        stack.extend(state.nodes[c].children.iter());
+    }
+    count
+}
+
+/// Default limit on the nesting of the layer tree (owner, 2026-10-31).
+pub const MAX_DEPTH: usize = 10_000;
+
+/// The deepest nesting of the visible tree: a root alone is 1. With an
+/// explicit stack (I4).
+pub fn tree_depth(state: &State) -> usize {
+    let mut deepest = 0;
+    let mut stack: Vec<(&NodeId, usize)> = state.roots.iter().map(|r| (r, 1)).collect();
+    while let Some((n, d)) = stack.pop() {
+        deepest = deepest.max(d);
+        stack.extend(state.nodes[n].children.iter().map(|c| (c, d + 1)));
+    }
+    deepest
+}
+
+/// The deepest nesting that goes through any of `nodes` (their depth plus
+/// the height of what is under them), from the store, without reading the
+/// whole tree: what a merge checks for the nodes it moved.
+pub fn depth_through<S: Store>(s: &S, nodes: &[NodeId]) -> usize {
+    let mut deepest = 0;
+    // Each node is walked once, even when moved nodes are inside each other.
+    let mut seen: std::collections::HashSet<NodeId> = std::collections::HashSet::new();
+    for n in nodes {
+        if seen.contains(n) {
+            continue;
+        }
+        let mut depth = 0;
+        let mut cur = Some(n.clone());
+        while let Some(c) = cur {
+            match s.parent(&c) {
+                Some(p) => {
+                    depth += 1;
+                    cur = p;
+                }
+                None => {
+                    depth = 0; // not visible: nothing to count
+                    break;
+                }
+            }
+        }
+        if depth == 0 {
+            continue;
+        }
+        let mut stack = vec![(n.clone(), depth)];
+        while let Some((c, d)) = stack.pop() {
+            if !seen.insert(c.clone()) {
+                continue;
+            }
+            deepest = deepest.max(d);
+            stack.extend(s.children(Some(&c)).into_iter().map(|k| (k, d + 1)));
+        }
+    }
+    deepest
 }
 
 /// "Salvar cópia para enviar" (ADR-0019, decision 5): rebuilds the visible
@@ -323,4 +395,34 @@ pub fn clean_copy<S: Store>(src: &S, peer: u64, drop_hidden: bool) -> (S, HashMa
     }
     dst.commit();
     (dst, ids)
+}
+
+/// Every pass the program makes over the whole document after opening it
+/// (ADR-0024, verification; audit 2026-10-31, B1 and Gemini 3.1). The
+/// verifier runs exactly this, inside its memory and time limits, so a
+/// structure that is pathological for any of these passes fails there and
+/// never in the program. Any new pass over the whole document is added
+/// here, or the verifier no longer covers it.
+///
+/// Today: decode everything; the visible state; the depth limit; the
+/// conflicts; the hidden layers; the large files in use; the compaction
+/// plan; the copy to send (built in memory, never written).
+///
+/// A tree nested deeper than `max_depth` is refused (`Err` with its depth)
+/// before the other passes run.
+pub fn every_pass<S: Store>(s: &S, max_depth: usize) -> Result<usize, usize> {
+    let mut seen = s.read_everything();
+    let state = s.state();
+    seen += state.nodes.len();
+    let depth = tree_depth(&state);
+    if depth > max_depth {
+        return Err(depth);
+    }
+    seen += s.open_conflicts().len();
+    seen += hidden_layers(&state).len();
+    seen += s.blob_hashes().len();
+    seen += s.plan_compaction(u64::MAX / 2, 0, false).purge.len();
+    let (copy, _) = clean_copy(s, 1, false);
+    seen += copy.state().nodes.len();
+    Ok(seen)
 }

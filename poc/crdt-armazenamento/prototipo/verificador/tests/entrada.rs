@@ -319,17 +319,10 @@ fn a_verifier_that_takes_too_long_is_stopped_and_the_file_refused() {
     assert!(started.elapsed() < Duration::from_secs(10));
 }
 
-#[test]
-fn a_very_deep_tree_is_opened_or_refused_but_never_takes_the_program_down() {
-    let t = trust("deep");
-    let path = fresh("deep");
-    let mut s = S::new_document(1);
-    let mut parent: Option<NodeId> = None;
-    let depth: usize = std::env::var("BIVAR_DEEP")
-        .ok()
-        .and_then(|d| d.parse().ok())
-        .unwrap_or(20_000);
-    let t0 = Instant::now();
+/// A chain of `depth` groups, one inside the other; returns them top first.
+fn chain(s: &mut S, under: Option<NodeId>, depth: usize) -> Vec<NodeId> {
+    let mut parent = under;
+    let mut out = Vec::with_capacity(depth);
     for _ in 0..depth {
         let n = s
             .apply(&Op::CreateNode {
@@ -340,22 +333,131 @@ fn a_very_deep_tree_is_opened_or_refused_but_never_takes_the_program_down() {
             .unwrap()
             .created
             .unwrap();
+        out.push(n.clone());
         parent = Some(n);
     }
     s.commit();
-    let build = t0.elapsed();
+    out
+}
+
+/// The depth limit (10,000 levels; owner, 2026-10-31, I4): a file nested
+/// one level deeper is refused with its own message, and one at the limit
+/// opens. Building the deep file is what takes time here.
+#[test]
+fn a_tree_deeper_than_the_limit_is_refused_and_one_at_the_limit_opens() {
+    let t = trust("deep");
+    for (depth, refused) in [(10_001, true), (10_000, false)] {
+        let path = fresh(&format!("deep-{depth}"));
+        let mut s = S::new_document(1);
+        chain(&mut s, None, depth);
+        drop(DocFile::create(&path, &mut s).unwrap());
+        let r = open(&path, &t);
+        if refused {
+            assert_eq!(refusal(r), Refusal::TooDeep);
+            assert!(Refusal::TooDeep.message().contains("deeper"));
+        } else {
+            assert_eq!(r.unwrap(), How::Verified);
+        }
+    }
+}
+
+/// Every operation of the program, not only opening, on a document at the
+/// depth limit, run on a thread with a small stack (256 KB, a quarter of
+/// Windows' default): nothing that walks the tree may call itself (I4).
+#[test]
+fn every_operation_runs_on_a_document_at_the_depth_limit_with_a_small_stack() {
+    let path = fresh("deep-ops");
+    let mut s = S::new_document(1);
+    let groups = chain(&mut s, None, bivar_poc_modelo::MAX_DEPTH);
     let f = DocFile::create(&path, &mut s).unwrap();
     drop(f);
-    let t1 = Instant::now();
-    let r = open(&path, &t);
-    println!(
-        "depth {depth}: {r:?}; build {build:?}; verify and open {:?}",
-        t1.elapsed()
-    );
-    assert!(
-        matches!(r, Ok(How::Verified) | Err(CheckError::Refused(_))),
-        "{r:?}"
-    );
+    let worker = std::thread::Builder::new()
+        .stack_size(256 << 10)
+        .spawn(move || {
+            let (mut f, mut s, _) = DocFile::open::<S>(&path, 2).unwrap();
+            // The top group hidden: the hidden-layer warning counts 9,999.
+            s.apply(&Op::SetParam {
+                node: groups[0].clone(),
+                key: bivar_poc_modelo::VISIBLE_KEY.into(),
+                value: Some(Value::Num(0.0)),
+            })
+            .unwrap();
+            s.commit();
+            let hidden = bivar_poc_modelo::hidden_layers(&s.state());
+            assert_eq!(hidden[0].inside, bivar_poc_modelo::MAX_DEPTH - 1);
+            assert!(bivar_poc_modelo::every_pass(&s, bivar_poc_modelo::MAX_DEPTH).is_ok());
+            // Saving, a copy to send (keeping the hidden layers), merging.
+            f.save(&mut s, "pc").unwrap();
+            let dest = fresh("deep-ops-copy");
+            let answers = bivar_poc_arquivo::SendCopyAnswers {
+                conflicts_seen: true,
+                hidden_layers: Some(bivar_poc_arquivo::HiddenChoice::Keep),
+            };
+            f.save_send_copy(&s, &dest, answers).unwrap();
+            let mut other = s.fork_as(3);
+            other
+                .apply(&Op::SetParam {
+                    node: groups[groups.len() - 1].clone(),
+                    key: "name".into(),
+                    value: Some(Value::Str("deepest".into())),
+                })
+                .unwrap();
+            s.merge_from(&mut other).unwrap();
+            assert_eq!(
+                s.param(&groups[groups.len() - 1], "name"),
+                Some(Value::Str("deepest".into()))
+            );
+            // A compaction.
+            s.record_seen("pc", 1);
+            let plan = s.plan_compaction(40 * 24 * 3600, 30 * 24 * 3600, false);
+            f.compact(&mut s, &plan).unwrap();
+            assert_eq!(
+                bivar_poc_modelo::tree_depth(&s.state()),
+                bivar_poc_modelo::MAX_DEPTH
+            );
+        })
+        .unwrap();
+    worker
+        .join()
+        .expect("an operation overflowed a 256 KB stack");
+}
+
+/// Two moves, each within the limit, that add up past it on merging: the
+/// merge never refuses; it warns, on both copies (owner, 2026-10-31).
+#[test]
+fn moves_that_add_up_past_the_depth_limit_merge_with_a_warning() {
+    let mut a = S::new_document(1);
+    let one = chain(&mut a, None, 5_000);
+    let two = chain(&mut a, None, 5_000);
+    let three = chain(&mut a, None, 4_000);
+    let mut b = a.fork_as(2);
+    // a: the second chain under the end of the first: 10,000 levels.
+    a.apply(&Op::MoveNode {
+        node: two[0].clone(),
+        parent: Some(one[one.len() - 1].clone()),
+        index: 0,
+    })
+    .unwrap();
+    a.commit();
+    // b: the first chain under the end of the third: 9,000 levels.
+    b.apply(&Op::MoveNode {
+        node: one[0].clone(),
+        parent: Some(three[three.len() - 1].clone()),
+        index: 0,
+    })
+    .unwrap();
+    b.commit();
+    let ra = a
+        .merge_from(&mut b)
+        .expect("a merge never refuses for depth");
+    let rb = b
+        .merge_from(&mut a)
+        .expect("a merge never refuses for depth");
+    assert_eq!(a.state(), b.state());
+    let depth = bivar_poc_modelo::tree_depth(&a.state());
+    assert_eq!(depth, 14_000);
+    assert_eq!(ra.too_deep, Some(depth), "{ra:?}");
+    assert_eq!(rb.too_deep, Some(depth), "{rb:?}");
 }
 
 #[test]
@@ -425,4 +527,82 @@ fn verification_cost_on_a_large_document() {
             started.elapsed().as_secs_f64()
         );
     }
+}
+
+/// A file whose bomb is where a plain reading of the document never looks
+/// (audit 2026-10-31, B1). `hide` puts 200 MB of one letter somewhere and
+/// leaves the visible document small. The verifier must refuse it with a
+/// 256 MiB cap (standing for the 4 GiB), as it refuses a visible bomb.
+fn hidden_bomb(name: &str, hide: impl FnOnce(&mut S)) {
+    let t = trust(name);
+    let path = fresh(name);
+    let mut s = S::new_document(1);
+    hide(&mut s);
+    let f = DocFile::create(&path, &mut s).unwrap();
+    let size = f.len();
+    drop(f);
+    drop(s);
+    assert!(
+        size < 20_000_000,
+        "the bomb must be small on disk: {size} bytes"
+    );
+    let v = VerifyLimits {
+        memory: 256 << 20,
+        ..VerifyLimits::default()
+    };
+    let why = refusal(open_with(&path, &t, &Limits::default(), &v));
+    assert_eq!(why, Refusal::TooMuchMemory, "{}", why.message());
+}
+
+fn big_text(s: &mut S) -> NodeId {
+    let n = s
+        .apply(&Op::CreateNode {
+            parent: None,
+            index: None,
+            kind: "text".into(),
+        })
+        .unwrap()
+        .created
+        .unwrap();
+    let chunk = "a".repeat(10_000_000);
+    for i in 0..20 {
+        s.apply(&Op::InsertText {
+            node: n.clone(),
+            pos: i * chunk.len(),
+            text: chunk.clone(),
+        })
+        .unwrap();
+        s.commit();
+    }
+    n
+}
+
+#[test]
+fn a_bomb_in_a_removed_node_is_refused() {
+    hidden_bomb("bomb-removed", |s| {
+        let n = big_text(s);
+        s.apply(&Op::RemoveNode { node: n }).unwrap();
+        s.commit();
+    });
+}
+
+#[test]
+fn a_bomb_only_in_the_history_is_refused() {
+    hidden_bomb("bomb-history", |s| {
+        let n = big_text(s);
+        s.apply(&Op::DeleteText {
+            node: n,
+            pos: 0,
+            len: 200_000_000,
+        })
+        .unwrap();
+        s.commit();
+    });
+}
+
+#[test]
+fn a_bomb_in_a_root_map_is_refused() {
+    hidden_bomb("bomb-root-map", |s| {
+        s.add_milestone(&"a".repeat(200_000_000));
+    });
 }

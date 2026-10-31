@@ -25,6 +25,10 @@ pub struct VerifyLimits {
     /// Test only: the verifier never finishes (proves the time limit).
     #[doc(hidden)]
     pub test_stall: bool,
+    /// Test only: the verifier first writes this many bytes to its error
+    /// output (proves a full pipe cannot stall it).
+    #[doc(hidden)]
+    pub test_noise: Option<usize>,
 }
 
 impl Default for VerifyLimits {
@@ -33,6 +37,7 @@ impl Default for VerifyLimits {
             time: Duration::from_secs(60),
             memory: 4 << 30,
             test_stall: false,
+            test_noise: None,
         }
     }
 }
@@ -132,6 +137,9 @@ fn run_verifier(
     if v.test_stall {
         cmd.env("BIVAR_VERIFIER_STALL", "1");
     }
+    if let Some(n) = v.test_noise {
+        cmd.env("BIVAR_VERIFIER_NOISE", n.to_string());
+    }
     let mut child = cmd
         .arg(path)
         .arg(v.memory.to_string())
@@ -139,11 +147,39 @@ fn run_verifier(
         .arg(limits.doc_total.to_string())
         .arg(limits.records.to_string())
         .arg(limits.blob_index.to_string())
+        .arg(limits.blob_index_total.to_string())
+        .arg(limits.depth.to_string())
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| CheckError::File(FileError::Io(e)))?;
+    // Both outputs are read while the verifier runs: a verifier that writes
+    // more than a pipe holds would otherwise wait for a reader forever and
+    // be refused as too slow (audit 2026-10-31, suspicion; tested).
+    let drain = |pipe: Option<Box<dyn Read + Send>>| {
+        std::thread::spawn(move || {
+            let mut text = String::new();
+            if let Some(mut p) = pipe {
+                let mut bytes = Vec::new();
+                let _ = p.read_to_end(&mut bytes);
+                text = String::from_utf8_lossy(&bytes).into_owned();
+            }
+            text
+        })
+    };
+    let out_reader = drain(
+        child
+            .stdout
+            .take()
+            .map(|p| Box::new(p) as Box<dyn Read + Send>),
+    );
+    let err_reader = drain(
+        child
+            .stderr
+            .take()
+            .map(|p| Box::new(p) as Box<dyn Read + Send>),
+    );
     let started = Instant::now();
     let status = loop {
         if let Some(status) = child
@@ -159,14 +195,8 @@ fn run_verifier(
         }
         std::thread::sleep(Duration::from_millis(20));
     };
-    let mut out = String::new();
-    let mut err = String::new();
-    if let Some(mut o) = child.stdout.take() {
-        let _ = o.read_to_string(&mut out);
-    }
-    if let Some(mut e) = child.stderr.take() {
-        let _ = e.read_to_string(&mut err);
-    }
+    let out = out_reader.join().unwrap_or_default();
+    let err = err_reader.join().unwrap_or_default();
     let line = out.lines().last().unwrap_or("").trim().to_owned();
     if status.success()
         && let Some(hex) = line.strip_prefix("OK ")
@@ -178,9 +208,18 @@ fn run_verifier(
     if let Some(why) = line.strip_prefix("REFUSED ") {
         return Err(CheckError::Refused(Refusal::Invalid(why.to_owned())));
     }
+    if line.starts_with("TOO_DEEP ") {
+        return Err(CheckError::Refused(Refusal::TooDeep));
+    }
+    // A failed allocation under the cap ends the process with this text
+    // from the Rust runtime. It is not a stable interface: a test locks it
+    // (`a_decompression_bomb_is_refused_by_the_memory_cap`), so a change in
+    // Rust shows up as a failing test, not as a wrong message (M3).
     let refusal = if err.contains("memory allocation") {
         Refusal::TooMuchMemory
     } else if err.contains("overflowed its stack") {
+        // No function that walks the tree calls itself (I4), so this is
+        // not expected; kept so a stack overflow is never "crashed".
         Refusal::TooDeep
     } else {
         Refusal::Crashed(format!("{status}; {}", err.lines().last().unwrap_or("")))
@@ -203,14 +242,17 @@ pub fn fuzz_limits() -> Limits {
         doc_total: 64 << 20,
         records: 100_000,
         blob_index: 1 << 20,
+        blob_index_total: 8 << 20,
+        depth: 10_000,
     }
 }
 
 /// Fuzzing target 1: any bytes, read as a whole `.bivar` file. Checksums
 /// make almost every input stop at the container, which is what it tests.
 pub fn fuzz_container(data: &[u8]) {
+    // The same passes as the verifier (B1), not only the visible state.
     if let Ok((store, _)) = bivar_poc_arquivo::check_bytes::<EntriesStore>(data, &fuzz_limits()) {
-        let _ = store.state();
+        let _ = bivar_poc_modelo::every_pass(&store, bivar_poc_modelo::MAX_DEPTH);
     }
 }
 

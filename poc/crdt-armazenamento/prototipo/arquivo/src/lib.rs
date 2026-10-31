@@ -39,6 +39,12 @@ pub struct Limits {
     pub records: u64,
     /// One large-file index (8 MiB: about 260,000 pieces, 1 TB per file).
     pub blob_index: u64,
+    /// All large-file indexes together (64 MiB: about 2 million pieces,
+    /// 8 TB of large files; owner, 2026-10-31, audit I9).
+    pub blob_index_total: u64,
+    /// Nesting of the layer tree (10,000 levels; owner, 2026-10-31, audit
+    /// I4). Checked by the verifier; a merge never refuses for it, it warns.
+    pub depth: u64,
 }
 
 impl Default for Limits {
@@ -48,6 +54,8 @@ impl Default for Limits {
             doc_total: 1 << 30,
             records: 50_000_000,
             blob_index: 8 << 20,
+            blob_index_total: 64 << 20,
+            depth: 10_000,
         }
     }
 }

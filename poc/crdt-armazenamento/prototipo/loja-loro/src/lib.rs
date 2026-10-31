@@ -291,6 +291,50 @@ fn param_entries(meta: &LoroMap, key: &str) -> Vec<(u64, Option<Value>)> {
         .collect()
 }
 
+/// The whole content of a document as text, part by part, every part
+/// decoded: each top-level part in full, then each tree node (removed or
+/// not) with its parent, its place among its siblings and all its data.
+/// Never the whole document as one value: that nests as deep as the tree,
+/// and building it overflowed the stack at 10,000 levels (audit I4). Used
+/// to decode everything (B1) and to compare two documents (re-rooting).
+fn content_parts(doc: &LoroDoc) -> Vec<String> {
+    let mut out = Vec::new();
+    if let LoroValue::Map(roots) = doc.get_value() {
+        let mut roots: Vec<(&String, &LoroValue)> = roots.iter().collect();
+        roots.sort_by(|a, b| a.0.cmp(b.0));
+        for (name, v) in roots {
+            let LoroValue::Container(id) = v else {
+                out.push(format!("{name}={v:?}"));
+                continue;
+            };
+            out.push(match doc.get_container(id.clone()) {
+                Some(Container::Map(m)) => format!("{name}={:?}", m.get_deep_value()),
+                Some(Container::List(l)) => format!("{name}={:?}", l.get_deep_value()),
+                Some(Container::MovableList(l)) => format!("{name}={:?}", l.get_deep_value()),
+                Some(Container::Text(t)) => format!("{name}={}", t.to_string()),
+                // The tree, node by node below.
+                Some(Container::Tree(_)) => continue,
+                other => format!("{name}={other:?}"),
+            });
+        }
+    }
+    let tree = doc.get_tree("tree");
+    let mut nodes = tree.nodes();
+    nodes.sort();
+    for t in nodes {
+        let meta = tree
+            .get_meta(t)
+            .map(|m| format!("{:?}", m.get_deep_value()))
+            .unwrap_or_default();
+        out.push(format!(
+            "{t} {:?} {:?} {meta}",
+            tree.parent(t),
+            tree.fractional_index(t)
+        ));
+    }
+    out
+}
+
 fn lib_err(e: LoroError) -> OpError {
     match e {
         LoroError::TreeError(LoroTreeError::CyclicMoveError) => OpError::WouldCycle,
@@ -926,7 +970,7 @@ impl<M: ParamMode> LoroStore<M> {
             .ok_or_else(|| OpError::Library("cut point not in the history".into()))?;
         let later = self.doc.export(ExportMode::updates(&since)).map_err(err)?;
         doc.import(&later).map_err(lib_err)?;
-        if doc.get_deep_value() != self.doc.get_deep_value()
+        if content_parts(&doc) != content_parts(&self.doc)
             || doc.oplog_vv() != self.doc.oplog_vv()
             || doc.shallow_since_frontiers() != *point
         {
@@ -1319,6 +1363,19 @@ impl<M: ParamMode> Store for LoroStore<M> {
         st
     }
 
+    fn read_everything(&self) -> usize {
+        let mut read: usize = content_parts(&self.doc).iter().map(String::len).sum();
+        // The whole kept history, every change body decoded.
+        if let Ok(h) = self.json_between(&self.history_start(), &self.doc.oplog_vv()) {
+            read += h
+                .changes
+                .iter()
+                .map(|c| format!("{c:?}").len())
+                .sum::<usize>();
+        }
+        read
+    }
+
     fn text_anchor(&self, id: &NodeId, pos: usize) -> Option<Anchor> {
         let c = self.text_of(id).ok()?.get_cursor(pos, Side::Middle)?;
         Some(Anchor(c.encode()))
@@ -1424,6 +1481,20 @@ impl<M: ParamMode> Store for LoroStore<M> {
                 tree.fractional_index(tree_id(n).ok()?)
             }),
             hidden_by_removal: detect::newly_hidden(self, &visible_before),
+            too_deep: {
+                // Only what moved can be deeper now; walked without
+                // recursion (I4).
+                let moved: Vec<NodeId> = local
+                    .iter()
+                    .chain(&remote)
+                    .filter_map(|t| match t {
+                        Touch::Move { node, .. } => Some(node.clone()),
+                        _ => None,
+                    })
+                    .collect();
+                let depth = bivar_poc_modelo::depth_through(self, &moved);
+                (depth > bivar_poc_modelo::MAX_DEPTH).then_some(depth)
+            },
         })
     }
 

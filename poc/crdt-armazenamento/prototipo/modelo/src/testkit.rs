@@ -476,6 +476,7 @@ pub fn merged(reports: &[&MergeReport]) -> MergeReport {
         all.lost_moves.extend(r.lost_moves.iter().cloned());
         all.hidden_by_removal
             .extend(r.hidden_by_removal.iter().cloned());
+        all.too_deep = all.too_deep.max(r.too_deep);
     }
     all
 }
