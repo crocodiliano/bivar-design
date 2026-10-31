@@ -126,7 +126,7 @@ Conferido na documentação oficial do `yrs` 0.28.0 (docs.rs, 2026-10-29):
 ## Decisão do dono (2026-10-29)
 
 - **Aprovadas só para a prova, com versão exata:** Loro `=1.17.1` e Automerge `=0.12.0`.
-- **BSL-1.0:** a exceção vale **só no `deny.toml` da prova**. A lista do projeto (`CLAUDE.md` §5 e `deny.toml` da raiz) não muda.
+- **BSL-1.0:** na prova, a exceção valia **só no `deny.toml` da prova**. **Atualização:** com a Loro escolhida, o ADR-0021 (seção 10) pôs a BSL-1.0 na lista do projeto (`CLAUDE.md` §5 e `deny.toml` da raiz), com a aprovação do dono em 2026-10-29 (auditoria de 2026-10-31, M11).
 - **Loro 1.17.1, e não 1.16.2:** fica a 1.17.1. A correção dos pacotes abandonados ([#1122](https://github.com/loro-dev/loro/pull/1122)) ainda não foi aceita, então ela **não** está nessa versão.
 - **Pedido para a Parte 2:** para cada recurso que falta numa biblioteca e precisa ser feito por fora (mover com segurança e desfazer no Automerge; detectar escrita simultânea na Loro), fazer uma versão mínima e registrar a velocidade, a **dificuldade** e o **risco de erro**.
 

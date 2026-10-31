@@ -21,7 +21,7 @@ All numbers are unsigned integers, **little-endian**.
 | 0 | 8 | ASCII `BIVARDOC` |
 | 8 | 4 | format version: `1` |
 | 12 | 4 | flags: `0`. Bit 0 is **reserved for encryption**, postponed by the owner. A reader refuses any unknown bit |
-| 16 | 16 | reserved: zeros (future encryption parameters) |
+| 16 | 16 | reserved: zeros (future encryption parameters). A reader refuses any byte that is not zero |
 | 32 | 32 | SHA-256 of bytes 0 to 31 |
 
 **A reader refuses the file:**
@@ -64,6 +64,21 @@ A reader checks these limits **before** reading or reserving memory for a payloa
 1. Read the records in order from byte 64.
 2. If the file ends inside a record, or if the **last** record has a wrong digest, that record is a **cut write** (for example, from a crash). Drop it; everything before it stands. A reader that may write removes those bytes from the end.
 3. If a record that is **not the last** has a wrong digest, an unknown kind or a length above the limit, the file is **damaged** from there on. Use only what came before, open **read-only**, and tell the user.
+4. A reader that removes a cut write from the end **first keeps the removed bytes** in a separate file (`<name>.estragado`): they may be a complete record damaged later on the disk, and are never just deleted.
+
+**The whole file is refused,** with a message, when:
+
+- the first record is not the snapshot;
+- there is a second snapshot;
+- an updates record comes before the snapshot (already the case above);
+- a large-file index is malformed;
+- the last record is a chunk whose identity does not match its data;
+- a save mark does not have exactly 8 bytes;
+- a limit of section 3.1 is passed.
+
+**An index pointing at a chunk the file does not have** does not refuse the file: it opens read-only, with the damage warning, and reading that large file fails.
+
+**Files received from outside** (that this computer did not write last) are first read by a separate process, with limited time and memory, before any real reading ([ADR-0024](../adr/0024.md), Portuguese). A reader in another program should take similar care: Loro snapshots and updates are decoded in parts, and a bomb may sit in a part read only later.
 
 ## 4. Record kinds
 
@@ -125,9 +140,12 @@ Snapshot and updates payloads use the binary format of **Loro 1.17.1** (open lib
   5. deletes `.anterior`. If the new file does not open well, `.anterior` goes back in place.
 - **On opening:**
   - if `<name>` is missing or damaged and `<name>.anterior` exists, the reader offers to recover from it. The damaged file is never deleted: it is kept as `<name>.estragado`;
-  - if `<name>` opens well and an `.anterior` is left (compaction stopped after the swap), the `.anterior` is deleted;
+  - if `<name>` opens well and an `.anterior` is left (compaction stopped after the swap), the `.anterior` is deleted **only if it is the file that compaction replaced**: its fingerprint matches the one noted in the new document (`note:replaced_file`). Otherwise it stays, and the opening warns;
+  - a cut last record is removed from the end, and its bytes are kept in `<name>.estragado`;
   - a leftover `.compact-tmp` is deleted.
 - **"Salvar cópia para enviar" (save a copy to send) and "Salvar como" (save as)** first write `<name>.parcial`, force it to disk, and only then rename it to `<name>`. They never overwrite an existing file. A `.parcial` left by a crash is never read as a document nor deleted without asking: the next save under that name stops and warns, and opening `<name>` warns that it is there.
+- **When a write fails** (a full disk, for example), the file goes back to the end of its last good record before anything else is written, and the edits stay in memory until the next try. "Save as" writes nothing to the current file: it copies the file up to its last good record and appends the pending edits at the destination.
+- **Compaction and the copy to send copy large files chunk by chunk,** each checked against its identity, no chunk written twice, and read the new file back whole before using it.
 - **The copy to send is an ordinary file in this format,** with a new document identity and a history that starts with it. Nothing in the file says it is a copy.
 
 ## 7. Not part of the format

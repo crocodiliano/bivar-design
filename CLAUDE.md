@@ -86,6 +86,7 @@ O plano completo está em `docs/PLANO.md`, que é a versão oficial do plano. As
 ## 6. Testes obrigatórios
 
 - Toda função nova vem com testes.
+- **Teste confere o efeito, não o plano.** Todo teste de uma função que promete um efeito confere o próprio efeito no resultado final (o arquivo diminuiu, a conexão está na cópia, a escrita sobreviveu à junção), e não só que um plano foi feito ou que nada quebrou.
 - O núcleo também recebe testes de propriedades sempre que fizer sentido.
 - **Testes visuais (golden images):** toda mudança que afeta o que aparece na tela ou na exportação precisa de um teste visual em `tests/golden/`. **Nunca atualize uma imagem de referência sem a aprovação explícita do dono.** Mostre a ele a diferença antes.
   - **Registro da aprovação:** todo commit que mexe em qualquer pasta `tests/golden/` leva a linha `Golden-Approved-By: Puã <344064416+crocodiliano@users.noreply.github.com>` na mensagem. Escreva essa linha só depois de o dono ver a diferença e escrever que aprova na conversa.

@@ -21,7 +21,7 @@ Todos os números são inteiros sem sinal, em ordem **little-endian**.
 | 0 | 8 | o texto `BIVARDOC` (ASCII) |
 | 8 | 4 | versão do formato: `1` |
 | 12 | 4 | opções (*flags*): `0`. O bit 0 está **reservado para criptografia**, adiada por decisão do dono. Um leitor recusa qualquer bit desconhecido |
-| 16 | 16 | reservado: zeros (parâmetros da criptografia, no futuro) |
+| 16 | 16 | reservado: zeros (parâmetros da criptografia, no futuro). Um leitor recusa qualquer byte diferente de zero |
 | 32 | 32 | SHA-256 dos bytes 0 a 31 |
 
 **O leitor recusa o arquivo:**
@@ -64,6 +64,21 @@ O leitor confere estes limites **antes** de ler ou reservar memória para o cont
 1. Leia os registros em ordem, a partir do byte 64.
 2. Se o arquivo terminar no meio de um registro, ou se o **último** registro tiver o resumo errado, esse registro é uma **gravação cortada**, por exemplo numa queda. Descarte-o; tudo antes dele vale. Um leitor que pode gravar remove esses bytes do fim.
 3. Se um registro que **não é o último** tiver o resumo errado, um tipo desconhecido ou um tamanho acima do limite, o arquivo está **danificado** a partir dali. Use só o que veio antes, abra **só para leitura** e avise o usuário.
+4. Um leitor que remove do fim uma gravação cortada **guarda antes os bytes removidos** num arquivo à parte (`<nome>.estragado`): podem ser um registro completo que estragou depois no disco, e nunca são simplesmente apagados.
+
+**O arquivo inteiro é recusado,** com mensagem, quando:
+
+- o primeiro registro não é o retrato;
+- há um segundo retrato;
+- um registro de atualizações vem antes do retrato (o que já é o caso acima);
+- um índice de arquivo grande está mal formado;
+- o último registro é um pedaço cuja identidade não bate com os dados;
+- uma marca de salvamento não tem exatamente 8 bytes;
+- um limite da seção 3.1 é passado.
+
+**Um índice que aponta para um pedaço que o arquivo não tem** não recusa o arquivo: ele abre só para leitura, com o aviso de dano, e ler aquele arquivo grande dá erro.
+
+**Arquivos recebidos de fora** (que este computador não gravou por último) são lidos primeiro por um processo separado, com tempo e memória limitados, antes de qualquer leitura de verdade ([ADR-0024](../adr/0024.md)). Um leitor de outro programa deve tomar cuidado parecido: os retratos e as atualizações da Loro são decodificados por partes, e uma bomba pode estar numa parte que só é lida depois.
 
 ## 4. Tipos de registro
 
@@ -124,9 +139,12 @@ O conteúdo dos registros de retrato e de atualizações é o formato binário d
   5. apaga o `.anterior`. Se o novo não abrir bem, o `.anterior` volta para o lugar.
 - **Ao abrir:**
   - se `<nome>` estiver faltando ou estragado e `<nome>.anterior` existir, o leitor oferece recuperar a partir dele. O arquivo estragado nunca é apagado: é guardado como `<nome>.estragado`;
-  - se `<nome>` abrir bem e houver um `.anterior` (compactação interrompida depois da troca), o `.anterior` é apagado;
+  - se `<nome>` abrir bem e houver um `.anterior` (compactação interrompida depois da troca), o `.anterior` é apagado **só se for o arquivo que essa compactação substituiu**: a impressão digital dele bate com a anotada no documento novo (`note:replaced_file`). Senão, ele fica e a abertura avisa;
+  - um último registro cortado é removido do fim, e os bytes dele ficam em `<nome>.estragado`;
   - um `.compact-tmp` que sobrar é apagado.
 - **"Salvar cópia para enviar" e "Salvar como"** gravam primeiro `<nome>.parcial`, forçam no disco e só então renomeiam para `<nome>`. Nunca sobrescrevem um arquivo que já existe. Um `.parcial` que sobrar de uma queda nunca é lido como documento nem apagado sem perguntar: a gravação seguinte no mesmo nome para e avisa, e a abertura de `<nome>` avisa que ele está ao lado.
+- **Quando uma gravação falha** (disco cheio, por exemplo), o arquivo volta ao fim do último registro bom antes de qualquer outra gravação, e as edições ficam na memória até a próxima tentativa. "Salvar como" não grava nada no arquivo atual: copia o arquivo até o último registro bom e acrescenta as edições pendentes no destino.
+- **A compactação e a cópia para enviar copiam os arquivos grandes pedaço por pedaço,** conferindo cada um contra a sua identidade, sem repetir um pedaço, e relêem o arquivo novo inteiro antes de usá-lo.
 - **A cópia para enviar é um arquivo comum deste formato,** com uma identidade de documento nova e um histórico que começa nela. Nada no arquivo diz que ele é uma cópia.
 
 ## 7. O que não faz parte do formato
