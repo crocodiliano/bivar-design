@@ -772,3 +772,64 @@ fn verification_of_a_file_with_2_gb_of_large_files() {
     );
     let _ = std::fs::remove_file(&path);
 }
+
+/// The owner's question (2026-10-31): does verification grow in proportion
+/// to the document? Documents of 250,000 to 2 million operations of the
+/// approved mix; for each, the whole verification (separate process) and
+/// each pass on its own, to find any part that grows faster.
+/// `cargo test --release -p bivar-poc-verificador --test entrada verification_grows -- --ignored --nocapture`
+#[test]
+#[ignore = "measurement"]
+fn verification_grows_with_the_document() {
+    let t = trust("grows");
+    for ops in [250_000usize, 500_000, 1_000_000, 2_000_000] {
+        let path = fresh(&format!("grows-{ops}"));
+        let mut s = S::new_document(1);
+        Workload::new(ops as u64).run(&mut s, ops);
+        drop(DocFile::create(&path, &mut s).unwrap());
+        drop(s);
+        let started = Instant::now();
+        let r = open(&path, &t);
+        let verify_s = started.elapsed().as_secs_f64();
+        // Each pass, in this process, on the same document.
+        let (_, s, _) = DocFile::open::<S>(&path, 2).unwrap();
+        let mut parts = Vec::new();
+        let mut time = |name: &str, f: &mut dyn FnMut()| {
+            let t = Instant::now();
+            f();
+            parts.push(format!("{name}={:.2}", t.elapsed().as_secs_f64()));
+        };
+        let mut state = None;
+        time("read_everything", &mut || {
+            s.read_everything();
+        });
+        time("state", &mut || state = Some(s.state()));
+        let state = state.unwrap();
+        time("depth", &mut || {
+            bivar_poc_modelo::tree_depth(&state);
+        });
+        time("conflicts", &mut || {
+            s.open_conflicts();
+        });
+        time("hidden", &mut || {
+            bivar_poc_modelo::hidden_layers(&state);
+        });
+        time("blobs", &mut || {
+            s.blob_hashes();
+        });
+        time("plan", &mut || {
+            s.plan_compaction(u64::MAX / 2, 0, false);
+        });
+        time("copy", &mut || {
+            bivar_poc_modelo::clean_copy_of::<S>(&state, 1, false);
+        });
+        println!(
+            "RESULT verification ops={ops} file_mb={:.1} nodes={} verified={} verify_s={verify_s:.2} {}",
+            std::fs::metadata(&path).unwrap().len() as f64 / 1_048_576.0,
+            state.nodes.len(),
+            r.is_ok(),
+            parts.join(" ")
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+}

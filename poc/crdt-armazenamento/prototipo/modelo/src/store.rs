@@ -351,7 +351,16 @@ pub fn depth_through<S: Store>(s: &S, nodes: &[NodeId]) -> usize {
 /// along. With `drop_hidden`, hidden layers (and what is inside them) stay
 /// out too. Returns the copy and the map old id -> new id.
 pub fn clean_copy<S: Store>(src: &S, peer: u64, drop_hidden: bool) -> (S, HashMap<NodeId, NodeId>) {
-    let state = src.state();
+    clean_copy_of(&src.state(), peer, drop_hidden)
+}
+
+/// `clean_copy` from a visible state already read (the verifier's passes
+/// read it once for all of them).
+pub fn clean_copy_of<S: Store>(
+    state: &State,
+    peer: u64,
+    drop_hidden: bool,
+) -> (S, HashMap<NodeId, NodeId>) {
     let mut dst = S::new_document(peer);
     let mut ids = HashMap::new();
     let mut stack: Vec<(Option<NodeId>, NodeId)> = state
@@ -437,7 +446,9 @@ pub fn every_pass<S: Store>(s: &S, max_depth: usize) -> Result<usize, usize> {
     seen += hidden_layers(&state).len();
     seen += s.blob_hashes().len();
     seen += s.plan_compaction(u64::MAX / 2, 0, false).purge.len();
-    let (copy, _) = clean_copy(s, 1, false);
-    seen += copy.state().nodes.len();
+    // The copy is built from the state already read, not read again.
+    let (copy, _) = clean_copy_of::<S>(&state, 1, false);
+    // What the program does next with it: list its large files.
+    seen += copy.blob_hashes().len();
     Ok(seen)
 }

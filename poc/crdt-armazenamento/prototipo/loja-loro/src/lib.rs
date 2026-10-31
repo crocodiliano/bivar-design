@@ -291,6 +291,32 @@ fn param_entries(meta: &LoroMap, key: &str) -> Vec<(u64, Option<Value>)> {
         .collect()
 }
 
+/// How much a decoded value holds (bytes of text and data, plus one per
+/// item), walked with an explicit stack: values can nest (I4).
+fn value_size(v: &LoroValue) -> usize {
+    let mut n = 0;
+    let mut stack = vec![v];
+    while let Some(v) = stack.pop() {
+        match v {
+            LoroValue::String(s) => n += s.len(),
+            LoroValue::Binary(b) => n += b.len(),
+            LoroValue::List(l) => {
+                n += 1;
+                stack.extend(l.iter());
+            }
+            LoroValue::Map(m) => {
+                n += 1;
+                for (k, x) in m.iter() {
+                    n += k.len();
+                    stack.push(x);
+                }
+            }
+            _ => n += 1,
+        }
+    }
+    n
+}
+
 /// The whole content of a document as text, part by part, every part
 /// decoded: each top-level part in full, then each tree node (removed or
 /// not) with its parent, its place among its siblings and all its data.
@@ -713,6 +739,17 @@ impl<M: ParamMode> LoroStore<M> {
 
     fn tree(&self) -> LoroTree {
         self.doc.get_tree("tree")
+    }
+
+    /// Every node still stored (removed or not, but not deleted by a
+    /// compaction), in one call: `exists` on each node asks Loro whether it
+    /// was deleted, which walks up the tree inside Loro every time.
+    fn stored_nodes(&self) -> Vec<TreeID> {
+        self.tree()
+            .get_nodes(false)
+            .into_iter()
+            .map(|n| n.id)
+            .collect()
     }
 
     fn exists(&self, t: TreeID) -> bool {
@@ -1368,14 +1405,44 @@ impl<M: ParamMode> Store for LoroStore<M> {
     }
 
     fn read_everything(&self) -> usize {
-        let mut read: usize = content_parts(&self.doc).iter().map(String::len).sum();
+        // Every value is decoded and walked, never turned into text: the
+        // text of a whole document of 1 million operations was 282 MB and
+        // took 5 s to build (2026-10-31).
+        let mut read = 0;
+        // Every top-level part, one at a time; the tree node by node below
+        // (the whole document as one value nests as deep as the tree).
+        if let LoroValue::Map(roots) = self.doc.get_value() {
+            for v in roots.values() {
+                let LoroValue::Container(id) = v else {
+                    read += value_size(v);
+                    continue;
+                };
+                read += match self.doc.get_container(id.clone()) {
+                    Some(Container::Map(m)) => value_size(&m.get_deep_value()),
+                    Some(Container::List(l)) => value_size(&l.get_deep_value()),
+                    Some(Container::MovableList(l)) => value_size(&l.get_deep_value()),
+                    Some(Container::Text(t)) => t.len_utf8(),
+                    _ => 0,
+                };
+            }
+        }
+        // Every node, removed (marked or cleaned) or not, with all its data.
+        let tree = self.tree();
+        for t in tree.nodes() {
+            if let Ok(meta) = tree.get_meta(t) {
+                read += value_size(&meta.get_deep_value());
+            }
+        }
         // The whole kept history, every change body decoded.
         if let Ok(h) = self.json_between(&self.history_start(), &self.doc.oplog_vv()) {
-            read += h
-                .changes
-                .iter()
-                .map(|c| format!("{c:?}").len())
-                .sum::<usize>();
+            for c in &h.changes {
+                read += c.ops.len();
+                for op in &c.ops {
+                    if let JsonOpContent::Map(loro::JsonMapOp::Insert { value, .. }) = &op.content {
+                        read += value_size(value);
+                    }
+                }
+            }
         }
         read
     }
@@ -1800,13 +1867,17 @@ impl<M: ParamMode> Store for LoroStore<M> {
             trim_refused: why_not,
             ..CompactionPlan::default()
         };
-        for t in tree.nodes() {
-            if !self.exists(t) || !self.flag_removed(t) {
+        // The nodes not deleted, in one pass: asking Loro node by node walks
+        // up the tree inside it each time (verification of 1 million
+        // operations, 2026-10-31).
+        for t in self.stored_nodes() {
+            if !self.flag_removed(t) {
                 continue;
             }
             // Only the top removed node of a branch; the branch goes with it.
+            // The visibility index answers for the parent.
             if let Some(TreeParentId::Node(p)) = tree.parent(t)
-                && !self.walk_visible(p)
+                && !self.is_visible(p)
             {
                 continue;
             }
@@ -1873,7 +1944,7 @@ impl<M: ParamMode> Store for LoroStore<M> {
     fn open_conflicts(&self) -> Vec<String> {
         let tree = self.tree();
         let mut out = Vec::new();
-        for t in tree.nodes() {
+        for t in self.stored_nodes() {
             if !self.is_visible(t) && !self.flag_removed(t) {
                 continue; // under a removed node: its own removal is the conflict
             }
@@ -1905,10 +1976,7 @@ impl<M: ParamMode> Store for LoroStore<M> {
     fn blob_hashes(&self) -> BTreeSet<String> {
         let tree = self.tree();
         let mut out = BTreeSet::new();
-        for t in tree.nodes() {
-            if !self.exists(t) {
-                continue;
-            }
+        for t in self.stored_nodes() {
             let Ok(meta) = tree.get_meta(t) else {
                 continue;
             };

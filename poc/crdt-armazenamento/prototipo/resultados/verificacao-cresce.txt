@@ -1,0 +1,12 @@
+RESULT verification ops=250000 file_mb=7.9 nodes=24846 verified=true verify_s=2.44 read_everything=0.83 state=0.31 depth=0.01 conflicts=0.26 hidden=0.01 blobs=0.18 plan=0.32 copy=0.35
+RESULT verification ops=500000 file_mb=15.9 nodes=50333 verified=true verify_s=5.96 read_everything=1.88 state=0.89 depth=0.02 conflicts=0.81 hidden=0.02 blobs=0.65 plan=0.86 copy=0.73
+RESULT verification ops=1000000 file_mb=32.2 nodes=101424 verified=true verify_s=13.80 read_everything=4.13 state=2.25 depth=0.04 conflicts=2.12 hidden=0.05 blobs=1.80 plan=2.50 copy=1.54
+RESULT verification ops=2000000 file_mb=65.5 nodes=201425 verified=true verify_s=35.21 read_everything=9.59 state=9.30 depth=0.10 conflicts=8.62 hidden=0.12 blobs=7.90 plan=11.86 copy=3.35
+# Causa do crescimento mais rápido que o documento (2026-10-31): ler o mapa de
+# metadados de um nó pela Loro (get_meta + keys), medido com 300 mil leituras:
+PROBE ops=250000 nodes=37338 same_node_us=0.26 different_nodes_us=4.68
+PROBE ops=1000000 nodes=151002 same_node_us=0.22 different_nodes_us=9.50
+PROBE ops=2000000 nodes=300994 same_node_us=0.20 different_nodes_us=11.87
+# O mesmo nó custa o mesmo em qualquer tamanho; nós diferentes ficam mais caros
+# com o documento maior: efeito da memória (o mapa de cada nó fica num lugar
+# diferente), não um laço que percorre o documento a cada nó.
