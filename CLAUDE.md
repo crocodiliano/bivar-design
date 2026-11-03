@@ -110,6 +110,14 @@ O plano completo está em `docs/PLANO.md`, que é a versão oficial do plano. As
 5. **Diga ao dono como testar,** citando os critérios de aceite da entrega.
 6. **Faça o commit** depois que o dono aprovar.
 
+**Ao terminar uma etapa, ou ao parar para uma decisão do dono** (aprovado pelo dono em 2026-11-03):
+- termine a mensagem sempre com um bloco **"Resumo para o orientador"**, de no máximo 15 linhas:
+  - o que foi feito;
+  - os números contra os limites aprovados;
+  - as decisões que o dono precisa tomar, com as opções e a sua recomendação;
+  - os riscos.
+- **O relatório completo vai para um arquivo no repositório** (por exemplo, o registro de tratamento em `docs/auditoria/` ou os resultados da entrega), e não para a conversa. O resumo diz qual é o arquivo.
+
 **Se algo na especificação estiver ambíguo ou contradizer um ADR, pergunte. Não presuma.**
 
 **Ordem das fases:** o Núcleo só começa quando as entregas 0.4 a 0.9 da Fase 0 estiverem concluídas e revisadas pelo agente auditor.
