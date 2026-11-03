@@ -25,7 +25,19 @@ A rodada de 2026-10-31 06:05 (código `4d9b8ba`) terminou com três "PIOROU" (sa
 
 O registro completo das decisões está em `docs/auditoria/2026-10-31-fase-0.6-tratamento.md`.
 
+## Referência atual: rodada de 2026-11-03 15:00 (código `7dc7c70`)
+
+A bateria rodou 3 vezes seguidas, às 14:49, 15:00 e 15:12, com a regra fixada antes de medir (pedido do dono, 2026-11-03).
+
+- **Para cada medida com limite, vale a mediana das 3 rodadas.** Nenhum limite aprovado muda.
+- **Se todas as medianas ficam dentro e não há PULADA nem FALHOU,** a rodada do meio em "abrir e ler 1 milhão" vira a referência. Se não, a referência não muda.
+- **O `ultima.json` não mudou entre as rodadas.** As 3 compararam com a referência de 13:13.
+- **Todas as 3 foram guardadas** (registros e `historico.csv`).
+
+O resultado: todas as medianas ficaram dentro dos limites, sem PULADA nem FALHOU. "Abrir e ler 1 milhão" deu 2,55, 2,54 e 2,50 s (mediana de 2,54 s, limite de 3 s). Por isso, a rodada de 15:00 é a referência. A tabela completa está no registro de tratamento.
+
 ## Como mudar a referência
 
 - **O script grava toda rodada sem falhas como a nova referência,** mesmo quando algo piorou (saída 2). Por isso uma rodada com "PIOROU" só entra no commit depois que o dono aceita a piora e ela é registrada nesta tabela. Sem a aceitação, a piora é tratada como defeito, e o `ultima.json` volta ao do último commit.
 - **Uma medida que melhora** vira referência na própria rodada.
+- **Quando o valor varia muito entre rodadas** (como "abrir e ler 1 milhão" perto dos 3 s), o dono pode pedir 3 rodadas com a regra da mediana, como na referência atual.
