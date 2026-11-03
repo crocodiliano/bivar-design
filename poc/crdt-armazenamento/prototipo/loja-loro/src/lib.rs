@@ -93,6 +93,11 @@ pub struct LoroStore<M: ParamMode = Entries> {
     visible: std::cell::RefCell<HashMap<TreeID, bool>>,
     /// Off only to measure the old way (walking up to the root).
     use_index: bool,
+    /// The data of each node read once, while `read_once` runs (the passes
+    /// over the whole document share one reading of each node; owner,
+    /// 2026-10-31). `None` outside it. Nothing can change the document
+    /// while it is on: the passes only get a shared borrow.
+    views: std::cell::RefCell<Option<HashMap<TreeID, std::rc::Rc<NodeView>>>>,
     /// The copy name in entry keys: stable across sessions of the same file
     /// on the same computer (kept outside the file, in the list of trusted
     /// files), unlike the Loro peer id, which is new for every session.
@@ -149,6 +154,13 @@ fn unix_now() -> u64 {
 
 /// Key prefix of the removal mark's entries (entries mode).
 const REMOVED_PREFIX: &str = "removed#";
+
+/// What the passes read of one node: its kind and its entries (entries
+/// mode), read from Loro once.
+struct NodeView {
+    kind: Option<String>,
+    entries: BTreeMap<String, Vec<Entry>>,
+}
 
 /// One copy's entry of a parameter or of the removal mark (layout 3).
 struct Entry {
@@ -440,6 +452,7 @@ impl<M: ParamMode> LoroStore<M> {
             mode: std::marker::PhantomData,
             visible: std::cell::RefCell::new(HashMap::new()),
             use_index: true,
+            views: std::cell::RefCell::new(None),
             copy,
             edges_made: 0,
         };
@@ -471,12 +484,46 @@ impl<M: ParamMode> LoroStore<M> {
     }
 
     /// When the node was removed (seconds), if it is marked removed.
-    fn removed_at(&self, t: TreeID) -> Option<u64> {
+    /// A node's kind and entries: read from Loro, or, while `read_once`
+    /// runs, from what was read the first time (reading a node's map costs
+    /// more in a larger document, so each pass reading it again multiplied
+    /// that cost; measured 2026-10-31).
+    fn view(&self, t: TreeID) -> Option<std::rc::Rc<NodeView>> {
+        if let Some(v) = self.views.borrow().as_ref().and_then(|m| m.get(&t)) {
+            return Some(v.clone());
+        }
         let meta = self.tree().get_meta(t).ok()?;
-        match raw_entries(&meta, REMOVED_PREFIX).pop()? {
-            (_, LoroValue::I64(at)) => Some(at as u64),
+        let kind = match meta.get("kind") {
+            Some(ValueOrContainer::Value(LoroValue::String(s))) => Some(s.to_string()),
+            _ => None,
+        };
+        let entries = if M::ENTRIES {
+            entries_by_prefix(&meta)
+        } else {
+            BTreeMap::new()
+        };
+        let v = std::rc::Rc::new(NodeView { kind, entries });
+        if let Some(m) = self.views.borrow_mut().as_mut() {
+            m.insert(t, v.clone());
+        }
+        Some(v)
+    }
+
+    /// The winning entry's value under `prefix` of a node (entries mode).
+    fn winner(&self, t: TreeID, prefix: &str) -> Option<LoroValue> {
+        self.view(t)?
+            .entries
+            .get(prefix)?
+            .last()
+            .map(|e| e.value.clone())
+    }
+
+    fn removed_at(&self, t: TreeID) -> Option<u64> {
+        // Register mode keeps no removal time (as before).
+        match self.winner(t, REMOVED_PREFIX)? {
+            LoroValue::I64(at) => Some(at as u64),
             // Marked removed in register mode: no time, treat as old.
-            (_, LoroValue::Bool(true)) => Some(0),
+            LoroValue::Bool(true) => Some(0),
             _ => None,
         }
     }
@@ -497,12 +544,8 @@ impl<M: ParamMode> LoroStore<M> {
     /// removal mark that the winning write had not seen. Never cleaned
     /// (owner's rule).
     fn has_open_conflict(&self, t: TreeID) -> bool {
-        let Ok(meta) = self.tree().get_meta(t) else {
-            return false;
-        };
-        entries_by_prefix(&meta)
-            .values()
-            .any(|group| !unseen_of(group).is_empty())
+        self.view(t)
+            .is_some_and(|v| v.entries.values().any(|group| !unseen_of(group).is_empty()))
     }
 
     /// Entries mode: a parameter (or removal mark) touched by this merge
@@ -758,6 +801,19 @@ impl<M: ParamMode> LoroStore<M> {
     }
 
     fn flag_removed(&self, t: TreeID) -> bool {
+        if M::ENTRIES && self.views.borrow().is_some() {
+            let Some(v) = self.view(t) else {
+                return true;
+            };
+            return matches!(
+                v.entries.get(REMOVED_PREFIX).and_then(|g| g.last()),
+                Some(Entry {
+                    value: LoroValue::Bool(true) | LoroValue::I64(_),
+                    ..
+                })
+            );
+        }
+        // Outside `read_once`: only the removal entries are read.
         let Ok(meta) = self.tree().get_meta(t) else {
             return true;
         };
@@ -961,7 +1017,11 @@ impl<M: ParamMode> LoroStore<M> {
         };
         self.doc.checkout(version).map_err(|e| self.trim_err(e))?;
         self.visible.borrow_mut().clear();
+        // What `read_once` read is of the latest version: set aside while
+        // looking at the old one, and given back after.
+        let read = self.views.borrow_mut().take();
         let out = look(self);
+        *self.views.borrow_mut() = read;
         drop(back);
         Ok(out)
     }
@@ -1359,13 +1419,40 @@ impl<M: ParamMode> Store for LoroStore<M> {
             .collect();
         while let Some((parent, t)) = stack.pop() {
             let id = node_id(t);
-            let meta = tree.get_meta(t).expect("node exists");
             let children = visible_children(TreeParentId::Node(t));
             let mut ns = NodeState {
                 parent,
                 children: children.iter().map(|c| node_id(*c)).collect(),
                 ..NodeState::default()
             };
+            // While `read_once` runs: what was read of the node already; the
+            // text container only for text nodes.
+            if M::ENTRIES
+                && self.views.borrow().is_some()
+                && let Some(view) = self.view(t)
+            {
+                ns.kind = view.kind.clone().unwrap_or_default();
+                if ns.kind == "text"
+                    && let Ok(meta) = tree.get_meta(t)
+                    && let Some(ValueOrContainer::Container(Container::Text(txt))) =
+                        meta.get("text")
+                {
+                    ns.text = Some(txt.to_string());
+                }
+                for (prefix, group) in &view.entries {
+                    if let (Some(name), Some(winner)) = (param_name(prefix), group.last())
+                        && let Some(v) = from_loro(&winner.value)
+                    {
+                        ns.params.insert(name.to_owned(), v);
+                    }
+                }
+                for c in children {
+                    stack.push((Some(id.clone()), c));
+                }
+                st.nodes.insert(id, ns);
+                continue;
+            }
+            let meta = tree.get_meta(t).expect("node exists");
             for key in meta.keys() {
                 match (key.as_ref(), meta.get(&key)) {
                     ("kind", Some(ValueOrContainer::Value(LoroValue::String(s)))) => {
@@ -1402,6 +1489,25 @@ impl<M: ParamMode> Store for LoroStore<M> {
             st.nodes.insert(id, ns);
         }
         st
+    }
+
+    fn read_once<T>(&self, passes: impl FnOnce() -> T) -> T {
+        /// Forgets what was read when dropped, also on a panic.
+        struct Forget<'a, M: ParamMode>(&'a LoroStore<M>, bool);
+        impl<M: ParamMode> Drop for Forget<'_, M> {
+            fn drop(&mut self) {
+                if self.1 {
+                    *self.0.views.borrow_mut() = None;
+                }
+            }
+        }
+        // Only the outermost call starts and ends the reading.
+        let outer = self.views.borrow().is_none();
+        if outer {
+            *self.views.borrow_mut() = Some(HashMap::new());
+        }
+        let _forget = Forget(self, outer);
+        passes()
     }
 
     fn read_everything(&self) -> usize {
@@ -1942,13 +2048,12 @@ impl<M: ParamMode> Store for LoroStore<M> {
     }
 
     fn open_conflicts(&self) -> Vec<String> {
-        let tree = self.tree();
         let mut out = Vec::new();
         for t in self.stored_nodes() {
             if !self.is_visible(t) && !self.flag_removed(t) {
                 continue; // under a removed node: its own removal is the conflict
             }
-            let Ok(meta) = tree.get_meta(t) else {
+            let Some(view) = self.view(t) else {
                 continue;
             };
             // Removals at different times all mean "removed".
@@ -1956,13 +2061,13 @@ impl<M: ParamMode> Store for LoroStore<M> {
                 LoroValue::I64(_) => LoroValue::Bool(true),
                 other => other,
             };
-            for (prefix, group) in entries_by_prefix(&meta) {
+            for (prefix, group) in &view.entries {
                 let Some(winner) = group.last() else {
                     continue;
                 };
                 let winner = norm(winner.value.clone());
                 // Two copies that wrote the same value lost nothing.
-                if unseen_of(&group).into_iter().any(|v| norm(v) != winner) {
+                if unseen_of(group).into_iter().any(|v| norm(v) != winner) {
                     let name = prefix.trim_end_matches('#');
                     let name = name.strip_prefix("p:").unwrap_or(name);
                     out.push(format!("{}.{name}", node_id(t)));
@@ -1977,11 +2082,20 @@ impl<M: ParamMode> Store for LoroStore<M> {
         let tree = self.tree();
         let mut out = BTreeSet::new();
         for t in self.stored_nodes() {
+            // Every copy's entry, not only the winner: a value that lost a
+            // concurrent write keeps its large file until the conflict goes.
+            if M::ENTRIES {
+                let Some(view) = self.view(t) else { continue };
+                for e in view.entries.get("p:blob#").into_iter().flatten() {
+                    if let LoroValue::String(s) = &e.value {
+                        out.insert(s.to_string());
+                    }
+                }
+                continue;
+            }
             let Ok(meta) = tree.get_meta(t) else {
                 continue;
             };
-            // Every copy's entry, not only the winner: a value that lost a
-            // concurrent write keeps its large file until the conflict goes.
             for key in meta.keys() {
                 if param_name(&key) == Some("blob")
                     && let Some(ValueOrContainer::Value(v)) = meta.get(&key)

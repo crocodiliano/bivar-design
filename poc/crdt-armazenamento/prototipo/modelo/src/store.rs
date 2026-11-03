@@ -123,6 +123,12 @@ pub trait Store: Sized {
     /// bomb anywhere goes off there (audit 2026-10-31, B1). Returns how many
     /// bytes of text and values it read, so nothing is skipped as unused.
     fn read_everything(&self) -> usize;
+    /// Runs `passes` with each node read from the library once, however
+    /// many passes read it (the store may keep what it read meanwhile).
+    /// Nothing can change the document meanwhile: `passes` gets no `&mut`.
+    fn read_once<T>(&self, passes: impl FnOnce() -> T) -> T {
+        passes()
+    }
 
     fn text_anchor(&self, id: &NodeId, pos: usize) -> Option<Anchor>;
     fn anchor_pos(&self, id: &NodeId, anchor: &Anchor) -> Option<usize>;
@@ -435,20 +441,25 @@ pub fn clean_copy_of<S: Store>(
 /// A tree nested deeper than `max_depth` is refused (`Err` with its depth)
 /// before the other passes run.
 pub fn every_pass<S: Store>(s: &S, max_depth: usize) -> Result<usize, usize> {
-    let mut seen = s.read_everything();
-    let state = s.state();
-    seen += state.nodes.len();
-    let depth = tree_depth(&state);
-    if depth > max_depth {
-        return Err(depth);
-    }
-    seen += s.open_conflicts().len();
-    seen += hidden_layers(&state).len();
-    seen += s.blob_hashes().len();
-    seen += s.plan_compaction(u64::MAX / 2, 0, false).purge.len();
-    // The copy is built from the state already read, not read again.
-    let (copy, _) = clean_copy_of::<S>(&state, 1, false);
-    // What the program does next with it: list its large files.
-    seen += copy.blob_hashes().len();
-    Ok(seen)
+    // Each node is read from the library once for all the passes (owner,
+    // 2026-10-31): reading a node costs more in a larger document, and each
+    // pass reading it again multiplied that.
+    s.read_once(|| {
+        let mut seen = s.read_everything();
+        let state = s.state();
+        seen += state.nodes.len();
+        let depth = tree_depth(&state);
+        if depth > max_depth {
+            return Err(depth);
+        }
+        seen += s.open_conflicts().len();
+        seen += hidden_layers(&state).len();
+        seen += s.blob_hashes().len();
+        seen += s.plan_compaction(u64::MAX / 2, 0, false).purge.len();
+        // The copy is built from the state already read, not read again.
+        let (copy, _) = clean_copy_of::<S>(&state, 1, false);
+        // What the program does next with it: list its large files.
+        seen += copy.blob_hashes().len();
+        Ok(seen)
+    })
 }

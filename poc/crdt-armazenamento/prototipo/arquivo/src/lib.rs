@@ -606,21 +606,29 @@ pub enum Access {
     ReadOnly,
 }
 
-/// Local, outside any document: the fingerprints of the files this computer
-/// wrote last, and the copy name each was written with. A file never
-/// vouches for itself (owner's condition, 2026-10-30): trust comes only from
-/// this list, by path and fingerprint. The copy name is reused only for a
-/// trusted file; any other file (copied, duplicated, restored from a backup,
-/// changed by another computer) opens with a new copy name, so two sessions
-/// never write the same entry keys without knowing (owner, 2026-10-31).
+/// Local, outside any document: the files this computer may open without
+/// the verifier, with the fingerprint each had and the copy name it was
+/// opened with. A file never vouches for itself (owner's condition,
+/// 2026-10-30): trust comes only from this list, by path and fingerprint.
+///
+/// A file gets here in two ways: this computer wrote it last; or it came
+/// from outside and the verifier passed it (owner, 2026-10-31), in which
+/// case the line also names the verifier version that passed it, and a
+/// newer verifier checks it again. Any other file (copied, duplicated,
+/// restored from a backup, changed by another computer) goes through the
+/// verifier and opens with a new copy name, so two sessions never write the
+/// same entry keys without knowing.
 pub struct TrustStore {
     list: PathBuf,
 }
 
-/// One line of the list: fingerprint, copy name, path.
+/// One line of the list: fingerprint, copy name, verifier version (empty
+/// for a file this computer wrote), path. Lines of the older form (no
+/// verifier field) are files this computer wrote.
 struct Noted {
     fingerprint: String,
     copy: Option<u64>,
+    verified_by: Option<String>,
     path: String,
 }
 
@@ -641,34 +649,35 @@ impl TrustStore {
             .unwrap_or_default()
             .lines()
             .filter_map(|l| {
-                let mut it = l.splitn(3, '\t');
-                let fingerprint = it.next()?.to_owned();
-                let copy = u64::from_str_radix(it.next()?, 16).ok();
-                let path = it.next()?.to_owned();
+                let parts: Vec<&str> = l.splitn(4, '\t').collect();
+                let (fingerprint, copy, verified_by, path) = match parts.as_slice() {
+                    [f, c, v, p] => (*f, *c, Some(*v).filter(|v| !v.is_empty()), *p),
+                    [f, c, p] => (*f, *c, None, *p),
+                    _ => return None,
+                };
                 Some(Noted {
-                    fingerprint,
-                    copy,
-                    path,
+                    fingerprint: fingerprint.to_owned(),
+                    copy: u64::from_str_radix(copy, 16).ok(),
+                    verified_by: verified_by.map(str::to_owned),
+                    path: path.to_owned(),
                 })
             })
             .collect()
     }
 
-    /// Notes that this computer just wrote `path` with this fingerprint, as
-    /// copy `copy`.
-    pub fn remember(&self, path: &Path, fingerprint: &[u8; 32], copy: u64) -> io::Result<()> {
-        let key = Self::key(path);
-        let mut entries: Vec<Noted> = self.read().into_iter().filter(|n| n.path != key).collect();
-        entries.push(Noted {
-            fingerprint: hex(fingerprint),
-            copy: Some(copy),
-            path: key,
-        });
+    fn note(&self, noted: Noted) -> io::Result<()> {
+        let mut entries: Vec<Noted> = self
+            .read()
+            .into_iter()
+            .filter(|n| n.path != noted.path)
+            .collect();
+        entries.push(noted);
         let text: String = entries
             .iter()
             .map(|n| {
                 let copy = n.copy.map(|c| format!("{c:016x}")).unwrap_or_default();
-                format!("{}\t{copy}\t{}\n", n.fingerprint, n.path)
+                let by = n.verified_by.as_deref().unwrap_or_default();
+                format!("{}\t{copy}\t{by}\t{}\n", n.fingerprint, n.path)
             })
             .collect();
         if let Some(dir) = self.list.parent() {
@@ -679,20 +688,56 @@ impl TrustStore {
         std::fs::rename(&tmp, &self.list)
     }
 
-    /// The fingerprint this computer noted when it last wrote `path`.
+    /// Notes that this computer just wrote `path` with this fingerprint, as
+    /// copy `copy`.
+    pub fn remember(&self, path: &Path, fingerprint: &[u8; 32], copy: u64) -> io::Result<()> {
+        self.note(Noted {
+            fingerprint: hex(fingerprint),
+            copy: Some(copy),
+            verified_by: None,
+            path: Self::key(path),
+        })
+    }
+
+    /// Notes that the verifier `verifier` (its version) passed `path`, a
+    /// file from outside, with this fingerprint, and that it opened as copy
+    /// `copy`. It opens without the verifier while it stays exactly as it
+    /// is and the verifier is this version.
+    pub fn remember_verified(
+        &self,
+        path: &Path,
+        fingerprint: &[u8; 32],
+        copy: u64,
+        verifier: &str,
+    ) -> io::Result<()> {
+        self.note(Noted {
+            fingerprint: hex(fingerprint),
+            copy: Some(copy),
+            verified_by: Some(verifier.to_owned()),
+            path: Self::key(path),
+        })
+    }
+
+    /// The fingerprint noted for `path`.
     pub fn fingerprint_for(&self, path: &Path) -> Option<[u8; 32]> {
         let key = Self::key(path);
         let n = self.read().into_iter().find(|n| n.path == key)?;
         hex_to_id(&n.fingerprint)
     }
 
-    /// Whether this computer was the last to write `path`, exactly as it is.
+    /// For a file noted as passed by the verifier, the verifier version that
+    /// passed it; `None` for a file this computer wrote (or not noted).
+    pub fn verified_by(&self, path: &Path) -> Option<String> {
+        let key = Self::key(path);
+        self.read().into_iter().find(|n| n.path == key)?.verified_by
+    }
+
+    /// Whether `path` is noted, exactly as it is.
     pub fn is_trusted(&self, path: &Path, fingerprint: &[u8; 32]) -> bool {
         self.copy_for(path, fingerprint).is_some()
     }
 
-    /// The copy name `path` was written with, if this computer was the last
-    /// to write it, exactly as it is.
+    /// The copy name `path` was noted with, if it is noted exactly as it is.
     pub fn copy_for(&self, path: &Path, fingerprint: &[u8; 32]) -> Option<u64> {
         let (key, fp) = (Self::key(path), hex(fingerprint));
         self.read()

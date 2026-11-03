@@ -492,3 +492,45 @@ fn names_that_would_corrupt_the_layout_are_refused() {
     assert!(matches!(r, Err(OpError::Invalid(_))), "{r:?}");
     assert!(s.edges().is_empty());
 }
+
+/// One reading per node for all the passes (owner, 2026-10-31) gives the
+/// same answers as reading each time: on two copies that worked at the same
+/// time (conflicts, removals, moves), every pass answers the same inside
+/// and outside `read_once`.
+#[test]
+fn one_reading_per_node_gives_the_same_answers() {
+    for seed in 1..=6u64 {
+        let mut a = LoroStore::new_document(1);
+        bivar_poc_modelo::testkit::Workload::new(seed).run(&mut a, 300);
+        let mut b = a.fork_as(2);
+        let mirror = bivar_poc_modelo::testkit::Mirror::from_state(&a.state());
+        bivar_poc_modelo::testkit::Workload::with_mirror(seed + 10, mirror.clone())
+            .run(&mut a, 150);
+        bivar_poc_modelo::testkit::Workload::with_mirror(seed + 20, mirror).run(&mut b, 150);
+        a.merge_from(&mut b).unwrap();
+        let plain = (
+            a.state(),
+            a.open_conflicts(),
+            a.blob_hashes(),
+            a.plan_compaction(u64::MAX / 2, 0, false),
+        );
+        let once = a.read_once(|| {
+            (
+                a.state(),
+                a.open_conflicts(),
+                a.blob_hashes(),
+                a.plan_compaction(u64::MAX / 2, 0, false),
+            )
+        });
+        assert_eq!(plain, once, "seed {seed}");
+        // After it, the store reads afresh again and can be edited.
+        let n = a.state().roots[0].clone();
+        a.apply(&Op::SetParam {
+            node: n.clone(),
+            key: "x".into(),
+            value: Some(Value::Num(-9.0)),
+        })
+        .unwrap();
+        assert_eq!(a.param(&n, "x"), Some(Value::Num(-9.0)));
+    }
+}

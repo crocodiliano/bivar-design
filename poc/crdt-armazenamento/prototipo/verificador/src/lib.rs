@@ -93,6 +93,12 @@ pub enum How {
     Verified,
 }
 
+/// The version of what the verifier checks. Raised whenever the verifier
+/// checks more or differently (a new pass, a new limit): the files from
+/// outside it passed before are checked again on their next opening
+/// (owner, 2026-10-31). Files this computer wrote are not affected.
+pub const VERIFIER_VERSION: &str = "0.6-2026-10-31";
+
 pub fn open_checked<S: Store>(
     path: &Path,
     peer: u64,
@@ -101,10 +107,17 @@ pub fn open_checked<S: Store>(
     limits: &Limits,
     vlimits: &VerifyLimits,
 ) -> Result<(DocFile, S, OpenReport, How), CheckError> {
-    // A file this computer wrote: opened once, and accepted only if it is
-    // still exactly what was written (checked before the document library
-    // sees it). Otherwise it goes through the verifier like any other.
-    if let Some(noted) = trust.fingerprint_for(path) {
+    // A noted file (this computer wrote it, or this version of the verifier
+    // passed it): opened once, and accepted only if it is still exactly what
+    // was noted (checked before the document library sees it). Otherwise,
+    // or if another verifier version passed it, it goes through the
+    // verifier like any other.
+    let passed_by_another_verifier = trust
+        .verified_by(path)
+        .is_some_and(|v| v != VERIFIER_VERSION);
+    if let Some(noted) = trust.fingerprint_for(path)
+        && !passed_by_another_verifier
+    {
         match DocFile::open_with::<S>(path, peer, limits, Access::Write, Some(noted)) {
             Ok((f, mut s, r)) => {
                 // The same copy as last time on this computer, unless the
@@ -121,6 +134,11 @@ pub fn open_checked<S: Store>(
     let (f, mut s, r) = DocFile::open_with::<S>(path, peer, limits, Access::Write, Some(checked))?;
     // Not the file this computer wrote last: another copy, with a new name.
     s.set_copy_name(random_u64());
+    // Passed: noted, so it is verified once while it stays as it is and the
+    // verifier is this version (owner, 2026-10-31).
+    trust
+        .remember_verified(path, &checked, s.copy_name(), VERIFIER_VERSION)
+        .map_err(|e| CheckError::File(FileError::Io(e)))?;
     Ok((f, s, r, How::Verified))
 }
 

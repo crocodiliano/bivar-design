@@ -833,3 +833,65 @@ fn verification_grows_with_the_document() {
         let _ = std::fs::remove_file(&path);
     }
 }
+
+/// A verifier that would never finish: opening with it proves the verifier
+/// did not run (it would be refused as too slow).
+fn no_verifier() -> VerifyLimits {
+    VerifyLimits {
+        time: Duration::from_secs(3),
+        test_stall: true,
+        ..VerifyLimits::default()
+    }
+}
+
+/// The owner's decision (2026-10-31): a file from outside is verified once;
+/// it opens without the verifier while it stays exactly as it is and the
+/// verifier is the same version. Changed, or a new verifier version: it is
+/// verified again. Files this computer wrote are not affected.
+#[test]
+fn a_verified_file_is_verified_once_until_it_or_the_verifier_changes() {
+    let t = trust("verified-once");
+    let own = saved_file("verified-once-own", &t);
+    let path = fresh("verified-once");
+    std::fs::copy(&own, &path).unwrap(); // a file from outside
+    // 1. Verified once, then reopened without the verifier.
+    assert_eq!(open(&path, &t).unwrap(), How::Verified);
+    assert_eq!(
+        t.verified_by(&path).as_deref(),
+        Some(bivar_poc_verificador::VERIFIER_VERSION)
+    );
+    assert_eq!(
+        open_with(&path, &t, &Limits::default(), &no_verifier()).unwrap(),
+        How::Trusted
+    );
+    // 2. Changed from outside: verified again.
+    {
+        let (mut f, _, _) =
+            DocFile::open_with::<S>(&path, 5, &Limits::default(), Access::Write, None).unwrap();
+        f.append_raw(5, &0u64.to_le_bytes()).unwrap();
+    }
+    assert_eq!(
+        refusal(open_with(&path, &t, &Limits::default(), &no_verifier())),
+        Refusal::TooSlow,
+        "a changed file opened without the verifier"
+    );
+    assert_eq!(open(&path, &t).unwrap(), How::Verified);
+    // 3. Another verifier version passed it: verified again.
+    let list = dir().join("trust-verified-once.txt");
+    let text = std::fs::read_to_string(&list).unwrap();
+    let older = text.replace(bivar_poc_verificador::VERIFIER_VERSION, "0.5-older");
+    assert_ne!(text, older, "test setup");
+    std::fs::write(&list, older).unwrap();
+    assert_eq!(
+        refusal(open_with(&path, &t, &Limits::default(), &no_verifier())),
+        Refusal::TooSlow,
+        "a file passed by another verifier version opened without the verifier"
+    );
+    assert_eq!(open(&path, &t).unwrap(), How::Verified);
+    // 4. A file this computer wrote is not affected by the verifier version.
+    assert_eq!(t.verified_by(&own), None);
+    assert_eq!(
+        open_with(&own, &t, &Limits::default(), &no_verifier()).unwrap(),
+        How::Trusted
+    );
+}
