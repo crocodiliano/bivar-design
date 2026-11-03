@@ -5,7 +5,8 @@
 # prototipo/resultados/bateria/, que fica no repositório (pedido do dono):
 #   <data>_<hora>.txt  o registro completo de cada rodada;
 #   historico.csv      uma linha por medida, de todas as rodadas;
-#   ultima.json        a referência da próxima comparação.
+#   ultima.json        a referência da próxima comparação;
+#   referencia.md      as medidas que pioraram e foram aceitas pelo dono.
 # Faça o commit desses arquivos junto com a parte em que a rodada foi feita.
 #
 # Uso, a partir da pasta do projeto:

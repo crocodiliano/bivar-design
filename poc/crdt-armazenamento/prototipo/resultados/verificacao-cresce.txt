@@ -10,3 +10,16 @@ PROBE ops=2000000 nodes=300994 same_node_us=0.20 different_nodes_us=11.87
 # O mesmo nó custa o mesmo em qualquer tamanho; nós diferentes ficam mais caros
 # com o documento maior: efeito da memória (o mapa de cada nó fica num lugar
 # diferente), não um laço que percorre o documento a cada nó.
+# Depois da leitura única por nó (commit caacb9c, 2026-11-03), rodada sem nada
+# rodando junto. verify_s é a verificação inteira (processo separado, todas as
+# passagens numa leitura só); as outras colunas medem cada passagem sozinha,
+# do jeito antigo, só para ver qual parte cresce.
+RESULT verification ops=250000 file_mb=7.9 nodes=24846 verified=true verify_s=2.00 read_everything=0.83 state=0.32 depth=0.01 conflicts=0.27 hidden=0.01 blobs=0.23 plan=0.33 copy=0.35
+RESULT verification ops=500000 file_mb=15.9 nodes=50333 verified=true verify_s=4.29 read_everything=1.83 state=0.87 depth=0.02 conflicts=0.78 hidden=0.02 blobs=0.71 plan=0.84 copy=0.71
+RESULT verification ops=1000000 file_mb=32.2 nodes=101424 verified=true verify_s=9.96 read_everything=4.12 state=2.28 depth=0.05 conflicts=2.36 hidden=0.05 blobs=2.03 plan=2.63 copy=1.58
+RESULT verification ops=2000000 file_mb=65.5 nodes=201425 verified=true verify_s=23.08 read_everything=9.54 state=8.22 depth=0.11 conflicts=9.63 hidden=0.14 blobs=9.03 plan=12.56 copy=4.24
+# Verificação: 2,44 -> 2,00 s (250 mil); 5,96 -> 4,29 (500 mil); 13,80 -> 9,96
+# (1 milhão); 35,21 -> 23,08 (2 milhões). Ao dobrar o tamanho, cresce 2,1 a 2,3
+# vezes (antes 2,3 a 2,6): ainda o efeito da memória, menor. Uma rodada anterior
+# no mesmo dia, com outra tarefa pesada rodando junto, deu 3,70 / 5,14 / 11,22 /
+# 23,02 s e não vale como registro.
