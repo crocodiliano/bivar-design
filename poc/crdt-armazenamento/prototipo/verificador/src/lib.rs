@@ -29,6 +29,10 @@ pub struct VerifyLimits {
     /// output (proves a full pipe cannot stall it).
     #[doc(hidden)]
     pub test_noise: Option<usize>,
+    /// Measurements only: the verifier reports the most memory it held,
+    /// as counted by its memory cap (`verify_measured`).
+    #[doc(hidden)]
+    pub test_peak: bool,
 }
 
 impl Default for VerifyLimits {
@@ -38,6 +42,7 @@ impl Default for VerifyLimits {
             memory: 4 << 30,
             test_stall: false,
             test_noise: None,
+            test_peak: false,
         }
     }
 }
@@ -46,7 +51,10 @@ impl Default for VerifyLimits {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Refusal {
     TooSlow,
-    TooMuchMemory,
+    /// Above the verifier's memory limit (bytes), which the message names.
+    TooMuchMemory {
+        limit: u64,
+    },
     TooDeep,
     /// The verifier read it and found it unacceptable (the reason given).
     Invalid(String),
@@ -60,15 +68,32 @@ impl Refusal {
             Refusal::TooSlow => "This file was refused: it takes longer to open than a real \
                 document would."
                 .into(),
-            Refusal::TooMuchMemory => "This file was refused: it asks for more memory than a \
-                real document would need."
-                .into(),
+            // ADR-0024, section 2: the limit passed, that it can be raised,
+            // and the warning that comes with raising it.
+            Refusal::TooMuchMemory { limit } => format!(
+                "This file was refused: reading it needs more memory than the limit of {} for \
+                 files from outside. A very large document may need more, and the limit can be \
+                 raised in the settings, with a warning: a file that asks for this much memory \
+                 may also be an attack.",
+                bytes_text(*limit)
+            ),
             Refusal::TooDeep => {
                 "This file was refused: its structure is nested deeper than can be read.".into()
             }
             Refusal::Invalid(why) => format!("This file was refused: {why}"),
             Refusal::Crashed(why) => format!("This file could not be read safely: {why}"),
         }
+    }
+}
+
+/// A memory size in the unit a person reads: "4 GiB", "256 MiB".
+fn bytes_text(bytes: u64) -> String {
+    if bytes >= 1 << 30 && bytes.is_multiple_of(1 << 30) {
+        format!("{} GiB", bytes >> 30)
+    } else if bytes >= 1 << 20 {
+        format!("{} MiB", bytes >> 20)
+    } else {
+        format!("{bytes} bytes")
     }
 }
 
@@ -153,6 +178,19 @@ pub fn verify(
     limits: &Limits,
     vlimits: &VerifyLimits,
 ) -> Result<[u8; 32], CheckError> {
+    verify_measured(path, verifier, limits, vlimits).map(|(fingerprint, _)| fingerprint)
+}
+
+/// `verify`, also returning the most memory the verifier held (bytes, as
+/// its memory cap counts it) when `test_peak` is on. Sampled every few
+/// milliseconds, so a short peak may be missed; above the limit the cap
+/// itself refuses the file.
+pub fn verify_measured(
+    path: &Path,
+    verifier: &Path,
+    limits: &Limits,
+    vlimits: &VerifyLimits,
+) -> Result<([u8; 32], Option<u64>), CheckError> {
     fingerprint_file(path, limits)?;
     run_verifier(verifier, path, limits, vlimits)
 }
@@ -162,13 +200,16 @@ fn run_verifier(
     path: &Path,
     limits: &Limits,
     v: &VerifyLimits,
-) -> Result<[u8; 32], CheckError> {
+) -> Result<([u8; 32], Option<u64>), CheckError> {
     let mut cmd = Command::new(exe);
     if v.test_stall {
         cmd.env("BIVAR_VERIFIER_STALL", "1");
     }
     if let Some(n) = v.test_noise {
         cmd.env("BIVAR_VERIFIER_NOISE", n.to_string());
+    }
+    if v.test_peak {
+        cmd.env("BIVAR_VERIFIER_PEAK", "1");
     }
     let mut child = cmd
         .arg(path)
@@ -232,7 +273,11 @@ fn run_verifier(
     if status.success()
         && let Some(hex) = line.strip_prefix("OK ")
     {
-        return parse_hex(hex).ok_or_else(|| {
+        let peak = err
+            .lines()
+            .find_map(|l| l.strip_prefix("PEAK_BYTES "))
+            .and_then(|n| n.trim().parse().ok());
+        return parse_hex(hex).map(|fp| (fp, peak)).ok_or_else(|| {
             CheckError::Refused(Refusal::Crashed("unreadable verifier answer".into()))
         });
     }
@@ -247,7 +292,7 @@ fn run_verifier(
     // (`a_decompression_bomb_is_refused_by_the_memory_cap`), so a change in
     // Rust shows up as a failing test, not as a wrong message (M3).
     let refusal = if err.contains("memory allocation") {
-        Refusal::TooMuchMemory
+        Refusal::TooMuchMemory { limit: v.memory }
     } else if err.contains("overflowed its stack") {
         // No function that walks the tree calls itself (I4), so this is
         // not expected; kept so a stack overflow is never "crashed".

@@ -11,6 +11,7 @@
 //! 2026-10-31, M3).
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use bivar_poc_arquivo::{Access, DocFile, Limits, hex};
@@ -55,6 +56,18 @@ fn main() {
         }
     }
     let _ = ALLOC.set_limit(usize::try_from(memory).unwrap_or(usize::MAX));
+    // Measurements only: the most memory held, as the cap counts it,
+    // sampled every 2 ms and written to the error output at the end.
+    static PEAK: AtomicUsize = AtomicUsize::new(0);
+    let peak = std::env::var("BIVAR_VERIFIER_PEAK").is_ok();
+    if peak {
+        std::thread::spawn(|| {
+            loop {
+                PEAK.fetch_max(ALLOC.allocated(), Ordering::Relaxed);
+                std::thread::sleep(Duration::from_millis(2));
+            }
+        });
+    }
     match DocFile::open_with::<EntriesStore>(&path, 1, &limits, Access::ReadOnly, None) {
         Ok((f, store, report)) => {
             // Every pass the program makes over the whole document, after
@@ -66,6 +79,10 @@ fn main() {
             if let Err(depth) = every_pass(&store, max) {
                 println!("TOO_DEEP {depth}");
                 std::process::exit(4);
+            }
+            if peak {
+                PEAK.fetch_max(ALLOC.allocated(), Ordering::Relaxed);
+                eprintln!("PEAK_BYTES {}", PEAK.load(Ordering::Relaxed));
             }
             println!("OK {}", hex(&f.fingerprint()));
         }

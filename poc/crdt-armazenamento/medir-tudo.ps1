@@ -12,9 +12,11 @@
 # Uso, a partir da pasta do projeto:
 #   powershell -ExecutionPolicy Bypass -File poc/crdt-armazenamento/medir-tudo.ps1
 #
-# Saída: 0 = tudo dentro dos limites e nada piorou; 1 = algum limite
-# passou ou alguma medida falhou; 2 = dentro dos limites, mas algo piorou
-# mais de 25% em relação à rodada anterior.
+# Saída: 0 = todas as medidas rodaram, dentro dos limites, e nada piorou;
+# 1 = algum limite passou ou alguma medida falhou; 2 = dentro dos limites,
+# mas algo piorou mais de 25% em relação à rodada anterior; 3 = alguma
+# medida foi PULADA (por exemplo, por falta de espaço): a rodada nunca
+# conta como limpa (pedido do dono, 2026-11-03).
 
 param(
     # Pasta no disco rígido (A:) e no SSD (C:) para as medidas de disco.
@@ -66,18 +68,21 @@ function Disco($pasta, $rotulo) {
                 (M "$rotulo.arquivo_compactado_mb" "Arquivo depois da compactação, 200 mil operações ($rotulo)" 'file_after_mb=([\d.]+)' 'MB' $null 0.5),
                 (M "$rotulo.compactar_s" "Tempo de compactar ($rotulo)" 'compact_s=([\d.]+)' 's' $null 0.5)) }
     )
-    if ($livre -ge $EspacoMinimoGB) {
-        # DeepSeek 3.3: verificar um arquivo legítimo com 2 GB de arquivos
-        # grandes cabe com folga nos 60 s do verificador.
-        $medidas += @{ Teste = 'verification_of_a_file_with_2_gb_of_large_files'; Pacote2 = 'bivar-poc-verificador'; Arquivo2 = 'entrada'; Metricas = @(
-                (M "$rotulo.verificar_2gb_s" "Verificar arquivo de fora com 2 GB de arquivos grandes ($rotulo)" 'verified_s=([\d.]+)' 's' 60 2)) }
-        $medidas += @{ Teste = 'blob_2gb'; Metricas = @(
+    # DeepSeek 3.3: verificar um arquivo legítimo com 2 GB de arquivos
+    # grandes cabe com folga nos 60 s do verificador.
+    $grandes = @(
+        @{ Teste = 'verification_of_a_file_with_2_gb_of_large_files'; Pacote2 = 'bivar-poc-verificador'; Arquivo2 = 'entrada'; Metricas = @(
+                (M "$rotulo.verificar_2gb_s" "Verificar arquivo de fora com 2 GB de arquivos grandes ($rotulo)" 'verified_s=([\d.]+)' 's' 60 2)) },
+        @{ Teste = 'blob_2gb'; Metricas = @(
                 (M "$rotulo.arquivo_2gb_gravar_s" "Arquivo grande de 2 GB: guardar ($rotulo)" 'write_and_save_s=([\d.]+)' 's' $null 5),
                 (M "$rotulo.arquivo_2gb_abrir_s" "Arquivo grande de 2 GB: abrir o documento ($rotulo)" 'open_s=([\d.]+)' 's' $null 0.5),
                 (M "$rotulo.arquivo_2gb_ler_s" "Arquivo grande de 2 GB: ler e conferir ($rotulo)" 'read_and_check_s=([\d.]+)' 's' $null 2)) }
-    } else {
-        $script:pulados += "Arquivo grande de 2 GB ($rotulo): só $([math]::Round($livre, 1)) GB livres, mínimo $EspacoMinimoGB GB"
+    )
+    if ($livre -lt $EspacoMinimoGB) {
+        # Pulada aparece na tabela como PULADA, nunca como limpa.
+        foreach ($g in $grandes) { $g.Pulado = "só $([math]::Round($livre, 1)) GB livres em $rotulo, mínimo $EspacoMinimoGB GB" }
     }
+    $medidas += $grandes
     foreach ($m in $medidas) {
         $m.Pacote = if ($m.Pacote2) { $m.Pacote2 } else { 'bivar-poc-arquivo' }
         $m.Arquivo = if ($m.Arquivo2) { $m.Arquivo2 } else { 'medidas' }
@@ -86,7 +91,6 @@ function Disco($pasta, $rotulo) {
     $medidas
 }
 
-$script:pulados = @()
 $bateria = @(
     @{ Pacote = 'bivar-poc-loja-loro'; Arquivo = 'measure'; Teste = 'ops_100k_entries'; Metricas = @(
             (M 'operacoes_100k_s' '100 mil operações' 'ops_100k_median_seconds=([\d.]+)' 's' 5 0.3)) },
@@ -102,7 +106,15 @@ $bateria = @(
             (M 'indice_leitura_us' 'Ler um nó a 10 mil níveis, com o índice' 'per_read_with_index_us=([\d.]+)' 'µs' $null 5)) },
     @{ Pacote = 'bivar-poc-verificador'; Arquivo = 'entrada'; Teste = 'verification_cost_on_a_large_document'; Metricas = @(
             (M 'abrir_confiavel_s' 'Abrir arquivo deste computador (1 milhão de operações)' 'Trusted in ([\d.]+) s' 's' $null 0.2),
-            (M 'abrir_de_fora_s' 'Abrir arquivo de fora, com verificação' 'Verified in ([\d.]+) s' 's' $null 0.5)) },
+            (M 'abrir_de_fora_s' 'Abrir arquivo de fora, com verificação' 'Verified in ([\d.]+) s' 's' 60 0.5)) },
+    # O verificador sozinho e a memória máxima que ele usou, contada pelo
+    # limite de memória dele (pedido do dono, 2026-11-03): a bateria falha
+    # acima de 60 s ou de 4 GiB. Um documento recusado faz o teste falhar.
+    @{ Pacote = 'bivar-poc-verificador'; Arquivo = 'entrada'; Teste = 'verification_grows_with_the_document'; Metricas = @(
+            (M 'verificador_1m_s' 'Verificador sozinho, 1 milhão de operações' 'ops=1000000 .*?verifier_s=([\d.]+)' 's' 60 1),
+            (M 'verificador_1m_mib' 'Memória máxima do verificador, 1 milhão de operações' 'ops=1000000 .*?verifier_peak_mib=(\d+)' 'MiB' 4096 100),
+            (M 'verificador_2m_s' 'Verificador sozinho, 2 milhões de operações' 'ops=2000000 .*?verifier_s=([\d.]+)' 's' 60 2),
+            (M 'verificador_2m_mib' 'Memória máxima do verificador, 2 milhões de operações' 'ops=2000000 .*?verifier_peak_mib=(\d+)' 'MiB' 4096 200)) },
     # Auditoria de 2026-10-31: a compactação com duas cópias, conferindo o
     # tamanho final (o teste falha se o arquivo não ficar com um décimo).
     @{ Pacote = 'bivar-poc-loja-loro'; Arquivo = 'growth'; Teste = 'two_copy_compaction_size'; Metricas = @(
@@ -125,6 +137,11 @@ if ($LASTEXITCODE -ne 0) { Write-Host "A compilação falhou; veja $log"; exit 1
 $valores = [ordered]@{}
 $falhas = @()
 foreach ($b in $bateria) {
+    if ($b.Pulado) {
+        Write-Host "PULADA: $($b.Teste) ($($b.Pulado))"
+        "### $($b.Teste) PULADA: $($b.Pulado)" | Out-File -Append -Encoding utf8 $log
+        continue
+    }
     Write-Host "Medindo: $($b.Teste) $(if ($b.Pasta) { "em $($b.Pasta)" })"
     if ($b.Pasta) { $env:BIVAR_TEST_DIR = $b.Pasta } else { Remove-Item Env:BIVAR_TEST_DIR -ErrorAction SilentlyContinue }
     $texto = & cargo test --release --manifest-path $manifest -p $b.Pacote --test $b.Arquivo $b.Teste -- --ignored --exact --nocapture --test-threads=1 2>&1 | ForEach-Object { "$_" }
@@ -150,9 +167,20 @@ $anterior = $null
 $arquivoAnterior = Join-Path $saida 'ultima.json'
 if (Test-Path $arquivoAnterior) { $anterior = Get-Content -Raw -Encoding utf8 $arquivoAnterior | ConvertFrom-Json }
 
-$acima = 0; $piorou = 0
+$acima = 0; $piorou = 0; $puladas = 0
 $linhas = foreach ($b in $bateria) {
     foreach ($m in $b.Metricas) {
+        if ($b.Pulado) {
+            $puladas++
+            [pscustomobject]@{
+                Medida   = $m.Nome
+                Valor    = '-'
+                Limite   = $(if ($null -ne $m.Limite) { "$($m.Limite) $($m.Unidade)" } else { '-' })
+                Anterior = '-'
+                Situacao = 'PULADA'
+            }
+            continue
+        }
         if (-not $valores.Contains($m.Chave)) { continue }
         $v = $valores[$m.Chave]
         $antes = $null
@@ -174,16 +202,26 @@ $tabela = $linhas | Format-Table -AutoSize -Wrap | Out-String -Width 220
 # O commit e o estado foram lidos no início (a bateria grava os próprios
 # arquivos durante a rodada, e lê-los aqui marcava toda rodada como suja).
 $resumo = @("Bateria de medidas da 0.6, $($inicio.ToString('yyyy-MM-dd HH:mm')) (levou $([math]::Round(((Get-Date) - $inicio).TotalMinutes, 1)) min; código: $commit)", $tabela)
-if ($script:pulados) { $resumo += 'Pulado:'; $resumo += $script:pulados | ForEach-Object { "  - $_" } }
+$motivos = @($bateria | Where-Object { $_.Pulado } | ForEach-Object { "$($_.Teste): $($_.Pulado)" })
+if ($motivos) { $resumo += 'PULADAS (a rodada não conta como limpa):'; $resumo += $motivos | ForEach-Object { "  - $_" } }
 if ($falhas) { $resumo += 'Falhas:'; $resumo += $falhas | ForEach-Object { "  - $_" } }
-$resumo += "Acima do limite: $acima. Pioraram mais de 25%: $piorou. Medidas que falharam: $($falhas.Count)."
+$resumo += "Acima do limite: $acima. Pioraram mais de 25%: $piorou. Medidas que falharam: $($falhas.Count). Medidas puladas: $puladas."
 $resumo | Out-File -Append -Encoding utf8 $log
 $resumo | Write-Host
 Write-Host "Registro completo: $log"
 
 # Só uma rodada completa e sem falhas vira a referência da próxima.
 if (-not $falhas) {
-    [pscustomobject]@{ data = $inicio.ToString('s'); valores = $valores } | ConvertTo-Json | Out-File -Encoding utf8 $arquivoAnterior
+    # Uma medida pulada guarda o valor da referência anterior, para a
+    # próxima rodada ainda ter com o que comparar.
+    $guardar = [ordered]@{}
+    foreach ($k in $valores.Keys) { $guardar[$k] = $valores[$k] }
+    foreach ($b in ($bateria | Where-Object { $_.Pulado })) {
+        foreach ($m in $b.Metricas) {
+            if ($anterior -and ($anterior.valores.PSObject.Properties.Name -contains $m.Chave)) { $guardar[$m.Chave] = $anterior.valores.($m.Chave) }
+        }
+    }
+    [pscustomobject]@{ data = $inicio.ToString('s'); valores = $guardar } | ConvertTo-Json | Out-File -Encoding utf8 $arquivoAnterior
 }
 $historico = Join-Path $saida 'historico.csv'
 if (-not (Test-Path $historico)) { 'data;medida;valor' | Out-File -Encoding utf8 $historico }
@@ -191,4 +229,5 @@ foreach ($k in $valores.Keys) { "$($inicio.ToString('s'));$k;$($valores[$k].ToSt
 
 if ($acima -or $falhas) { exit 1 }
 if ($piorou) { exit 2 }
+if ($puladas) { exit 3 }
 exit 0

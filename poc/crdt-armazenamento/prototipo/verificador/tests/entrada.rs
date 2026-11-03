@@ -7,7 +7,9 @@ use bivar_poc_arquivo::{Access, DocFile, FileError, Limits, TrustStore};
 use bivar_poc_loja_loro::EntriesStore;
 use bivar_poc_modelo::testkit::Workload;
 use bivar_poc_modelo::{NodeId, Op, Store, Value};
-use bivar_poc_verificador::{CheckError, How, Refusal, VerifyLimits, open_checked};
+use bivar_poc_verificador::{
+    CheckError, How, Refusal, VerifyLimits, open_checked, verify_measured,
+};
 
 type S = EntriesStore;
 
@@ -330,7 +332,12 @@ fn a_decompression_bomb_is_refused_by_the_memory_cap() {
     };
     let started = Instant::now();
     let why = refusal(open_with(&path, &t, &Limits::default(), &v));
-    assert_eq!(why, Refusal::TooMuchMemory, "{}", why.message());
+    assert_eq!(
+        why,
+        Refusal::TooMuchMemory { limit: 256 << 20 },
+        "{}",
+        why.message()
+    );
     println!(
         "bomb of {size} bytes on disk refused in {:?}",
         started.elapsed()
@@ -590,7 +597,12 @@ fn hidden_bomb(name: &str, hide: impl FnOnce(&mut S)) {
         ..VerifyLimits::default()
     };
     let why = refusal(open_with(&path, &t, &Limits::default(), &v));
-    assert_eq!(why, Refusal::TooMuchMemory, "{}", why.message());
+    assert_eq!(
+        why,
+        Refusal::TooMuchMemory { limit: 256 << 20 },
+        "{}",
+        why.message()
+    );
 }
 
 fn big_text(s: &mut S) -> NodeId {
@@ -776,21 +788,34 @@ fn verification_of_a_file_with_2_gb_of_large_files() {
 /// The owner's question (2026-10-31): does verification grow in proportion
 /// to the document? Documents of 250,000 to 2 million operations of the
 /// approved mix; for each, the whole verification (separate process) and
-/// each pass on its own, to find any part that grows faster.
+/// each pass on its own, to find any part that grows faster. Also the
+/// verifier alone (its limit is 60 s) and the most memory it held (its
+/// limit is 4 GiB; owner, 2026-11-03). A refusal fails the measurement.
 /// `cargo test --release -p bivar-poc-verificador --test entrada verification_grows -- --ignored --nocapture`
 #[test]
 #[ignore = "measurement"]
 fn verification_grows_with_the_document() {
-    let t = trust("grows");
     for ops in [250_000usize, 500_000, 1_000_000, 2_000_000] {
         let path = fresh(&format!("grows-{ops}"));
         let mut s = S::new_document(1);
         Workload::new(ops as u64).run(&mut s, ops);
         drop(DocFile::create(&path, &mut s).unwrap());
         drop(s);
+        // What `open_checked` does with a file from outside: the verifier,
+        // then the opening of the file it read.
+        let measured = VerifyLimits {
+            test_peak: true,
+            ..VerifyLimits::default()
+        };
         let started = Instant::now();
-        let r = open(&path, &t);
+        let (checked, peak) =
+            verify_measured(&path, Path::new(VERIFIER), &Limits::default(), &measured)
+                .unwrap_or_else(|e| panic!("{ops} operations refused: {e:?}"));
+        let verifier_s = started.elapsed().as_secs_f64();
+        DocFile::open_with::<S>(&path, 2, &Limits::default(), Access::Write, Some(checked))
+            .unwrap();
         let verify_s = started.elapsed().as_secs_f64();
+        let peak_mib = peak.expect("the verifier reports its peak") as f64 / 1_048_576.0;
         // Each pass, in this process, on the same document.
         let (_, s, _) = DocFile::open::<S>(&path, 2).unwrap();
         let mut parts = Vec::new();
@@ -824,10 +849,10 @@ fn verification_grows_with_the_document() {
             bivar_poc_modelo::clean_copy_of::<S>(&state, 1, false);
         });
         println!(
-            "RESULT verification ops={ops} file_mb={:.1} nodes={} verified={} verify_s={verify_s:.2} {}",
+            "RESULT verification ops={ops} file_mb={:.1} nodes={} verify_s={verify_s:.2} \
+             verifier_s={verifier_s:.2} verifier_peak_mib={peak_mib:.0} {}",
             std::fs::metadata(&path).unwrap().len() as f64 / 1_048_576.0,
             state.nodes.len(),
-            r.is_ok(),
             parts.join(" ")
         );
         let _ = std::fs::remove_file(&path);
@@ -894,4 +919,43 @@ fn a_verified_file_is_verified_once_until_it_or_the_verifier_changes() {
         open_with(&own, &t, &Limits::default(), &no_verifier()).unwrap(),
         How::Trusted
     );
+}
+
+/// ADR-0024, section 2 (owner, 2026-11-03): a legitimate document above the
+/// verifier's memory limit is refused with a message that names the limit,
+/// says it can be raised in the settings with a warning, and that a file
+/// asking for this much may also be an attack. With the limit raised, the
+/// same file opens.
+#[test]
+fn a_legitimate_document_above_the_memory_limit_opens_once_the_limit_is_raised() {
+    let t = trust("memory-limit");
+    let path = fresh("memory-limit");
+    let mut s = S::new_document(1);
+    Workload::new(11).run(&mut s, 50_000);
+    drop(DocFile::create(&path, &mut s).unwrap());
+    drop(s);
+    let low = VerifyLimits {
+        memory: 16 << 20,
+        ..VerifyLimits::default()
+    };
+    let why = refusal(open_with(&path, &t, &Limits::default(), &low));
+    assert_eq!(why, Refusal::TooMuchMemory { limit: 16 << 20 });
+    let text = why.message();
+    for part in [
+        "limit of 16 MiB",
+        "raised in the settings",
+        "warning",
+        "may also be an attack",
+    ] {
+        assert!(text.contains(part), "missing {part:?}: {text}");
+    }
+    // Refused, it is not noted as passed.
+    assert_eq!(t.verified_by(&path), None);
+    // The limit raised (here, back to the default 4 GiB): the same file opens.
+    assert_eq!(open(&path, &t).unwrap(), How::Verified);
+    // At the default limit, the message names 4 GiB.
+    let default = Refusal::TooMuchMemory {
+        limit: VerifyLimits::default().memory,
+    };
+    assert!(default.message().contains("limit of 4 GiB"));
 }
