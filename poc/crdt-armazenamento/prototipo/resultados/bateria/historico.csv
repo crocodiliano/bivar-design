@@ -108,3 +108,31 @@
 2026-10-31T06:05:52;HD A:.arquivo_2gb_gravar_s;13.2
 2026-10-31T06:05:52;HD A:.arquivo_2gb_abrir_s;0.01
 2026-10-31T06:05:52;HD A:.arquivo_2gb_ler_s;4.2
+2026-11-03T13:13:09;operacoes_100k_s;1.402
+2026-11-03T13:13:09;juncao_10k_10k_s;0.333
+2026-11-03T13:13:09;gerar_1m_s;29.4
+2026-11-03T13:13:09;tamanho_1m_mb;33796527
+2026-11-03T13:13:09;abrir_ler_1m_s;2.53
+2026-11-03T13:13:09;memoria_1m_mb;226
+2026-11-03T13:13:09;indice_leitura_us;1.2
+2026-11-03T13:13:09;abrir_confiavel_s;0.13
+2026-11-03T13:13:09;abrir_de_fora_s;10.43
+2026-11-03T13:13:09;compactar_2_copias_bytes;14607
+2026-11-03T13:13:09;juncao_pequena_1m_ms;2.7
+2026-11-03T13:13:09;mapa_pedacos_bytes_por_pedaco;124
+2026-11-03T13:13:09;SSD C:.gravar_no_disco_ms;0.34
+2026-11-03T13:13:09;SSD C:.pausa_autosave_ms;1.58
+2026-11-03T13:13:09;SSD C:.arquivo_compactado_mb;2.7
+2026-11-03T13:13:09;SSD C:.compactar_s;2.1
+2026-11-03T13:13:09;SSD C:.verificar_2gb_s;0.09
+2026-11-03T13:13:09;SSD C:.arquivo_2gb_gravar_s;43.5
+2026-11-03T13:13:09;SSD C:.arquivo_2gb_abrir_s;0.02
+2026-11-03T13:13:09;SSD C:.arquivo_2gb_ler_s;4.5
+2026-11-03T13:13:09;HD A:.gravar_no_disco_ms;19.82
+2026-11-03T13:13:09;HD A:.pausa_autosave_ms;1.37
+2026-11-03T13:13:09;HD A:.arquivo_compactado_mb;2.7
+2026-11-03T13:13:09;HD A:.compactar_s;2.18
+2026-11-03T13:13:09;HD A:.verificar_2gb_s;0.04
+2026-11-03T13:13:09;HD A:.arquivo_2gb_gravar_s;14.9
+2026-11-03T13:13:09;HD A:.arquivo_2gb_abrir_s;0.01
+2026-11-03T13:13:09;HD A:.arquivo_2gb_ler_s;4.4
