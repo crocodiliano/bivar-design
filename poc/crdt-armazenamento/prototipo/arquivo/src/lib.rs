@@ -825,6 +825,9 @@ fn open_writer(path: &Path) -> io::Result<File> {
         o.share_mode(1); // FILE_SHARE_READ
     }
     let f = o.open(path)?;
+    // Diagnosis C only (BIVAR_DIAG_SERIALIZE): no verifier launch while the
+    // lock is asked for.
+    let _gate = diag::gate();
     #[cfg(not(windows))]
     f.try_lock()
         .map_err(|_| io::Error::new(io::ErrorKind::WouldBlock, "file is locked"))?;
@@ -1764,6 +1767,17 @@ pub mod diag {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_nanos())
             .unwrap_or(0)
+    }
+
+    static GATE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// Diagnosis C (branch diag/trava-linux only): with
+    /// `BIVAR_DIAG_SERIALIZE` set, a lock held while the verifier is
+    /// launched and while a file lock is asked for, so the two never happen
+    /// at the same time. Without the variable, nothing is held.
+    pub fn gate() -> Option<std::sync::MutexGuard<'static, ()>> {
+        std::env::var_os("BIVAR_DIAG_SERIALIZE")
+            .map(|_| GATE.lock().unwrap_or_else(|e| e.into_inner()))
     }
 
     pub fn enabled() -> bool {

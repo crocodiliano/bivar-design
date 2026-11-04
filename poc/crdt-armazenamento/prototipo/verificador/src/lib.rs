@@ -212,6 +212,8 @@ fn run_verifier(
         cmd.env("BIVAR_VERIFIER_PEAK", "1");
     }
     bivar_poc_arquivo::diag::log(&format!("SPAWN-START path={}", path.display()));
+    // Diagnosis C only: no file lock is asked for during the launch.
+    let gate = bivar_poc_arquivo::diag::gate();
     let spawned = cmd
         .arg(path)
         .arg(v.memory.to_string())
@@ -226,6 +228,7 @@ fn run_verifier(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn();
+    drop(gate);
     if let Ok(c) = &spawned {
         bivar_poc_arquivo::diag::log(&format!("SPAWN-END child={}", c.id()));
     }

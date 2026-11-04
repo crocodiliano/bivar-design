@@ -1,0 +1,14 @@
+# Temporary (branch diag/trava-linux, never merged): a minimal reproduction
+# of the refused lock, without any Bivar code and without dependencies.
+[package]
+name = "bivar-diag-trava-repro"
+version = "0.0.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+publish = false
+
+# Its own workspace: it is not part of the root one.
+[workspace]
+
+[lints.rust]
+unsafe_code = "forbid"
