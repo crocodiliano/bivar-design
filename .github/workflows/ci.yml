@@ -123,8 +123,11 @@ jobs:
         run: cargo test --locked --release --manifest-path poc/crdt-armazenamento/Cargo.toml
 
       # The proofs are outside the workspace, so their dependencies are
-      # checked here: licenses, sources and security advisories.
+      # checked here: licenses, sources and security advisories. They run
+      # even when a test step above failed (owner, 2026-11-04); the job
+      # still fails if the tests did.
       - name: cargo deny and cargo audit on both proofs and on fuzz/
+        if: success() || failure()
         run: |
           cargo install --locked cargo-deny --version 0.20.2
           cargo install --locked cargo-audit --version 0.22.2
