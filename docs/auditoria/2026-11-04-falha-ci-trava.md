@@ -164,3 +164,129 @@ No mesmo ramo `diag/trava-linux`, sem dependência nova, sem `unsafe` e sem muda
 | `a1d47df` (ramo `diag/trava-linux`) | passou nas 5 partes | **rodaram e passaram** | passou |
 
 O ramo `diag/trava-linux` continua no GitHub. Não foi apagado e não será juntado ao `main`.
+
+## 7. Segunda medida (aprovada pelo dono em 2026-11-04)
+
+> **Resultado:** a regra fixada antes de medir **não fechou**. A configuração C teve recusas, e, pela regra, isso quer dizer que a hipótese da herança da trava não explica tudo. A causa continua **não provada**, nenhuma correção é proposta e nenhuma medida nova foi inventada.
+
+**Regra fixada antes de medir:**
+- a causa só conta como provada se:
+  - M1 tiver recusas;
+  - M2 tiver zero;
+  - A continuar com recusas;
+  - C tiver zero recusas;
+  - e houver execuções suficientes para a comparação fazer sentido;
+- qualquer recusa em C ou em M2 quer dizer que a hipótese não explica tudo;
+- se a regra não fechar, nenhuma medida nova é inventada.
+
+### 7.1 Como foi medido
+
+Ramo `diag/trava-linux`, commit `1e97bc7`, execução `41876124751`, com os dois jobs no mesmo envio.
+
+- **Reprodução mínima (`poc/diag-trava-repro`).** É um programa separado, sem código do Bivar e sem dependências.
+  - Uma linha de execução abre um arquivo para leitura e escrita, pede a mesma trava do protótipo (`File::try_lock`), fecha o arquivo e o abre de novo, contando as recusas.
+  - Em M1, outras 4 linhas de execução lançam `/bin/true` sem parar, do mesmo jeito que o protótipo lança o verificador (entrada vazia, saídas por tubo).
+  - Em M2, não há lançamentos.
+  - Cada uma roda 5 minutos.
+- **Intervenção (`copias`, compilado uma vez).** Execuções alternadas, uma de A, uma de C, até 500 de cada ou 30 minutos, sem parar antes por falha.
+  - **A:** sem mudanças, como controle.
+  - **C:** os mesmos testes e o mesmo paralelismo, com `BIVAR_DIAG_SERIALIZE=1`. Essa variável liga uma trava global, só de diagnóstico e dentro do processo de testes, que fica presa durante o `spawn()` do verificador e durante o `try_lock` de um arquivo. Assim, as duas coisas nunca acontecem ao mesmo tempo.
+  - Sem a variável, nada fica preso, então A roda o mesmo código de antes.
+
+### 7.2 Resultados
+
+**Reprodução mínima:**
+
+| Medida | Tempo | Tentativas de travar | Recusas | Lançamentos |
+|---|---|---|---|---|
+| M1, com lançamentos | 300 s | 145.354.573 | **44.933.426 (30,9%)** | 1.886.561 |
+| M2, sem lançamentos | 300 s | 242.501.000 | **0** | 0 |
+
+**Intervenção:**
+
+| Configuração | Execuções | Falhas | Recusas | Execuções com recusa | Tempo somado das execuções | Lista de testes |
+|---|---|---|---|---|---|---|
+| A, controle | 500 | **87** | **318** | 267 | 53 s | os 5 testes, igual nas 500 |
+| C, com a trava global | 500 | **44** | **175** | 156 | 52 s | os 5 testes, igual nas 500 |
+
+- **A lista de testes foi conferida em cada execução** e é a mesma nas 1.000:
+  - `a_file_copied_to_another_computer_gets_a_new_name`;
+  - `a_file_duplicated_on_this_computer_gets_a_new_name`;
+  - `a_file_in_a_synced_folder_gets_a_name_per_computer`;
+  - `an_old_backup_restored_in_place_gets_a_new_name`;
+  - `two_sessions_with_the_same_name_still_lose_nothing`.
+- **As 1.000 execuções levaram 114 s** e chegaram às 500 de cada antes dos 30 minutos.
+
+### 7.3 Aplicação da regra
+
+| Condição | Esperado | Medido | Cumpriu? |
+|---|---|---|---|
+| M1 tem recusas | > 0 | 44.933.426 | sim |
+| M2 tem zero | 0 | 0 | sim |
+| A continua com recusas | > 0 | 318 | sim |
+| C tem zero recusas | 0 | **175** | **não** |
+| Execuções suficientes | — | 500 + 500, e M1/M2 com mais de 100 milhões de tentativas cada | sim |
+
+**A regra não fechou.**
+
+### 7.4 Provado
+
+1. **No Linux, lançar processos enquanto outra linha de execução fecha e reabre um arquivo travado faz a trava ser recusada, sem nenhum código do Bivar.** Isso aconteceu em 31% das tentativas em M1, e nunca em mais de 242 milhões de tentativas sem lançamentos (M2).
+2. **A trava global de C reduz as recusas e as falhas na suíte,** mas não acaba com elas: de 318 para 175 recusas e de 87 para 44 falhas, nas mesmas 500 execuções e com os mesmos testes.
+3. **Portanto, impedir que o lançamento do verificador e o pedido da trava aconteçam ao mesmo tempo não basta.** Na suíte, parte das recusas tem outra origem, ou acontece fora do intervalo que a trava global de C cobre.
+
+### 7.5 Hipótese (não provada)
+
+- **O que segura a trava nas 175 recusas de C** não foi identificado. Também não está provado se é o mesmo mecanismo de M1 fora do intervalo coberto, ou outra coisa.
+- **As 3 recusas sem verificador em andamento** da primeira medida (seção 3.4) **continuam sem explicação.** As 175 recusas de C mostram que há recusas que a hipótese, como foi descrita, não cobre. Essas 3 podem ser do mesmo grupo, mas isso não foi verificado.
+
+### 7.6 Contagem correta de recusas por teste (primeira medida, configuração A)
+
+- **58** é o total de recusas, em **48** execuções.
+- **10** dessas recusas estão nas 10 execuções que falharam, uma em cada. Foi sempre a 2ª abertura do arquivo do backup, logo antes de um `save`.
+- **As outras 48 recusas** estão nas outras **38** execuções, que passaram.
+- **O número 48 aparece duas vezes por coincidência:** 48 execuções com recusa e 48 recusas sem falha.
+
+| Teste que recebeu a recusa | Com falha | Sem falha | Total |
+|---|---|---|---|
+| `an_old_backup_restored_in_place_gets_a_new_name` | 10 (2ª abertura) | 10 (3ª abertura) | 20 |
+| `a_file_duplicated_on_this_computer_gets_a_new_name` | 0 | 16 | 16 |
+| `a_file_copied_to_another_computer_gets_a_new_name` | 0 | 14 | 14 |
+| `a_file_in_a_synced_folder_gets_a_name_per_computer` | 0 | 6 | 6 |
+| `two_sessions_with_the_same_name_still_lose_nothing` | 0 | 2 | 2 |
+| **Total** | **10** | **48** | **58** |
+
+### 7.7 Testes que precisam passar a conferir que o arquivo abriu para escrita
+
+Nenhum foi alterado agora. Todos estão em `poc/crdt-armazenamento/prototipo/verificador/tests/copias.rs`.
+
+- **Os 5 testes do arquivo, em cada abertura:**
+
+  | Teste | Aberturas que precisam conferir |
+  |---|---|
+  | `a_file_copied_to_another_computer_gets_a_new_name` | `p1` e `p2` |
+  | `a_file_duplicated_on_this_computer_gets_a_new_name` | `p` e `dup` |
+  | `an_old_backup_restored_in_place_gets_a_new_name` | a abertura antes do `save`, que hoje só falha no `save`, e a do backup restaurado, que hoje passa sem perceber |
+  | `a_file_in_a_synced_folder_gets_a_name_per_computer` | `p1`, `p2` e a reabertura de `p1` |
+  | `two_sessions_with_the_same_name_still_lose_nothing` | `p1` e `p2`, e a abertura direta com `DocFile::open` |
+
+- **A criação, em `original()`, usada pelos 5 testes:** `DocFile::create` não informa se o arquivo ficou aberto para escrita.
+- **Não foi verificado** se os testes de outros arquivos (`disco.rs`, `copia.rs`, `entrada.rs`) também abrem arquivos sem conferir isso. Neste diagnóstico, só o `copias` rodou em laço.
+
+### 7.8 Observações que não fazem parte da regra
+
+- **No Windows,** o executável do verificador compilado com a trava global de C foi recusado pelo sistema ao ser lançado: "Acesso negado", inclusive rodando direto pelo terminal. A versão anterior rodava normalmente. Isso parece uma política de segurança do Windows contra executáveis novos sem reputação, e não o código, mas não foi investigado. A medida rodou no Linux da CI, onde o código compilou e rodou.
+- **O Fuzz do ramo falhou** em `1e97bc7`, no alvo `bivar_records`, no passo "Fuzz bivar_records" (execução `41876124671`). O GitHub guardou uma entrada que causou o erro (artefato `fuzz-artifacts-bivar_records`, 569 bytes).
+  - O registro e o artefato exigem login e não foram lidos.
+  - O Fuzz passou no `main` em `343e453` e em `f420b9d`, e no ramo em `a1d47df`.
+  - Não se sabe se a falha vem do código de diagnóstico do ramo ou se é um achado real do sorteio do fuzzing.
+
+## 8. CI e Fuzz (atualizado)
+
+| Commit | CI | `cargo deny` e `cargo audit` das provas | Fuzz |
+|---|---|---|---|
+| `343e453` (`main`, relatório) | passou | rodaram e passaram | passou |
+| `f420b9d` (`main`, a CI roda deny e audit mesmo depois de falha) | falhou em `poc-crdt`, no passo "Prototype tests" (código 101; o teste não foi identificado, porque o registro exige login) | **rodaram e passaram depois da falha** | passou |
+| `1e97bc7` (ramo `diag/trava-linux`) | passou | rodaram e passaram | **falhou em `bivar_records`** (veja 7.8) |
+
+O ramo `diag/trava-linux` continua no GitHub, sem ser apagado nem juntado ao `main`.
