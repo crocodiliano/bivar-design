@@ -1,0 +1,61 @@
+# Temporary diagnosis of the CI failure of 2026-11-03 (run 41693430250,
+# dd7d0af): an_old_backup_restored_in_place_gets_a_new_name saved to a file
+# that had opened read-only. Lives only on the branch diag/trava-linux,
+# which is never merged into main (owner, 2026-11-04).
+#
+# The test suite that holds the test (copias) is compiled once and run in
+# a loop: A in parallel (as CI runs it) for 30 minutes, stopping at 10
+# failures; B with --test-threads=1 for 30 minutes. With
+# BIVAR_DIAG_LOCK_LOG set, the program writes every opening for writing,
+# close, verifier launch and refused lock, and on a refused lock, the
+# /proc/locks lines and every process holding the file. Runs that failed
+# or saw a refused lock keep their logs; everything goes into an artifact.
+name: Diag lock (temporary)
+
+on:
+  push:
+    branches: [diag/trava-linux]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  copias-loop:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install toolchain from rust-toolchain.toml
+        run: rustup show
+
+      - name: Build the copias suite once
+        run: |
+          set -o pipefail
+          BIN=$(cargo test --locked --release \
+            --manifest-path poc/crdt-armazenamento/prototipo/Cargo.toml \
+            -p bivar-poc-verificador --test copias --no-run --message-format=json \
+            | jq -r 'select(.reason=="compiler-artifact" and .target.name=="copias" and .profile.test==true) | .executable')
+          test -x "$BIN"
+          echo "BIN=$BIN" >> "$GITHUB_ENV"
+          mkdir -p diag/A diag/B
+
+      - name: Loop A, in parallel, 30 minutes or 10 failures
+        run: bash .github/workflows/diag-trava-loop.sh A 10
+
+      - name: Loop B, --test-threads=1, 30 minutes
+        if: always()
+        run: bash .github/workflows/diag-trava-loop.sh B 0 --test-threads=1
+
+      - name: Report as annotations
+        if: always()
+        run: bash .github/workflows/diag-trava-report.sh
+
+      - name: Keep the logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: diag-trava-logs
+          path: diag/
+          retention-days: 30

@@ -211,7 +211,8 @@ fn run_verifier(
     if v.test_peak {
         cmd.env("BIVAR_VERIFIER_PEAK", "1");
     }
-    let mut child = cmd
+    bivar_poc_arquivo::diag::log(&format!("SPAWN-START path={}", path.display()));
+    let spawned = cmd
         .arg(path)
         .arg(v.memory.to_string())
         .arg(limits.doc_record.to_string())
@@ -224,8 +225,11 @@ fn run_verifier(
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| CheckError::File(FileError::Io(e)))?;
+        .spawn();
+    if let Ok(c) = &spawned {
+        bivar_poc_arquivo::diag::log(&format!("SPAWN-END child={}", c.id()));
+    }
+    let mut child = spawned.map_err(|e| CheckError::File(FileError::Io(e)))?;
     // Both outputs are read while the verifier runs: a verifier that writes
     // more than a pipe holds would otherwise wait for a reader forever and
     // be refused as too slow (audit 2026-10-31, suspicion; tested).

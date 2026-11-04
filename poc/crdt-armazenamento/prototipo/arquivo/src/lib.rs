@@ -1127,8 +1127,16 @@ impl DocFile {
         let (mut file, mut writable) = match access {
             Access::ReadOnly => (open_reader(path)?, false),
             Access::Write => match open_writer(path) {
-                Ok(f) => (f, true),
+                Ok(f) => {
+                    diag::log(&format!("OPEN-WRITE path={}", path.display()));
+                    (f, true)
+                }
                 Err(e) if e.kind() == io::ErrorKind::NotFound => return Err(e.into()),
+                Err(e) if held_by_another(&e) && diag::enabled() => {
+                    diag::lock_refused(path);
+                    busy = Some("the file is already open for writing elsewhere".to_owned());
+                    (open_reader(path)?, false)
+                }
                 // Read-only, with the real reason (M13): "already open
                 // elsewhere" only when another program holds it; any other
                 // refusal (a read-only folder, for example) says what it is.
@@ -1738,5 +1746,145 @@ mod tests {
         assert_eq!(std::fs::read(&dest).unwrap(), b"the copy");
         assert!(!partial.exists());
         std::fs::remove_file(&dest).unwrap();
+    }
+}
+
+/// Temporary diagnosis of the CI failure of 2026-11-03 (branch
+/// diag/trava-linux, never merged): with `BIVAR_DIAG_LOCK_LOG` set to a
+/// file, every opening for writing, every close and every refused lock is
+/// written there; on Linux a refused lock also records the /proc/locks
+/// lines of the file and every process holding it, with its parent and
+/// command. Without the variable, nothing is written.
+pub mod diag {
+    use std::io::Write;
+    use std::path::Path;
+
+    fn now_ns() -> u128 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0)
+    }
+
+    pub fn enabled() -> bool {
+        std::env::var_os("BIVAR_DIAG_LOCK_LOG").is_some()
+    }
+
+    /// One line with the time, the process, the thread (the test's name)
+    /// and the text.
+    pub fn log(text: &str) {
+        let Some(file) = std::env::var_os("BIVAR_DIAG_LOCK_LOG") else {
+            return;
+        };
+        let thread = std::thread::current();
+        let line = format!(
+            "{} pid={} thread={} {}\n",
+            now_ns(),
+            std::process::id(),
+            thread.name().unwrap_or("?"),
+            text
+        );
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(file)
+        {
+            let _ = f.write_all(line.as_bytes());
+        }
+    }
+
+    /// Everything Linux says about who holds `path`, read twice: right
+    /// after the refusal and 50 ms later.
+    pub fn lock_refused(path: &Path) {
+        if !enabled() {
+            return;
+        }
+        log(&format!("LOCKFAIL path={}", path.display()));
+        #[cfg(target_os = "linux")]
+        for round in ["now", "after-50ms"] {
+            if round == "after-50ms" {
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            for line in holders(path) {
+                log(&format!("LOCKFAIL {round} {line}"));
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    fn holders(path: &Path) -> Vec<String> {
+        use std::os::unix::fs::MetadataExt;
+        let mut out = Vec::new();
+        let Ok(meta) = std::fs::metadata(path) else {
+            out.push("file gone".into());
+            return out;
+        };
+        let ino = meta.ino();
+        out.push(format!("dev={} ino={ino}", meta.dev()));
+        let needle = format!(":{ino} ");
+        match std::fs::read_to_string("/proc/locks") {
+            Ok(locks) => {
+                for l in locks.lines().filter(|l| l.contains(&needle)) {
+                    out.push(format!("proc_locks: {l}"));
+                }
+            }
+            Err(e) => out.push(format!("proc_locks unreadable: {e}")),
+        }
+        let me = std::process::id();
+        let Ok(procs) = std::fs::read_dir("/proc") else {
+            return out;
+        };
+        for p in procs.flatten() {
+            let name = p.file_name().to_string_lossy().into_owned();
+            if !name.bytes().all(|b| b.is_ascii_digit()) {
+                continue;
+            }
+            let Ok(fds) = std::fs::read_dir(p.path().join("fd")) else {
+                continue;
+            };
+            for fd in fds.flatten() {
+                let same = std::fs::metadata(fd.path())
+                    .map(|m| m.ino() == ino && m.dev() == meta.dev())
+                    .unwrap_or(false);
+                if !same {
+                    continue;
+                }
+                let fdname = fd.file_name().to_string_lossy().into_owned();
+                let status = std::fs::read_to_string(p.path().join("status")).unwrap_or_default();
+                let field = |k: &str| {
+                    status
+                        .lines()
+                        .find_map(|l| l.strip_prefix(k))
+                        .map(|v| v.trim().to_owned())
+                        .unwrap_or_default()
+                };
+                let cmd = std::fs::read(p.path().join("cmdline"))
+                    .map(|b| String::from_utf8_lossy(&b).replace('\0', " "))
+                    .unwrap_or_default();
+                let fdinfo = std::fs::read_to_string(p.path().join("fdinfo").join(fdname.as_str()))
+                    .unwrap_or_default();
+                let lock = fdinfo
+                    .lines()
+                    .filter(|l| l.starts_with("lock:"))
+                    .collect::<Vec<_>>()
+                    .join(" | ");
+                out.push(format!(
+                    "holder pid={name} self={} ppid={} name={} fd={fdname} lock=[{lock}] cmdline={}",
+                    name == me.to_string(),
+                    field("PPid:"),
+                    field("Name:"),
+                    cmd.trim()
+                ));
+            }
+        }
+        out
+    }
+}
+
+impl Drop for DocFile {
+    fn drop(&mut self) {
+        if diag::enabled() && self.writable {
+            diag::log(&format!("CLOSE path={}", self.path.display()));
+        }
     }
 }
