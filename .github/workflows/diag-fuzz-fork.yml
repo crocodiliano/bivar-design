@@ -1,0 +1,113 @@
+name: Diag fuzz fork (temporary)
+
+# TEMPORARY (branch diag/fuzz-fork, never merged; owner, 2026-11-04).
+# - probe: fork mode with the real input (must be ignored and counted) and
+#   with artificial failures (each must turn the job red);
+# - real-30min: the bivar_records target in fork mode for the 30 minutes of
+#   the daily run;
+# - measure: the largest single memory request of the verifier.
+
+on:
+  push:
+    branches: [diag/fuzz-fork]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        case: [oom-real, panic, abort, stack-overflow, timeout]
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install the pinned nightly toolchain (fuzz/ only)
+        working-directory: fuzz
+        run: rustup show
+      - name: Install cargo-fuzz
+        working-directory: fuzz
+        run: cargo install --locked cargo-fuzz --version 0.13.2
+      - name: Build the probe target
+        working-directory: fuzz
+        run: cargo fuzz build diag_probe
+      - name: Fork mode, case ${{ matrix.case }}
+        working-directory: fuzz
+        env:
+          DIAG_PROBE: ${{ matrix.case }}
+        run: bash ../.github/workflows/diag-fuzz-fork.sh diag_probe 300 corpus/bivar_records
+      - name: Keep the log and the inputs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: diag-probe-${{ matrix.case }}
+          path: |
+            fuzz/diag-out/
+            fuzz/artifacts/
+          retention-days: 30
+
+  real-30min:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install the pinned nightly toolchain (fuzz/ only)
+        working-directory: fuzz
+        run: rustup show
+      - name: Install cargo-fuzz
+        working-directory: fuzz
+        run: cargo install --locked cargo-fuzz --version 0.13.2
+      # Read only: this branch never saves a corpus.
+      - name: Restore the corpus found by earlier runs
+        uses: actions/cache/restore@v4
+        with:
+          path: fuzz/found/bivar_records
+          key: fuzz-found-bivar_records-${{ github.run_id }}
+          restore-keys: fuzz-found-bivar_records-
+      - name: Build the target
+        working-directory: fuzz
+        run: cargo fuzz build bivar_records
+      - name: Fork mode, bivar_records, 1800 s
+        working-directory: fuzz
+        run: |
+          mkdir -p found/bivar_records
+          bash ../.github/workflows/diag-fuzz-fork.sh bivar_records 1800 found/bivar_records corpus/bivar_records
+      - name: Keep the log and the inputs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: diag-real-30min
+          path: |
+            fuzz/diag-out/
+            fuzz/artifacts/
+          retention-days: 30
+
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install toolchain from rust-toolchain.toml
+        run: rustup show
+      - name: Install strace
+        run: sudo apt-get update && sudo apt-get install -y strace && strace -V | head -1
+      - name: Largest single request
+        run: |
+          mkdir -p diag-out
+          cargo test --locked --release --manifest-path poc/crdt-armazenamento/prototipo/Cargo.toml \
+            -p bivar-poc-verificador --test diag_medida -- --ignored --nocapture --test-threads=1 \
+            2>&1 | tee diag-out/measure.txt
+          rc=${PIPESTATUS[0]}
+          # Readable without logging in: the results as annotations, a few
+          # lines per annotation (at most 10 annotations per step).
+          grep '^RESULT' diag-out/measure.txt | sed 's/^RESULT //' \
+            | awk 'BEGIN{n=0; s=""} {if (length(s)+length($0) > 3800) {print "::notice title=measure " n "::" s; n++; s=""} s = s $0 " || "} END{if (s != "") print "::notice title=measure " n "::" s}'
+          test "$rc" -eq 0
+      - name: Keep the results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: diag-measure
+          path: diag-out/
+          retention-days: 30

@@ -37,5 +37,13 @@ test = false
 doc = false
 bench = false
 
+# TEMPORARY (branch diag/fuzz-fork, never merged).
+[[bin]]
+name = "diag_probe"
+path = "fuzz_targets/diag_probe.rs"
+test = false
+doc = false
+bench = false
+
 [profile.release]
 debug = 1
