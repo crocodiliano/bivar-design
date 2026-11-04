@@ -4,6 +4,8 @@
 //! do share a name, the merge still finds their writes and loses neither.
 //! Each case runs as is and after a compaction.
 
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use bivar_poc_arquivo::{DocFile, Limits, TrustStore};
@@ -36,8 +38,14 @@ fn trust(name: &str) -> TrustStore {
     TrustStore::new(p)
 }
 
+thread_local! {
+    /// Why each file opened by `open` in this test was read-only, if it
+    /// was: a failed save shows it (CI failure of 2026-11-03, dd7d0af).
+    static READ_ONLY: RefCell<HashMap<PathBuf, Option<String>>> = RefCell::new(HashMap::new());
+}
+
 fn open(path: &Path, t: &TrustStore, peer: u64) -> (DocFile, S, How) {
-    let (f, s, _, how) = open_checked::<S>(
+    let (f, s, report, how) = open_checked::<S>(
         path,
         peer,
         t,
@@ -46,12 +54,27 @@ fn open(path: &Path, t: &TrustStore, peer: u64) -> (DocFile, S, How) {
         &VerifyLimits::default(),
     )
     .unwrap();
+    READ_ONLY.with(|r| r.borrow_mut().insert(path.to_owned(), report.read_only));
     (f, s, how)
 }
 
 /// Saves and notes the file as this computer's, with the session's name.
+/// A failed save says whether the file was open for writing and, if not,
+/// why it opened read-only.
 fn save(f: &mut DocFile, s: &mut S, path: &Path, t: &TrustStore) {
-    f.save(s, "pc").unwrap();
+    if let Err(e) = f.save(s, "pc") {
+        let why = READ_ONLY.with(|r| r.borrow().get(path).cloned());
+        let why = match why {
+            Some(Some(reason)) => format!("opened read-only: {reason}"),
+            Some(None) => "opened for writing, no read-only reason".to_owned(),
+            None => "opened by DocFile::create, which does not report a reason".to_owned(),
+        };
+        panic!(
+            "saving {} failed: {e:?}; writable: {}; {why}",
+            path.display(),
+            f.is_writable()
+        );
+    }
     t.remember(path, &f.fingerprint(), s.copy_name()).unwrap();
 }
 
