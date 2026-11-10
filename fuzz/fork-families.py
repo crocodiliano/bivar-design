@@ -44,7 +44,7 @@ def short_path(path):
         (r"registry/src/[^/]+/(.+)$", ""),
         (r"/library/(.+)$", "rust/"),
         (r"/checkouts/[^/]+/[^/]+/(.+)$", ""),
-        (r"bivar-design/(.+)$", ""),
+        (r".*/bivar-design/(.+)$", ""),
     ):
         m = re.search(pattern, path)
         if m:
