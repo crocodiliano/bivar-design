@@ -1,0 +1,63 @@
+name: Diag fuzz census (temporary)
+
+# TEMPORARY (branch diag/fuzz-censo, never merged; owner, 2026-11-10).
+# Census: bivar_records in fork mode for 1800 s, with the 1.6 TiB input
+# among the seeds, ignoring crashes, out-of-memory and timeouts (this run
+# only), then every saved input is replayed and grouped by its stack. One
+# input per family is kept; the rest are discarded.
+
+on:
+  push:
+    branches: [diag/fuzz-censo]
+
+permissions:
+  contents: read
+
+jobs:
+  census:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install the pinned nightly toolchain (fuzz/ only)
+        working-directory: fuzz
+        run: rustup show
+      - name: Install cargo-fuzz
+        working-directory: fuzz
+        run: cargo install --locked cargo-fuzz --version 0.13.2
+      # Read only: this branch never saves a corpus.
+      - name: Restore the corpus found by earlier runs
+        uses: actions/cache/restore@v4
+        with:
+          path: fuzz/found/bivar_records
+          key: fuzz-found-bivar_records-${{ github.run_id }}
+          restore-keys: fuzz-found-bivar_records-
+      - name: Build the target
+        working-directory: fuzz
+        run: cargo fuzz build bivar_records
+      - name: Census, fork mode, 1800 s
+        working-directory: fuzz
+        run: bash ../.github/workflows/diag-fuzz-censo.sh 1800
+      - name: Replay and group by stack
+        if: always()
+        working-directory: fuzz
+        run: python3 ../.github/workflows/diag-fuzz-censo.py
+      - name: Annotations, summary and families
+        if: always()
+        working-directory: fuzz
+        run: cat census-out/ann-0.txt 2>/dev/null || true
+      - name: Annotations, inputs 1
+        if: always()
+        working-directory: fuzz
+        run: cat census-out/ann-1.txt 2>/dev/null || true
+      - name: Annotations, inputs 2
+        if: always()
+        working-directory: fuzz
+        run: cat census-out/ann-2.txt 2>/dev/null || true
+      - name: Keep the census (one input per family)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: diag-census
+          path: fuzz/census-out/
+          retention-days: 30

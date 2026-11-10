@@ -41,6 +41,14 @@ pub fn install() {
         {
             let _ = writeln!(f, "allocation_failed bytes={}", layout.size());
         }
+        // Census replay only (branch diag/fuzz-censo): the stack that asked,
+        // so the inputs can be grouped by family.
+        if std::env::var_os("BIVAR_FUZZ_OOM_BT").is_some() {
+            eprintln!(
+                "BIVAR-FUZZ-BACKTRACE-BEGIN\n{}\nBIVAR-FUZZ-BACKTRACE-END",
+                std::backtrace::Backtrace::force_capture()
+            );
+        }
         let tripwire: Vec<u8> = Vec::with_capacity(TRIPWIRE);
         std::hint::black_box(&tripwire);
     });
