@@ -116,8 +116,14 @@ jobs:
           cargo fmt --manifest-path poc/crdt-armazenamento/prototipo/Cargo.toml --all --check
           cargo clippy --locked --release --manifest-path poc/crdt-armazenamento/prototipo/Cargo.toml --all-targets -- -D warnings
 
+      # One test at a time (owner, 2026-11-10). On Linux, closing and
+      # reopening a locked file while another test spawns the verifier can
+      # make the lock refused with no other session holding the file; the
+      # cause was not proved to be the only one, and in series it never
+      # happened (0 refusals in 7,471 runs). See
+      # docs/auditoria/2026-11-04-falha-ci-trava.md and ADR-0023, section 3.
       - name: Prototype tests (model, Loro store, chain)
-        run: cargo test --locked --release --manifest-path poc/crdt-armazenamento/prototipo/Cargo.toml
+        run: cargo test --locked --release --manifest-path poc/crdt-armazenamento/prototipo/Cargo.toml -- --test-threads=1
 
       - name: Comparison proof tests (Loro x Automerge)
         run: cargo test --locked --release --manifest-path poc/crdt-armazenamento/Cargo.toml

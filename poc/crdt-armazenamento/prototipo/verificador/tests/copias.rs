@@ -54,6 +54,15 @@ fn open(path: &Path, t: &TrustStore, peer: u64) -> (DocFile, S, How) {
         &VerifyLimits::default(),
     )
     .unwrap();
+    // The effect, not only the outcome: each of these files is open in no
+    // other session, so it must open for writing (audit 2026-11-04,
+    // falha-ci-trava, 7.7: these tests passed read-only without noticing).
+    assert!(
+        f.is_writable(),
+        "{} opened read-only with no other session: {:?}",
+        path.display(),
+        report.read_only
+    );
     READ_ONLY.with(|r| r.borrow_mut().insert(path.to_owned(), report.read_only));
     (f, s, how)
 }
@@ -104,6 +113,7 @@ fn original(tag: &str, t1: &TrustStore) -> (PathBuf, NodeId) {
         .unwrap();
     s.commit();
     let mut f = DocFile::create(&path, &mut s).unwrap();
+    assert!(f.is_writable(), "{} created read-only", path.display());
     save(&mut f, &mut s, &path, t1);
     (path, n)
 }
@@ -240,7 +250,15 @@ fn the_same_name_on_two_sessions(compact: bool) {
     let (p1, n) = original(&tag, &t1);
     let p2 = fresh(&format!("{tag}-clone"));
     std::fs::copy(&p1, &p2).unwrap();
-    let fp = DocFile::open::<S>(&p2, 99).unwrap().0.fingerprint();
+    let (clone, _, report) = DocFile::open::<S>(&p2, 99).unwrap();
+    assert!(
+        clone.is_writable(),
+        "{} opened read-only with no other session: {:?}",
+        p2.display(),
+        report.read_only
+    );
+    let fp = clone.fingerprint();
+    drop(clone);
     t2.remember(&p2, &fp, 0xc0de_0001).unwrap();
     let (_f1, mut a, how1) = open(&p1, &t1, 11);
     let (_f2, mut b, how2) = open(&p2, &t2, 12);
