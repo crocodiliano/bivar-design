@@ -1,8 +1,16 @@
 name: Fuzz
 
 # Fuzzing of every external-input reader (ADR-0011, ADR-0024). Each target
-# runs 2 minutes on every push and 30 minutes once a day. The nightly
-# toolchain is pinned in fuzz/rust-toolchain.toml and used only here.
+# runs about 2 minutes on every push and about 30 minutes once a day, in
+# libFuzzer's fork mode (fuzz/run-fork.sh). The nightly toolchain is pinned
+# in fuzz/rust-toolchain.toml and used only here.
+#
+# Fork mode (owner, 2026-11-10; audit report 2026-11-04, section 12):
+# - only out-of-memory is ignored (-ignore_ooms=1): it is the verifier's
+#   refusal family, and the program survives it. Each one is counted in the
+#   log, and one input per family is kept;
+# - a panic, any other crash, or a timeout stops the run and turns the job
+#   red, with one input per family kept.
 
 on:
   push:
@@ -16,6 +24,9 @@ permissions:
 jobs:
   fuzz:
     runs-on: ubuntu-24.04
+    # Setup takes about 4 minutes; the fuzzing itself at most 1500 s plus
+    # 300 s for the last children (run-fork.sh); grouping at most 150 s.
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
@@ -47,23 +58,30 @@ jobs:
           key: fuzz-found-${{ matrix.target }}-${{ github.run_id }}
           restore-keys: fuzz-found-${{ matrix.target }}-
 
-      # -max_len: without it libFuzzer keeps inputs no longer than the
-      # largest seed (about 6.6 KB) and never reaches large records (M5).
-      - name: Fuzz ${{ matrix.target }}
+      - name: Build ${{ matrix.target }}
+        working-directory: fuzz
+        run: cargo fuzz build ${{ matrix.target }}
+
+      # The seconds asked are the budget minus the 300 s a child can still
+      # run after the time ends: 1500 s once a day (at most 1800 s in all).
+      # On a push, 120 s: children started in 2 minutes run for at most
+      # about 20 s each.
+      - name: Fuzz ${{ matrix.target }} (fork mode)
         working-directory: fuzz
         env:
-          SECONDS_TO_RUN: ${{ github.event_name == 'schedule' && '1800' || '120' }}
-        run: |
-          mkdir -p found/${{ matrix.target }}
-          cargo fuzz run ${{ matrix.target }} found/${{ matrix.target }} corpus/${{ matrix.target }} -- \
-            -max_total_time=$SECONDS_TO_RUN -rss_limit_mb=4096 -timeout=60 -max_len=1048576
+          SECONDS_TO_RUN: ${{ github.event_name == 'schedule' && '1500' || '120' }}
+        run: bash run-fork.sh ${{ matrix.target }} "$SECONDS_TO_RUN"
 
-      # A crash leaves its input in fuzz/artifacts; keep it so it can become
-      # a file in fuzz/regressions (replayed by the normal tests).
-      - name: Keep crashing inputs
-        if: failure()
+      # One input per family (crash, timeout or out-of-memory), with the text
+      # of its run; a crash input can become a file in fuzz/regressions, or
+      # in fuzz/verifier-refused while the document library still falls.
+      - name: Keep one input per family
+        if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: fuzz-artifacts-${{ matrix.target }}
-          path: fuzz/artifacts/
+          name: fuzz-families-${{ matrix.target }}
+          path: |
+            fuzz/kept/
+            fuzz/fork-out/fuzz.log
+          if-no-files-found: ignore
           retention-days: 30

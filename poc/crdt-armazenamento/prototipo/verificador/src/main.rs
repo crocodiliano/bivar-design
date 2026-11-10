@@ -8,7 +8,10 @@
 //! record, document total, records, large-file index, all large-file
 //! indexes, depth, pieces. A tree deeper than the depth limit is answered
 //! `TOO_DEEP <depth>`: our own message, not the text of a crash (audit
-//! 2026-10-31, M3).
+//! 2026-10-31, M3). A reader that panics on the file's contents is answered
+//! `DAMAGED <where and why>`, also our own message: the program then says
+//! the file is damaged, and never shows the text of the panic (audit report
+//! 2026-11-04, section 12).
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -28,7 +31,23 @@ fn arg(args: &[String], i: usize) -> u64 {
     })
 }
 
+/// A panic in a reader ends the verifier at once with its own answer. The
+/// document library can panic on contents whose checksums are right, and
+/// its document then panics again when dropped, which aborts the process
+/// with no useful text: stopping at the first panic avoids both.
+fn answer_a_panic_with_damaged() {
+    std::panic::set_hook(Box::new(|info| {
+        // The answer must not fail for lack of memory under the cap.
+        let _ = ALLOC.set_limit(usize::MAX);
+        let detail = info.to_string().replace(['\r', '\n'], " ");
+        eprintln!("verifier: a reader panicked: {detail}");
+        println!("DAMAGED {detail}");
+        std::process::exit(5);
+    }));
+}
+
 fn main() {
+    answer_a_panic_with_damaged();
     let args: Vec<String> = std::env::args().collect();
     let path = PathBuf::from(args.get(1).cloned().unwrap_or_default());
     let memory = arg(&args, 2);

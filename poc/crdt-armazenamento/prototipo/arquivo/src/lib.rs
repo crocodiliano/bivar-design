@@ -390,6 +390,8 @@ struct Scan {
     torn: bool,
     report: OpenReport,
     fp: Sha256,
+    /// Bytes of all snapshot and updates records (the document data).
+    doc_bytes: u64,
 }
 
 /// Reads every record. With `keep` false, document data is checked and
@@ -415,6 +417,7 @@ fn scan<R: Read + Seek>(
         torn: false,
         report: OpenReport::default(),
         fp: Sha256::new(),
+        doc_bytes: 0,
     };
     s.fp.update(head);
     let (mut records, mut doc_bytes, mut index_bytes, mut pieces) = (0u64, 0u64, 0u64, 0u64);
@@ -566,6 +569,7 @@ fn scan<R: Read + Seek>(
     if s.snapshot.is_none() {
         return Err(FileError::Unreadable("no document snapshot".into()));
     }
+    s.doc_bytes = doc_bytes;
     Ok(s)
 }
 
@@ -579,9 +583,17 @@ fn build_store<S: Store>(s: &mut Scan, peer: u64) -> Result<S, FileError> {
 /// The fingerprint of a file: SHA-256 of its header and of every record's
 /// kind, length and digest. Computed without reading the document library.
 pub fn fingerprint_file(path: &Path, limits: &Limits) -> Result<[u8; 32], FileError> {
+    file_summary(path, limits).map(|(fingerprint, _)| fingerprint)
+}
+
+/// The fingerprint of a file and the size of its document data: the bytes
+/// of all its snapshot and updates records together (large files do not
+/// count). Computed without reading the document library.
+pub fn file_summary(path: &Path, limits: &Limits) -> Result<([u8; 32], u64), FileError> {
     let mut f = open_reader(path)?;
     let len = f.metadata()?.len();
-    Ok(scan(&mut f, len, limits, false)?.fp.finalize().into())
+    let s = scan(&mut f, len, limits, false)?;
+    Ok((s.fp.finalize().into(), s.doc_bytes))
 }
 
 /// Reads a whole file held in memory, the way opening would, without

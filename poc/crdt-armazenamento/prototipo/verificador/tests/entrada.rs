@@ -959,3 +959,84 @@ fn a_legitimate_document_above_the_memory_limit_opens_once_the_limit_is_raised()
     };
     assert!(default.message().contains("limit of 4 GiB"));
 }
+
+/// The inputs of `fuzz/verifier-refused/`: found by fuzzing, they still end
+/// the process of the document library, so they cannot be replayed in the
+/// test process like `fuzz/regressions/`. Each one, opened as a file from
+/// outside, must be refused with the refusal its list names, with a message
+/// that fits the cause, and the program must survive (audit report
+/// 2026-11-04, section 12).
+#[test]
+fn inputs_the_verifier_must_refuse_are_refused_and_the_program_survives() {
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../../fuzz/verifier-refused");
+    let list = std::fs::read_to_string(dir.join("bivar_records.txt")).unwrap();
+    let expected: Vec<Vec<&str>> = list
+        .lines()
+        .filter(|l| !l.trim().is_empty() && !l.starts_with('#'))
+        .map(|l| l.split_whitespace().take(3).collect())
+        .collect();
+    // The list and the folder name the same files.
+    let mut listed: Vec<String> = expected.iter().map(|e| e[0].to_owned()).collect();
+    let mut found: Vec<String> = std::fs::read_dir(dir.join("bivar_records"))
+        .unwrap()
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .collect();
+    listed.sort();
+    found.sort();
+    assert_eq!(listed, found, "the list and the folder differ");
+    assert!(
+        expected.iter().any(|e| e[1] == "absurd-request")
+            && expected.iter().any(|e| e[1] == "damaged"),
+        "both kinds of refusal must be covered"
+    );
+    let limit = VerifyLimits::default().memory;
+    for e in &expected {
+        let (name, kind, asked_text) = (e[0], e[1], e[2]);
+        let data = std::fs::read(dir.join("bivar_records").join(name)).unwrap();
+        let path = fresh(&format!("refused-{name}"));
+        std::fs::write(&path, bivar_poc_verificador::fuzz_records_file(&data)).unwrap();
+        let t = trust(&format!("refused-{name}"));
+        let why = refusal(open(&path, &t));
+        let text = why.message();
+        println!("{name}: {why:?}\n  {text}");
+        match kind {
+            "absurd-request" => {
+                let Refusal::AbsurdRequest {
+                    asked,
+                    doc_bytes,
+                    limit: named,
+                } = why
+                else {
+                    panic!("{name}: expected an absurd request, got {why:?}");
+                };
+                assert_eq!(asked, asked_text.parse::<u64>().unwrap(), "{name}");
+                assert_eq!(named, limit);
+                assert!(asked > limit && asked / 1000 > doc_bytes, "{name}");
+                assert!(doc_bytes > 0 && doc_bytes < data.len() as u64, "{name}");
+                assert!(text.contains("probably not help"), "{text}");
+                assert!(!text.contains("can be raised"), "{text}");
+            }
+            "damaged" => {
+                let Refusal::Damaged { detail } = &why else {
+                    panic!("{name}: expected a damaged file, got {why:?}");
+                };
+                // Where it panicked is kept for a log, and never shown.
+                assert!(detail.contains("panicked at"), "{detail}");
+                assert!(text.contains("damaged"), "{text}");
+                for part in ["memory", "limit", "panicked", "RUST_BACKTRACE", "exit code"] {
+                    assert!(!text.contains(part), "must not say {part:?}: {text}");
+                }
+            }
+            other => panic!("{name}: unknown refusal {other:?} in the list"),
+        }
+        // Refused, it is not noted as passed.
+        assert_eq!(t.verified_by(&path), None);
+    }
+    // The program survived all of them: it still verifies and opens a file.
+    let t = trust("after-refused");
+    let good = saved_file("after-refused", &t);
+    let copy = fresh("after-refused-copy");
+    std::fs::copy(&good, &copy).unwrap();
+    assert_eq!(open(&copy, &t).unwrap(), How::Verified);
+}

@@ -11,9 +11,7 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
-use bivar_poc_arquivo::{
-    Access, DocFile, FileError, Limits, OpenReport, TrustStore, fingerprint_file,
-};
+use bivar_poc_arquivo::{Access, DocFile, FileError, Limits, OpenReport, TrustStore, file_summary};
 use bivar_poc_loja_loro::EntriesStore;
 use bivar_poc_modelo::{Store, random_u64};
 
@@ -55,6 +53,22 @@ pub enum Refusal {
     TooMuchMemory {
         limit: u64,
     },
+    /// One memory request above the limit and more than
+    /// `ABSURD_REQUEST_FACTOR` times the document data: no real document
+    /// asks for that, and a higher limit would probably not help
+    /// (ADR-0024, section 2).
+    AbsurdRequest {
+        /// The size of the request that failed (bytes).
+        asked: u64,
+        /// The document data of the file (bytes).
+        doc_bytes: u64,
+        limit: u64,
+    },
+    /// A reader panicked on the file's contents. `detail` is where and why,
+    /// for a log; the message never shows it.
+    Damaged {
+        detail: String,
+    },
     TooDeep,
     /// The verifier read it and found it unacceptable (the reason given).
     Invalid(String),
@@ -77,6 +91,23 @@ impl Refusal {
                  may also be an attack.",
                 bytes_text(*limit)
             ),
+            Refusal::AbsurdRequest {
+                asked,
+                doc_bytes,
+                limit,
+            } => format!(
+                "This file was refused: it holds {} of document data, but reading it asks for \
+                 {} of memory in a single request. A real document does not do that: the file \
+                 is damaged, or it was made to attack. Raising the memory limit ({}) will \
+                 probably not help.",
+                approx_text(*doc_bytes),
+                approx_text(*asked),
+                bytes_text(*limit)
+            ),
+            // Nothing about memory or limits: the cause is another one.
+            Refusal::Damaged { .. } => "This file was refused: it is damaged, or it was made to \
+                attack. Its contents could not be read."
+                .into(),
             Refusal::TooDeep => {
                 "This file was refused: its structure is nested deeper than can be read.".into()
             }
@@ -95,6 +126,47 @@ fn bytes_text(bytes: u64) -> String {
     } else {
         format!("{bytes} bytes")
     }
+}
+
+/// A size a person reads at a glance, rounded to one decimal: "1.6 TiB",
+/// "12.0 GiB", "924 bytes".
+fn approx_text(bytes: u64) -> String {
+    const UNITS: [(&str, u128); 4] = [
+        ("TiB", 1 << 40),
+        ("GiB", 1 << 30),
+        ("MiB", 1 << 20),
+        ("KiB", 1 << 10),
+    ];
+    for (name, size) in UNITS {
+        if u128::from(bytes) >= size {
+            let tenths = (u128::from(bytes) * 10 + size / 2) / size;
+            return format!("{}.{} {name}", tenths / 10, tenths % 10);
+        }
+    }
+    format!("{bytes} bytes")
+}
+
+/// How many times the document data one memory request must pass, besides
+/// passing the limit, to be called absurd (owner, 2026-11-10). Measured
+/// (audit report 2026-11-04, sections 11.3 and 12.3): legitimate documents
+/// ask for 1.0 times their data, the decompression bombs for at most 170.9
+/// times, and the inputs that make the document library reserve by a count
+/// read from the file for millions of times.
+pub const ABSURD_REQUEST_FACTOR: u64 = 1000;
+
+/// Whether one failed memory request is absurd for the file: above the
+/// memory limit and more than `ABSURD_REQUEST_FACTOR` times the file's
+/// document data.
+pub fn is_absurd_request(asked: u64, limit: u64, doc_bytes: u64) -> bool {
+    asked > limit && u128::from(asked) > u128::from(ABSURD_REQUEST_FACTOR) * u128::from(doc_bytes)
+}
+
+/// The size of the request in the text the Rust runtime writes when an
+/// allocation fails ("memory allocation of N bytes failed"), if it is there.
+fn failed_request(err: &str) -> Option<u64> {
+    let rest = err.split("memory allocation of ").nth(1)?;
+    let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
+    digits.parse().ok()
 }
 
 #[derive(Debug)]
@@ -191,8 +263,10 @@ pub fn verify_measured(
     limits: &Limits,
     vlimits: &VerifyLimits,
 ) -> Result<([u8; 32], Option<u64>), CheckError> {
-    fingerprint_file(path, limits)?;
-    run_verifier(verifier, path, limits, vlimits)
+    // The document data is measured here, by the program, not by the
+    // verifier: the size the absurd-request rule compares with.
+    let (_, doc_bytes) = file_summary(path, limits)?;
+    run_verifier(verifier, path, limits, vlimits, doc_bytes)
 }
 
 fn run_verifier(
@@ -200,6 +274,7 @@ fn run_verifier(
     path: &Path,
     limits: &Limits,
     v: &VerifyLimits,
+    doc_bytes: u64,
 ) -> Result<([u8; 32], Option<u64>), CheckError> {
     let mut cmd = Command::new(exe);
     if v.test_stall {
@@ -287,12 +362,29 @@ fn run_verifier(
     if line.starts_with("TOO_DEEP ") {
         return Err(CheckError::Refused(Refusal::TooDeep));
     }
+    // A reader panicked: the verifier's own line, written by its panic
+    // hook, not the text of a crash. Checked before the memory text, so a
+    // panic is never reported as a memory refusal.
+    if let Some(detail) = line.strip_prefix("DAMAGED") {
+        return Err(CheckError::Refused(Refusal::Damaged {
+            detail: detail.trim().to_owned(),
+        }));
+    }
     // A failed allocation under the cap ends the process with this text
     // from the Rust runtime. It is not a stable interface: a test locks it
     // (`a_decompression_bomb_is_refused_by_the_memory_cap`), so a change in
     // Rust shows up as a failing test, not as a wrong message (M3).
     let refusal = if err.contains("memory allocation") {
-        Refusal::TooMuchMemory { limit: v.memory }
+        match failed_request(&err) {
+            Some(asked) if is_absurd_request(asked, v.memory, doc_bytes) => {
+                Refusal::AbsurdRequest {
+                    asked,
+                    doc_bytes,
+                    limit: v.memory,
+                }
+            }
+            _ => Refusal::TooMuchMemory { limit: v.memory },
+        }
     } else if err.contains("overflowed its stack") {
         // No function that walks the tree calls itself (I4), so this is
         // not expected; kept so a stack overflow is never "crashed".
@@ -337,6 +429,13 @@ pub fn fuzz_container(data: &[u8]) {
 /// payload) and given correct checksums, so arbitrary payloads reach the
 /// document library through the snapshot and updates records.
 pub fn fuzz_records(data: &[u8]) {
+    fuzz_container(&fuzz_records_file(data));
+}
+
+/// The `.bivar` file that `fuzz_records` builds from its input: the same
+/// bytes, so a test can open an input of that target as a file.
+#[doc(hidden)]
+pub fn fuzz_records_file(data: &[u8]) -> Vec<u8> {
     let mut records: Vec<(u8, &[u8])> = Vec::new();
     let mut rest = data;
     while rest.len() >= 3 && records.len() < 64 {
@@ -345,6 +444,83 @@ pub fn fuzz_records(data: &[u8]) {
         records.push((kind, &rest[3..3 + len]));
         rest = &rest[3 + len..];
     }
-    let bytes = bivar_poc_arquivo::build_file_bytes(&records);
-    fuzz_container(&bytes);
+    bivar_poc_arquivo::build_file_bytes(&records)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_request_is_absurd_only_above_the_limit_and_above_a_thousand_times_the_data() {
+        let limit = 4 << 30;
+        // The measured cases (audit report 2026-11-04, 11.3 and 12.3).
+        assert!(is_absurd_request(1_747_498_019_256, limit, 1_060));
+        assert!(is_absurd_request(12_884_901_884, limit, 924));
+        // A legitimate document refused by a low limit: 1.0 times its data.
+        assert!(!is_absurd_request(68_684_139, 64 << 20, 68_684_139));
+        // A decompression bomb: 170.9 times its data, at the limit.
+        assert!(!is_absurd_request(268_435_456, 256 << 20, 1_570_000));
+        // Above a thousand times the data but not above the limit.
+        assert!(!is_absurd_request(limit, limit, 1));
+        assert!(is_absurd_request(limit + 1, limit, 1));
+        // Above the limit but not above a thousand times the data.
+        assert!(!is_absurd_request(5_000_000_000, limit, 5_000_000));
+        assert!(is_absurd_request(5_000_000_001, limit, 5_000_000));
+        // No overflow at the ends.
+        assert!(!is_absurd_request(u64::MAX, limit, u64::MAX));
+        assert!(is_absurd_request(u64::MAX, limit, 0));
+    }
+
+    #[test]
+    fn the_failed_request_is_read_from_the_runtime_text() {
+        let err = "noise\nmemory allocation of 1747498019256 bytes failed\n";
+        assert_eq!(failed_request(err), Some(1_747_498_019_256));
+        assert_eq!(failed_request("memory allocation failed"), None);
+        assert_eq!(
+            failed_request("memory allocation of many bytes failed"),
+            None
+        );
+        assert_eq!(failed_request(""), None);
+    }
+
+    #[test]
+    fn sizes_are_written_for_a_person() {
+        assert_eq!(approx_text(1_747_498_019_256), "1.6 TiB");
+        assert_eq!(approx_text(12_884_901_884), "12.0 GiB");
+        assert_eq!(approx_text(1_060), "1.0 KiB");
+        assert_eq!(approx_text(924), "924 bytes");
+        assert_eq!(approx_text(u64::MAX), "16777216.0 TiB");
+    }
+
+    #[test]
+    fn the_new_refusals_say_what_they_must_and_no_more() {
+        let absurd = Refusal::AbsurdRequest {
+            asked: 1_747_498_019_256,
+            doc_bytes: 1_060,
+            limit: 4 << 30,
+        }
+        .message();
+        for part in [
+            "1.0 KiB",
+            "1.6 TiB",
+            "4 GiB",
+            "damaged",
+            "attack",
+            "probably not help",
+        ] {
+            assert!(absurd.contains(part), "missing {part:?}: {absurd}");
+        }
+        assert!(!absurd.contains("can be raised"), "{absurd}");
+        let damaged = Refusal::Damaged {
+            detail: "panicked at block.rs:305:14: RUST_BACKTRACE".into(),
+        }
+        .message();
+        for part in ["damaged", "attack"] {
+            assert!(damaged.contains(part), "missing {part:?}: {damaged}");
+        }
+        for part in ["memory", "limit", "block.rs", "RUST_BACKTRACE", "panicked"] {
+            assert!(!damaged.contains(part), "must not say {part:?}: {damaged}");
+        }
+    }
 }

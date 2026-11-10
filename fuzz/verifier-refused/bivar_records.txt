@@ -1,0 +1,13 @@
+# Inputs of the bivar_records target that still end the process of the
+# document library (Loro 1.17.1), and that the verifier must refuse while
+# the program survives (ADR-0024, section 5). They are NOT in regressions/:
+# replayed in the test process, each would take the whole test binary down.
+# Tested by `inputs_the_verifier_must_refuse_are_refused_and_the_program_survives`
+# (poc/crdt-armazenamento/prototipo/verificador/tests/entrada.rs).
+#
+# One line per file of bivar_records/:
+#   file name | expected refusal | bytes of the failed request, or - | what it is
+# Expected refusal: absurd-request or damaged.
+crash-c6869029ad0329fc11298f77b7f2ea0fe497bf61 absurd-request 1747498019256 D1: Loro reserves by a sum of counts read from an updates blob (block_meta_encode.rs:162); run 41876124671
+oom-d8f611603e5679d75944b87fe7239a356336f783 absurd-request 12884901884 D1b: Loro reserves by the change count read from an updates blob (block_meta_encode.rs:132); run 42852601857
+crash-0c03624454b91bd7277d8f01e2c3173ac606e1b9 damaged - D2: Loro panics on a malformed SSTable block with a correct checksum (loro-kv-store block.rs:305), in a snapshot blob imported into an open document; run 41913641114
