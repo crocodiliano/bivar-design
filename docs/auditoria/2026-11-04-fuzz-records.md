@@ -784,8 +784,18 @@ A seção 11.4 atribuiu números à "entrada real" que **vieram do alvo de prova
 - **Uma falta de memória acima de 1 TiB não deixa vermelho:** ela é contada no registro e no resumo, e as entradas repetidas da mesma família viram uma só.
 - **A duração ficou perto do pedido:** 124 a 128 s para 120 s.
 
+**Tempo esgotado, provado depois** (pedido do dono, 2026-11-10):
+- **Ramo temporário:** `diag/fuzz-fork-tempo`, commit `dde9c9d`, que parte do commit do `main` `da6bf52`. Ele só acrescenta a `bivar_records` um travamento artificial de 120 s quando a entrada começa com `!`, acima de `-timeout=60`.
+- **Execução `42904794042`, 120 s pedidos:**
+
+| Alvo | Job | Resumo |
+|---|---|---|
+| `bivar_records` (trava) | **vermelho** | parou aos 117 s, antes do fim do tempo (nenhuma linha "wrapping up"); 8 processos filhos; 2 entradas `timeout-` (dois filhos em paralelo); **1 família** (`timeout in fuzz/fuzz_targets/bivar_records.rs:21`), **1 entrada guardada** |
+| `bivar_container` (sem falha) | **verde** | 128 s; nenhuma falta de memória, queda ou tempo esgotado; nada guardado |
+
+- **Os padrões do libFuzzer** (`libfuzzer-sys` `=0.4.13`, `FuzzerFlags.def`), no modo `-fork`, são `ignore_timeouts=1`, `ignore_ooms=1` e `ignore_crashes=0`. Por isso `run-fork.sh` passa `-ignore_ooms=1 -ignore_timeouts=0 -ignore_crashes=0` de forma explícita: sem isso, um tempo esgotado seria ignorado.
+
 **Não provado aqui:**
-- **Tempo esgotado:** a prova da seção 11.4 mostrou o job vermelho com `-ignore_timeouts=0` (código 70), com o mesmo libFuzzer.
 - **A rodada diária de 1.500 s:** ela só roda no horário agendado. A espera pelos filhos no fim foi medida no censo (14 s depois de 1.800 s).
 
 ### 13.5 Registro interno: os defeitos da Loro (sem contato com a Loro)
