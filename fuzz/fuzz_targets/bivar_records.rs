@@ -15,6 +15,11 @@ fuzz_target!(
         oom_hook::install();
     },
     |data: &[u8]| {
+        // TEMPORARY (branch diag/fuzz-fork-tempo): an artificial hang,
+        // longer than -timeout=60.
+        if data.first() == Some(&b'!') {
+            std::thread::sleep(std::time::Duration::from_secs(120));
+        }
         bivar_poc_verificador::fuzz_records(data);
     }
 );
