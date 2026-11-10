@@ -1,0 +1,35 @@
+name: Diag prototype tests (temporary)
+
+# TEMPORARY (branch diag/fuzz-fork-prova, never merged): the same tests as
+# the poc-crdt job, with the names of the failing tests as annotations
+# (readable without logging in).
+
+on:
+  push:
+    branches: [diag/fuzz-fork-prova]
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install toolchain from rust-toolchain.toml
+        run: rustup show
+      - name: Prototype tests, names of failures
+        run: |
+          set +e
+          cargo test --locked --release --manifest-path poc/crdt-armazenamento/prototipo/Cargo.toml --no-fail-fast 2>&1 | tee out.txt
+          rc=${PIPESTATUS[0]}
+          sums=$(grep -E '^test result' out.txt | awk '{p+=$4; f+=$6; i+=$8} END {print "passed", p, "failed", f, "ignored", i}')
+          failed=$(grep -E '^test .* \.\.\. FAILED$|^    [a-z_:]+$' out.txt | sort -u | tr '\n' ' ' | cut -c1-3000)
+          panics=$(grep -E "panicked at|PermissionDenied|read-only" out.txt | sort | uniq -c | tr '\n' '|' | cut -c1-3000)
+          mine=$(grep -E 'test (inputs_the_verifier_must_refuse|the_summary_of_a_file|tests::)' out.txt | tr '\n' '|' | cut -c1-3000)
+          echo "::notice title=prototype tests::rc=$rc $sums"
+          echo "::notice title=failed tests::${failed:-none}"
+          echo "::notice title=panics::${panics:-none}"
+          echo "::notice title=new tests::${mine:-none}"
+          exit "$rc"
