@@ -888,3 +888,34 @@ fn files_that_break_the_spec_in_small_ways_are_refused() {
     bytes[32..64].copy_from_slice(&digest);
     refused("spec-reserved", bytes, "reserved");
 }
+
+/// The document data of a file is its snapshot and updates records, and
+/// nothing else: a large file (an image) does not count.
+#[test]
+fn the_summary_of_a_file_counts_only_its_document_data() {
+    use bivar_poc_arquivo::{Limits, build_file_bytes, file_summary, fingerprint_file};
+    let limits = Limits::default();
+    // Exact: 1 = snapshot, 2 = updates, 5 = save mark (not document data).
+    let mut s = S::new_document(1);
+    Workload::new(5).run(&mut s, 50);
+    let snapshot = s.save();
+    let updates = [7u8; 1234];
+    let path = fresh("summary-exact");
+    let bytes = build_file_bytes(&[(1, &snapshot), (5, &0u64.to_le_bytes()), (2, &updates)]);
+    std::fs::write(&path, bytes).unwrap();
+    let (fingerprint, doc_bytes) = file_summary(&path, &limits).unwrap();
+    assert_eq!(doc_bytes, snapshot.len() as u64 + 1234);
+    assert_eq!(fingerprint, fingerprint_file(&path, &limits).unwrap());
+
+    // A real file with a 3 MB large file: the large file does not count.
+    let path = fresh("summary-blob");
+    let mut f = DocFile::create(&path, &mut s).unwrap();
+    let (_, before) = file_summary(&path, &limits).unwrap();
+    let blob: Vec<u8> = (0..3_000_000u32).map(|i| (i % 251) as u8).collect();
+    f.put_blob(&blob[..]).unwrap();
+    drop(f);
+    let (_, after) = file_summary(&path, &limits).unwrap();
+    assert!(before > 0);
+    assert_eq!(after, before, "a large file changed the document data");
+    assert!(std::fs::metadata(&path).unwrap().len() > 3_000_000);
+}

@@ -9,3 +9,10 @@
 # results: never converted, so the bytes and the text stay as written.
 tests/formato/*.bivar binary
 tests/formato/*.txt text eol=lf
+
+# Inputs the verifier must refuse (ADR-0024): bytes, never converted.
+fuzz/verifier-refused/bivar_records/* binary
+fuzz/verifier-refused/*.txt text eol=lf
+# Scripts of the automatic build run under sh and python on Linux.
+fuzz/*.sh text eol=lf
+fuzz/*.py text eol=lf
