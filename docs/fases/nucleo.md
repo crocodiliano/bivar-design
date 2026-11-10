@@ -76,7 +76,7 @@
   - **Uma sessão só:** uma abertura sem nenhuma outra sessão com o arquivo aberto nunca vira só leitura, inclusive enquanto outra linha de execução lança processos sem parar.
   - **1.000 repetições por sistema, sem nenhuma falha.** Se o defeito acontecer em pelo menos 0,5% das repetições, 1.000 o pegam com 99,3% de chance (1 − 0,995^1000). No protótipo, ele aparecia em mais da metade das execuções da suíte.
   - **Onde roda cada sistema:**
-    - **Linux:** na compilação automática do GitHub, a cada envio;
+    - **Linux:** na compilação automática do GitHub, a cada envio, num passo próprio que roda o teste `trava` com `--ignored` (`cargo test --release -p bivar-doc --test trava -- --ignored --nocapture`), separado do `cargo test` comum;
     - **Windows:** no PC do dono, antes de fechar a N.2, com o comando `cargo test --release -p bivar-doc --test trava -- --ignored --nocapture`. O teste `trava` é ignorado no `cargo test` comum por ser demorado, e a compilação automática o roda com esse mesmo comando no Linux.
 - [ ] **Ganchos de teste só nas compilações de teste** (auditoria da 0.6, O4): os ganchos que fazem o programa parar, travar ou simular disco cheio (no protótipo, `BIVAR_CRASH_AT`, `BIVAR_VERIFIER_STALL`, `BIVAR_VERIFIER_NOISE`, `BIVAR_VERIFIER_PEAK` e o disco simulado) não existem no programa final. Uma checagem automática confere.
 - [ ] **Migração do histórico:** depois da migração de exemplo da "versão 1" para a "versão 2", as operações antigas do histórico continuam legíveis (o desfazer funciona sobre elas), e a junção com uma cópia de outra versão do formato segue o que o ADR de armazenamento da 0.6 definiu.
