@@ -14,6 +14,12 @@ fuzz_target!(
         oom_hook::install();
     },
     |data: &[u8]| {
+        // TEMPORARY (branch diag/fuzz-fork-prova): an artificial request of
+        // 2 TiB, which must be counted as an ignored out-of-memory.
+        if data.first() == Some(&b'?') {
+            let v: Vec<u8> = Vec::with_capacity(std::hint::black_box(2usize << 40));
+            std::hint::black_box(&v);
+        }
         bivar_poc_verificador::fuzz_container(data);
     }
 );

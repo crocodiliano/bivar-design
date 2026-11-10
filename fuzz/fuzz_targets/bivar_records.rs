@@ -15,6 +15,10 @@ fuzz_target!(
         oom_hook::install();
     },
     |data: &[u8]| {
+        // TEMPORARY (branch diag/fuzz-fork-prova): an artificial panic.
+        if data.first() == Some(&b'!') {
+            panic!("artificial panic (proof of the fuzzing job)");
+        }
         bivar_poc_verificador::fuzz_records(data);
     }
 );
