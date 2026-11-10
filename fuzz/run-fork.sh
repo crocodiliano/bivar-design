@@ -88,7 +88,16 @@ if [ "$families_rc" -ne 0 ]; then
   why="the inputs could not be grouped by family (fork-families.py: $families_rc)"
 fi
 
-summary="FORK SUMMARY target=$target verdict=$verdict ($why) seconds_asked=$seconds elapsed_s=$((end - start)) fuzzer_time_s=${fuzzer_time:-none} first_line_to_wrap_s=$(( ${t_wrap:-0} - ${t_first:-0} )) wrap_to_exit_s=$(( ${t_exit:-0} - ${t_wrap:-0} )) children=$jobs ooms_ignored=${ooms_ignored:-none} oom/timeout/crash=${counters:-none} oom_files=$oom_files slow_unit_files=$slow_files crash_or_timeout_files=$failure_files families=$families inputs_kept=$kept_inputs | last status: ${last_status:-none}"
+to_wrap=none
+wrap_to_exit=none
+if [ -n "$t_wrap" ] && [ -n "$t_first" ]; then
+  to_wrap=$((t_wrap - t_first))
+  [ -n "$t_exit" ] && wrap_to_exit=$((t_exit - t_wrap))
+fi
+# The families, one line each in the table: kind, inputs, where.
+family_list=$(tail -n +2 "$kept/families.tsv" 2>/dev/null | awk -F'\t' '{printf "F%s %s x%s: %s || ", $1, $2, $3, $7}' | cut -c1-2500)
+
+summary="FORK SUMMARY target=$target verdict=$verdict ($why) seconds_asked=$seconds elapsed_s=$((end - start)) fuzzer_time_s=${fuzzer_time:-none} start_to_time_up_s=$to_wrap time_up_to_exit_s=$wrap_to_exit children=$jobs ooms_ignored=${ooms_ignored:-none} oom/timeout/crash=${counters:-none} oom_files=$oom_files slow_unit_files=$slow_files crash_or_timeout_files=$failure_files families=$families inputs_kept=$kept_inputs | last status: ${last_status:-none} | families: ${family_list:-none}"
 echo "$summary" | tee "$out/summary.txt"
 cp "$out/summary.txt" "$kept/summary.txt"
 # Readable on the run's page without opening the log.

@@ -60,14 +60,14 @@ def is_ours_or_a_library(func, path):
         return False
     if not path or "/library/" in path or "/rustc/" in path:
         return False
-    if "libfuzzer" in path or "oom_hook.rs" in path or "fuzz_targets/" in path:
+    if "libfuzzer" in path or "oom_hook.rs" in path:
         return False
     return "registry/src/" in path or "bivar-design/" in path or "/checkouts/" in path
 
 
 def stack_after(text, marker):
     """The first sanitizer stack after the line holding `marker`: a list of
-    (function, path:line)."""
+    (function, path:line). Frames without a name are kept as ("?", "")."""
     idx = text.find(marker)
     if idx < 0:
         return []
