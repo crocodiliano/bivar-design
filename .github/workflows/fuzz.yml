@@ -37,7 +37,14 @@ jobs:
       # The grouping decides green or red by family (audit 2026-11-10, I1):
       # its tests run before any fuzzing.
       - name: Tests of the family grouping
-        run: python3 fuzz/test_fork_families.py
+        run: |
+          set -o pipefail
+          # TEMPORARY (proof branch only): failures as annotations.
+          python3 fuzz/test_fork_families.py > /tmp/t.log 2>&1 || {
+            grep -A12 -E '^(FAIL|ERROR):' /tmp/t.log | head -c 3000 | sed -z 's/%/%25/g; s/\n/%0A/g' | sed 's/^/::error::/'
+            echo
+            exit 1
+          }
 
       - name: Install the pinned nightly toolchain (fuzz/ only)
         working-directory: fuzz
