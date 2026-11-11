@@ -74,12 +74,6 @@ jobs:
       # run after the time ends: 1500 s once a day (at most 1800 s in all).
       # On a push, 120 s: children started in 2 minutes run for at most
       # about 20 s each.
-      - name: TEMPORARY hole proof, a failing input only in found/ (proof branch)
-        working-directory: fuzz
-        run: |
-          mkdir -p found/${{ matrix.target }}
-          printf '\x01\x08\x00T3!Czzzz' > found/${{ matrix.target }}/hole-proof
-
       - name: Fuzz ${{ matrix.target }} (fork mode)
         working-directory: fuzz
         env:

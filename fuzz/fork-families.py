@@ -442,4 +442,5 @@ def red_reasons(families, failures_not_replayed, known):
 
 
 if __name__ == "__main__":
+    raise RuntimeError("proof 7a: the grouping fails")
     sys.exit(main())
