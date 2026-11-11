@@ -11,4 +11,9 @@
 #
 # One line per family, four fields separated by tabs:
 #   key | kind (oom or panic) | defect (D1, D1b, D2) | date approved
-# Empty until the keys come from a run on Linux (treatment 2026-11-10, T3).
+# The keys below came out of run 43087139535 (the three inputs of
+# verifier-refused/, through the seed check and the grouping), approved by
+# the owner on 2026-11-11 (treatment 2026-11-10, T3).
+oom-request-failed in serde_columnar-0.3.14/src/strategy/rle.rs:233 <- loro-internal-1.17.1/src/oplog/change_store/block_meta_encode.rs:162	oom	D1	2026-11-11
+oom in loro-internal-1.17.1/src/oplog/change_store/block_meta_encode.rs:132 <- loro-internal-1.17.1/src/oplog/change_store/block_encode.rs:400	oom	D1b	2026-11-11
+panic at loro-kv-store-1.17.0/src/block.rs:305: validated SSTable block should decode: DecodeError("Invalid bytes")	panic	D2	2026-11-11
