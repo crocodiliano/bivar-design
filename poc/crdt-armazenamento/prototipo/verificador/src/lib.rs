@@ -265,7 +265,6 @@ pub fn verify_measured(
 ) -> Result<([u8; 32], Option<u64>), CheckError> {
     // The document data is measured here, by the program, not by the
     // verifier: the size the absurd-request rule compares with.
-    bivar_poc_arquivo::fingerprint_file(path, limits)?;
     let (_, doc_bytes) = file_summary(path, limits)?;
     run_verifier(verifier, path, limits, vlimits, doc_bytes)
 }
