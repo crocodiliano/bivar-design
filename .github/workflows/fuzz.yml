@@ -85,6 +85,17 @@ jobs:
         timeout-minutes: 33
         run: bash run-fork.sh ${{ matrix.target }} "$SECONDS_TO_RUN"
 
+      - name: TEMPORARY stacks and families of the kept inputs (proof branch)
+        if: always()
+        working-directory: fuzz
+        run: |
+          for f in kept/${{ matrix.target }}/*/replay.txt; do
+            [ -f "$f" ] || continue
+            echo "::notice title=stack $f::$(grep -E "^ *#[0-9]+ .* in (bivar|loro)|panicked at|ERROR: " "$f" | head -14 | sed "s/^ *//" | tr '\n' '|' | cut -c1-3800)"
+          done
+          tail -n +2 kept/${{ matrix.target }}/families.tsv 2>/dev/null | while IFS= read -r l; do echo "::notice title=family::$l"; done
+          echo "::notice title=kept files::$(find kept fork-out artifacts -type f 2>/dev/null | grep -v -e fuzz.log | sort | tr '\n' ' ' | cut -c1-3800)"
+
       # One input per family (crash, timeout or out-of-memory), with the text
       # of its run, and the reserve of inputs (M6); a crash input can become a
       # file in fuzz/regressions, or in fuzz/verifier-refused while the
