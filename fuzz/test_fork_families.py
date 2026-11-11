@@ -257,7 +257,8 @@ def rust_code(path):
 
 
 def body(code, name):
-    m = re.search(r"\bfn " + re.escape(name) + r"\b[^{;]*\{", code)
+    # A signature may hold ';' ([u8; 32]); these files declare no fn without a body.
+    m = re.search(r"\bfn " + re.escape(name) + r"\b[^{]*\{", code)
     if not m:
         return None
     i, depth = m.end(), 1
@@ -310,7 +311,7 @@ class BeforeVerifier(unittest.TestCase):
 
     def test_extraction_finds_a_new_call(self):
         """The extraction itself: a call added before the verifier shows up."""
-        code = ("fn verify_measured(p: &Path) -> R { let x = peek(p)?; let c = io::Cursor::new(x); "
+        code = ("fn verify_measured(p: &Path) -> Result<([u8; 32], u64), E> { let x = peek(p)?; let c = io::Cursor::new(x); "
                 "c.len(); bivar_poc_arquivo::fingerprint_file(p, l)?; "
                 "let (_, n) = file_summary(p, l)?; run_verifier(p, n) }")
         m = body(code, "verify_measured")

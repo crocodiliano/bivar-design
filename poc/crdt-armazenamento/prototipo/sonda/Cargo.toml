@@ -1,9 +1,0 @@
-[package]
-name = "sonda-temporaria"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-publish = false
-
-[dependencies]
-loro = "=1.17.1"
