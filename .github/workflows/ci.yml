@@ -109,6 +109,12 @@ jobs:
       - name: Only the store crate depends on Loro
         run: sh poc/crdt-armazenamento/prototipo/check-loro-isolated.sh
 
+      # Also here, not only in the Fuzz workflow: a change to the code the
+      # program runs before the verifier fails in the same push unless
+      # fuzz/before-verifier.txt follows it (owner, 2026-11-11, D-1).
+      - name: Tests of the fuzzing family grouping (fuzz/before-verifier.txt)
+        run: python3 fuzz/test_fork_families.py
+
       # The prototype is outside the workspace: its format and lints are
       # checked here (audit 2026-10-31, M14).
       - name: Prototype format and lints

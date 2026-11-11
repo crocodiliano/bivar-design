@@ -7,8 +7,13 @@
 # bivar-doc; only a direct dependency is refused.
 set -e
 cd "$(dirname "$0")"
-members=$(cargo metadata --locked --no-deps --format-version 1 \
-  | tr ',' '\n' | sed -n 's/^.*"name":"\(bivar-poc-[a-z-]*\)".*$/\1/p' | sort -u)
+# The packages listed in workspace_members, whatever their names (audit
+# 2026-11-10, M12: a member not named bivar-poc-* was not checked).
+members=$(cargo metadata --locked --no-deps --format-version 1 | python3 -c '
+import json, sys
+m = json.load(sys.stdin)
+ids = set(m["workspace_members"])
+print("\n".join(sorted(p["name"] for p in m["packages"] if p["id"] in ids)))')
 [ -n "$members" ] || { echo "::error::no workspace packages found"; exit 1; }
 for p in $members; do
   direct=$(cargo tree --locked -p "$p" -e normal,build --depth 1 --prefix none \
