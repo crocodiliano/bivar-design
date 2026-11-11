@@ -56,11 +56,12 @@ else
       seed_failed=$((seed_failed + 1))
       { echo "== $f (code $rc)"; tail -n 80 "$out/seed.txt"; } >> "$out/seed-check.log"
       sum=$(sha1sum "$f" | cut -d' ' -f1)
-      # libFuzzer names the input by its kind; if it did not write it
-      # (killed by the wall clock), it is kept under a name of ours.
+      # Run alone, libFuzzer does not write the input (run 43079383530): it
+      # is kept under the name fork mode would give it.
       if ! compgen -G "artifacts/$target/*-$sum" > /dev/null; then
         kind=crash
-        [ "$rc" -eq 124 ] && kind=timeout
+        grep -q 'ERROR: libFuzzer: out-of-memory' "$out/seed.txt" && kind=oom
+        { [ "$rc" -eq 124 ] || grep -q 'ERROR: libFuzzer: timeout' "$out/seed.txt"; } && kind=timeout
         cp "$f" "artifacts/$target/$kind-$sum"
       fi
     fi
