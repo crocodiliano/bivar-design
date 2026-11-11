@@ -212,6 +212,7 @@ A especificação fica num documento em `docs/` (o nome é proposto no plano da 
   - **as edições escondidas por uma remoção.** Na medida da 0.6, em 1.947 de 2.000 cenários, a cópia que recebeu as mudanças já juntadas não avisou.
 
   **Teste:** três cópias. A recebe B e depois C; B e C recebem A. As três mostram os mesmos avisos de movimento perdido e de edição escondida, uma vez cada, inclusive os conflitos entre A e C vistos por B. Os testes `every_copy_warns_about_hidden_edits` e o equivalente de movimentos passam nos 2.000 cenários.
+- [ ] **Junção lenta de propósito** (decisão do dono, 2026-11-11; [auditoria de 2026-11-10](../auditoria/2026-11-10-fase-0.6.md), M5 e S4; Gemini 3.1 e DeepSeek 3.2 da auditoria de 2026-10-31): o verificador da entrada externa mede a abertura, mas não a detecção de conflitos da junção, então um arquivo feito para deixar a junção lenta passaria por ele. A detecção da junção é medida com entrada feita para ser lenta (por exemplo, muitos movimentos simultâneos do mesmo nó e de nós em cadeia), com um limite de tempo aprovado pelo dono. **Precisa estar medida e dentro do limite antes do P2P.** O resultado fica registrado com o comando e os números.
 - [ ] **Revisão:** os ADRs novos estão com status "Revisado por IA".
 
 ### 0.8 Cor, scripts e papel do Vello

@@ -136,7 +136,12 @@ Colaboração, scripts e plugins são três fontes de operações no mesmo grafo
 ### Colaboração P2P (ponto 6)
 
 - **Rede:** só rede local (LAN), com descoberta automática dos colegas. Equipes de 5 a 8 pessoas, cada uma conectada diretamente a todas. A parte de rede fica isolada, para que um relay de internet possa ser adicionado no futuro.
-- **CRDT:** o modelo de dados é compatível desde o dia 1, mesmo que o P2P chegue só depois da Fase 2. A candidata é a [Loro](https://loro.dev), por ter árvore com movimentação e texto rico. Automerge e Yrs são as alternativas.
+- **CRDT:** o modelo de dados é compatível desde o dia 1, mesmo que o P2P chegue só depois da Fase 2. A biblioteca escolhida é a [Loro](https://loro.dev), por ter árvore com movimentação e texto rico ([ADR-0021](adr/0021.md); Automerge e Yrs foram as alternativas avaliadas).
+- **Bloqueio: o P2P só abre com as duas exigências do [ADR-0024](adr/0024.md)** (seção "Consequências", Pendentes; também no [ADR-0014](adr/0014.md)):
+  1. a proteção contra bombas de descompressão vindas pela rede, desenhada e aprovada;
+  2. e uma de duas: (a) uma versão nova da Loro, aprovada pelo dono, recebe todas as entradas de `fuzz/verifier-refused/`, cada uma num processo separado, sem queda, e o fuzzing não acha família nova da Loro; ou (b) os dados de colegas passam antes por um processo separado com teto de memória e de tempo, que os decodifica por inteiro, cuja queda recusa o dado sem derrubar o programa, com o custo medido e aprovado.
+
+  Motivo: entradas achadas pelo fuzzing derrubam o processo que importa dados na Loro ([relatório](auditoria/2026-11-04-fuzz-records.md), seções 12 e 13).
 - **Arquivos grandes:** não passam pelo CRDT. Viajam à parte, identificados pelo hash do conteúdo e baixados sob demanda.
 - **Regras de junção:**
   - depois de cada junção, uma validação marca grafos inválidos em estado de conflito;
