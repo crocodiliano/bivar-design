@@ -61,8 +61,11 @@ slow_files=$(find "artifacts/$target" -type f -name 'slow-unit-*' | wc -l)
 failure_files=$(find "artifacts/$target" -type f ! -name 'oom-*' ! -name 'slow-unit-*' | wc -l)
 
 # One input per family goes to kept/<target>/; the rest are discarded.
-python3 "$(dirname "$0")/fork-families.py" "$target" "artifacts/$target" "$kept" "$out" "$(cd "$(dirname "$0")/.." && pwd)"
-families_rc=$?
+# At most 300 s (replays stop after 150 s, plus one replay of up to 90 s):
+# a grouping that hangs is stopped and reads as "could not be grouped".
+timeout 300 python3 "$(dirname "$0")/fork-families.py" "$target" "artifacts/$target" "$kept" "$out" "$(cd "$(dirname "$0")/.." && pwd)" | tee "$out/families.txt"
+families_rc=${PIPESTATUS[0]}
+families_verdict=$(grep '^verdict: red: ' "$out/families.txt" | tail -1 | cut -d' ' -f3-)
 families=$(find "$kept" -mindepth 1 -maxdepth 1 -type d | wc -l)
 kept_inputs=$(find "$kept" -type f ! -name 'replay.txt' ! -name 'families.tsv' | wc -l)
 rm -rf "artifacts/$target"
@@ -83,9 +86,14 @@ if [ "$failure_files" -gt 0 ]; then
   verdict=fail
   why="$failure_files crash or timeout input(s) were written"
 fi
-if [ "$families_rc" -ne 0 ]; then
+# Each red reason of its own (owner, 2026-11-11): "could not be grouped" is
+# only for a grouping that failed, hung (124) or did not run.
+if [ "$families_rc" -eq 3 ] && [ -n "$families_verdict" ]; then
   verdict=fail
-  why="the inputs could not be grouped by family (fork-families.py: $families_rc)"
+  why="$families_verdict"
+elif [ "$families_rc" -ne 0 ]; then
+  verdict=fail
+  why="the inputs could not be grouped by family: fork-families.py failed, hung or did not run (code $families_rc)"
 fi
 
 to_wrap=none

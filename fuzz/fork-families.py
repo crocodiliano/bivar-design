@@ -24,8 +24,10 @@ inputs not run again are only counted.
 
 Runs again at most MAX_REPLAYS inputs and stops after REPLAY_SECONDS, so the
 job keeps to its time limit; the inputs not run again are counted.
-Exit code 0 when every family is known (or there is none), 1 when there is a
-new, outside-verifier or unclassified one, 2 when the grouping could not run.
+Exit code 0 when every family is known (or there is none), 3 when there is a
+new, outside-verifier or unclassified one, with a last line "verdict: red:"
+giving each reason; any other code means the grouping could not run (2 for
+a bad argument or list, 1 for an error of Python itself).
 """
 
 import collections
@@ -48,6 +50,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 KNOWN_FILE = os.path.join(HERE, "known-families.txt")
 BEFORE_FILE = os.path.join(HERE, "before-verifier.txt")
 RED_CLASSES = ("new", "outside-verifier", "unclassified")
+# Not 1: Python itself exits with 1 on an uncaught error, which must read as
+# "the grouping failed", never as a verdict.
+RED = 3
 
 SKIP_FUNCTIONS = (
     "std::", "core::", "alloc::", "<std::", "<core::", "<alloc::", "__rust",
@@ -267,6 +272,7 @@ def main():
                         cls = "known" if family in known else "new"
                     fam = families[family] = {
                         "kind": kind, "class": cls, "rep": path, "text": text, "count": 0,
+                        "rep_prefix": prefix,
                     }
                 else:
                     # One input of the family through the code before the
@@ -309,7 +315,43 @@ def main():
     print("classes: " + " ".join(
         f"{c}={count[c]}" for c in ("known",) + RED_CLASSES
     ) + f" out-of-memory-not-run-again={ooms_not_replayed}")
-    return 1 if any(count[c] for c in RED_CLASSES) else 0
+    reasons = red_reasons(families, failures_not_replayed, known)
+    if reasons:
+        print("verdict: red: " + "; ".join(reasons))
+        return RED
+    print("verdict: green")
+    return 0
+
+
+def red_reasons(families, failures_not_replayed, known):
+    """Why the run is red, one sentence per case (owner, 2026-11-11), so the
+    job says the right reason."""
+    def inputs(cls, kinds=None):
+        return sum(f["count"] for f in families.values()
+                   if f["class"] == cls and (kinds is None or f["rep_prefix"] in kinds))
+
+    reasons = []
+    n = sum(1 for f in families.values() if f["class"] == "outside-verifier")
+    if n:
+        reasons.append(f"{n} family(ies) failed in code the program runs before the "
+                       "verifier (fuzz/before-verifier.txt): always red")
+    n = sum(1 for f in families.values() if f["class"] == "new")
+    if n:
+        reasons.append(f"{n} new family(ies): the failure happened again but is not in "
+                       "fuzz/known-families.txt"
+                       + (" (the list is still empty)" if not known else ""))
+    n = inputs("unclassified", ("oom",))
+    if n:
+        reasons.append(f"{n} out-of-memory input(s) did not run out of memory when run "
+                       "again: family unknown")
+    n = inputs("unclassified") - n
+    if n:
+        reasons.append(f"{n} crash or timeout input(s) did not fail when run again: "
+                       "family unknown")
+    if failures_not_replayed:
+        reasons.append(f"{failures_not_replayed} crash or timeout input(s) were not run "
+                       "again (time limit): family unknown")
+    return reasons
 
 
 if __name__ == "__main__":

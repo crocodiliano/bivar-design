@@ -8,7 +8,9 @@ replaced, everything after it (classes, files, exit code) is the real code.
 The last test reads the prototype's source and checks before-verifier.txt.
 """
 
+import contextlib
 import importlib.util
+import io
 import os
 import re
 import shutil
@@ -78,7 +80,9 @@ def panic_d2(repo):
 
 SCAN = ("bivar_poc_arquivo::scan::<std::io::cursor::Cursor<&[u8]>>",
         f"{CI_REPO}/poc/crdt-armazenamento/prototipo/arquivo/src/lib.rs:470")
-NO_REPRO = "INFO: Running with entropic power schedule\nExecuted crash-x in 3 ms\n"
+BEFORE_VERDICT = ("verdict: red: 1 family(ies) failed in code the program runs before the "
+                  "verifier (fuzz/before-verifier.txt): always red")
+NO_REPRO ="INFO: Running with entropic power schedule\nExecuted crash-x in 3 ms\n"
 
 
 class Grouping(unittest.TestCase):
@@ -120,10 +124,13 @@ class Grouping(unittest.TestCase):
                  mock.patch.object(ff, "KNOWN_FILE", self.known), \
                  mock.patch.object(sys, "argv", argv), \
                  mock.patch.object(ff, "REPLAY_SECONDS", replay_seconds), \
-                 mock.patch("sys.stdout"):
+                 contextlib.redirect_stdout(io.StringIO()) as out:
                 code = ff.main()
         finally:
             os.chdir(cwd)
+        # The verdict line the job shows (run-fork.sh takes it as the reason).
+        lines = [x for x in out.getvalue().splitlines() if x.startswith("verdict: ")]
+        self.verdict = lines[-1] if lines else None
         tsv = os.path.join(self.kept, "families.tsv")
         if not os.path.exists(tsv):
             return code, None
@@ -140,6 +147,7 @@ class Grouping(unittest.TestCase):
         self.input("oom-b", oom_d1b(CI_REPO), size=5)
         code, rows = self.run_grouping()
         self.assertEqual(code, 0)
+        self.assertEqual(self.verdict, "verdict: green")
         self.assertEqual([(r[2], r[3], r[7]) for r in rows], [("2", "oom-b", "known")])
         # The key, as it goes in known-families.txt, with Loro's version (D-2).
         self.assertEqual(
@@ -154,8 +162,17 @@ class Grouping(unittest.TestCase):
         other = oom_d1b(CI_REPO).replace("block_meta_encode.rs:132", "block_meta_encode.rs:140")
         self.input("oom-c", other)
         code, rows = self.run_grouping()
-        self.assertEqual(code, 1)
+        self.assertEqual(code, ff.RED)
         self.assertEqual(sorted(r[7] for r in rows), ["known", "new"])
+        self.assertEqual(self.verdict, "verdict: red: 1 new family(ies): the failure happened "
+                         "again but is not in fuzz/known-families.txt")
+
+    def test_new_family_with_the_list_still_empty_says_so(self):
+        self.input("oom-a", oom_d1b(CI_REPO))
+        code, rows = self.run_grouping()
+        self.assertEqual((code, rows[0][7]), (ff.RED, "new"))
+        self.assertEqual(self.verdict, "verdict: red: 1 new family(ies): the failure happened "
+                         "again but is not in fuzz/known-families.txt (the list is still empty)")
 
     def test_known_d2_panic_is_known_and_green(self):
         key = ff.classify(panic_d2(CI_REPO), "crash", CI_REPO)[1]
@@ -165,14 +182,17 @@ class Grouping(unittest.TestCase):
         code, rows = self.run_grouping()
         self.assertEqual(code, 0)
         self.assertEqual([(r[1], r[7]) for r in rows], [("panic", "known")])
+        self.assertEqual(self.verdict, "verdict: green")
 
     def test_new_panic_is_red(self):
         self.know(ff.classify(panic_d2(CI_REPO), "crash", CI_REPO)[1])
         self.input("crash-new", panic_text(
             CI_REPO, f"{REG}/loro-internal-1.17.1/src/state.rs:88", "called `Option::unwrap()` on a `None` value"))
         code, rows = self.run_grouping()
-        self.assertEqual(code, 1)
+        self.assertEqual(code, ff.RED)
         self.assertEqual([r[7] for r in rows], ["new"])
+        self.assertIn("1 new family(ies)", self.verdict)
+        self.assertNotIn("still empty", self.verdict)
 
     def test_any_failure_through_scan_is_red_even_when_known(self):
         # The real before-verifier.txt, not a test copy.
@@ -187,8 +207,9 @@ class Grouping(unittest.TestCase):
                 self.know(ff.classify(text, name.split("-")[0], CI_REPO)[1])
                 self.input(name, text)
                 code, rows = self.run_grouping()
-                self.assertEqual(code, 1)
+                self.assertEqual(code, ff.RED)
                 self.assertEqual([r[7] for r in rows], ["outside-verifier"])
+                self.assertEqual(self.verdict, BEFORE_VERDICT)
 
     def test_one_input_through_scan_makes_a_known_family_red(self):
         self.know(self.key(oom_d1b(CI_REPO)))
@@ -197,8 +218,9 @@ class Grouping(unittest.TestCase):
         self.input("oom-b", oom_d1b(CI_REPO).replace(
             "    #6 ", f"    #6 0x1 in {SCAN[0]} {SCAN[1]}:1\n    #6 ", 1))
         code, rows = self.run_grouping()
-        self.assertEqual(code, 1)
+        self.assertEqual(code, ff.RED)
         self.assertEqual([(r[2], r[7]) for r in rows], [("2", "outside-verifier")])
+        self.assertEqual(self.verdict, BEFORE_VERDICT)
 
     def test_same_stack_in_a_folder_of_another_name_is_the_same_family(self):
         ours = ("bivar_poc_verificador::fuzz_records",
@@ -222,20 +244,50 @@ class Grouping(unittest.TestCase):
         self.input("crash-a", panic_d2(CI_REPO))
         self.input("timeout-b", panic_d2(CI_REPO))
         code, rows = self.run_grouping(replay_seconds=-1)
-        self.assertEqual(code, 1)
+        self.assertEqual(code, ff.RED)
         self.assertEqual([(r[1], r[2], r[7]) for r in rows], [("not-run-again", "2", "unclassified")])
+        self.assertEqual(self.verdict, "verdict: red: 2 crash or timeout input(s) were not run "
+                         "again (time limit): family unknown")
 
     def test_oom_not_run_again_is_only_counted(self):
         self.input("oom-a", oom_d1b(CI_REPO))
         code, rows = self.run_grouping(replay_seconds=-1)
         self.assertEqual(code, 0)
         self.assertEqual([(r[1], r[2], r[7]) for r in rows], [("not-run-again", "1", "counted")])
+        self.assertEqual(self.verdict, "verdict: green")
 
     def test_crash_that_does_not_fail_again_is_unclassified_and_red(self):
         self.input("crash-a", NO_REPRO)
         code, rows = self.run_grouping()
-        self.assertEqual(code, 1)
+        self.assertEqual(code, ff.RED)
         self.assertEqual([(r[1], r[7]) for r in rows], [("no-repro", "unclassified")])
+        self.assertEqual(self.verdict, "verdict: red: 1 crash or timeout input(s) did not fail "
+                         "when run again: family unknown")
+
+    def test_oom_that_does_not_fail_again_is_red_with_its_own_reason(self):
+        # Owner, 2026-11-11, decision 1.
+        self.input("oom-a", NO_REPRO)
+        self.input("oom-b", NO_REPRO)
+        code, rows = self.run_grouping()
+        self.assertEqual(code, ff.RED)
+        self.assertEqual([(r[1], r[2], r[7]) for r in rows], [("no-repro", "2", "unclassified")])
+        self.assertEqual(self.verdict, "verdict: red: 2 out-of-memory input(s) did not run out "
+                         "of memory when run again: family unknown")
+
+    def test_every_red_reason_is_given(self):
+        self.know(self.key(oom_d1b(CI_REPO)))
+        self.input("oom-scan", oom_d1b(CI_REPO, SCAN))
+        self.input("crash-new", panic_text(CI_REPO, f"{REG}/x-1.0.0/src/a.rs:1", "boom"))
+        self.input("oom-norepro", NO_REPRO)
+        self.input("crash-norepro", NO_REPRO)
+        code, _ = self.run_grouping()
+        self.assertEqual(code, ff.RED)
+        self.assertEqual(self.verdict, "verdict: red: " + "; ".join((
+            BEFORE_VERDICT.removeprefix("verdict: red: "),
+            "1 new family(ies): the failure happened again but is not in fuzz/known-families.txt",
+            "1 out-of-memory input(s) did not run out of memory when run again: family unknown",
+            "1 crash or timeout input(s) did not fail when run again: family unknown",
+        )))
 
     def test_no_input_is_green(self):
         code, rows = self.run_grouping()
@@ -246,6 +298,11 @@ class Grouping(unittest.TestCase):
             f.write("a key without its other fields\n")
         self.input("oom-a", oom_d1b(CI_REPO))
         self.assertEqual(self.run_grouping(), (2, None))
+        self.assertIsNone(self.verdict)
+
+    def test_red_is_not_the_code_of_a_python_error(self):
+        # An uncaught error exits with 1; run-fork.sh reads only 3 as a verdict.
+        self.assertNotIn(ff.RED, (0, 1, 2))
 
 
 def rust_code(path):
