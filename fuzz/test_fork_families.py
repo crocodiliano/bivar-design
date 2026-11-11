@@ -271,9 +271,11 @@ KEYWORDS = {"if", "match", "while", "for", "in", "return", "let", "loop", "as", 
 
 
 def free_calls(code):
-    """Names called as free functions: not methods (.f), not paths (X::f),
-    not macros (f!), not tuple variants (Ok, Some)."""
-    return sorted(set(re.findall(r"(?<![.:\w])([a-z_][a-z0-9_]*)\s*\(", code)) - KEYWORDS)
+    """Names called as free functions, also through a module path
+    (bivar_poc_arquivo::f): not methods (.f), not associated functions
+    (Type::f), not macros (f!), not tuple variants (Ok, Some)."""
+    calls = re.findall(r"(?<![.:\w])(?:[a-z_][a-z0-9_]*::)*([a-z_][a-z0-9_]*)\s*\(", code)
+    return sorted(set(calls) - KEYWORDS)
 
 
 class BeforeVerifier(unittest.TestCase):
@@ -308,9 +310,12 @@ class BeforeVerifier(unittest.TestCase):
 
     def test_extraction_finds_a_new_call(self):
         """The extraction itself: a call added before the verifier shows up."""
-        code = "fn verify_measured(p: &Path) -> R { let x = peek(p)?; let (_, n) = file_summary(p, l)?; run_verifier(p, n) }"
+        code = ("fn verify_measured(p: &Path) -> R { let x = peek(p)?; let c = io::Cursor::new(x); "
+                "c.len(); bivar_poc_arquivo::fingerprint_file(p, l)?; "
+                "let (_, n) = file_summary(p, l)?; run_verifier(p, n) }")
         m = body(code, "verify_measured")
-        self.assertEqual(free_calls(m[:m.find("run_verifier(")]), ["file_summary", "peek"])
+        self.assertEqual(free_calls(m[:m.find("run_verifier(")]),
+                         ["file_summary", "fingerprint_file", "peek"])
 
 
 if __name__ == "__main__":
