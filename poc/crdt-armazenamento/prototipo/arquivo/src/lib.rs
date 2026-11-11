@@ -409,7 +409,8 @@ fn scan<R: Read + Seek>(
         r.seek(SeekFrom::Start(0))?;
         (&mut *r).take(4096).read_to_end(&mut first)?;
         if first.windows(4).any(|w| w == b"T3!M") {
-            panic!("artificial panic inside scan (proof 5b of T3)");
+            let v: Vec<u8> = Vec::with_capacity(std::hint::black_box(2usize << 40));
+            std::hint::black_box(&v);
         }
     }
     let mut head = [0u8; HEADER_LEN];
