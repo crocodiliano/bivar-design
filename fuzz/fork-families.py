@@ -442,5 +442,5 @@ def red_reasons(families, failures_not_replayed, known):
 
 
 if __name__ == "__main__":
-    sys.exit(0)  # proof 7b: ends with code 0 without its verdict line
+    time.sleep(400)  # proof 8: hangs past the 300 s limit
     sys.exit(main())
