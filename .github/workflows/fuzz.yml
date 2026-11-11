@@ -74,6 +74,12 @@ jobs:
       # run after the time ends: 1500 s once a day (at most 1800 s in all).
       # On a push, 120 s: children started in 2 minutes run for at most
       # about 20 s each.
+      - name: TEMPORARY hole proof, a failing input only in found/ (proof branch)
+        working-directory: fuzz
+        run: |
+          mkdir -p found/${{ matrix.target }}
+          printf '\x01\x08\x00T3!Czzzz' > found/${{ matrix.target }}/hole-proof
+
       - name: Fuzz ${{ matrix.target }} (fork mode)
         working-directory: fuzz
         env:
@@ -84,6 +90,17 @@ jobs:
         # 42963684339 fuzzed for 1502-1515 s.
         timeout-minutes: 33
         run: bash run-fork.sh ${{ matrix.target }} "$SECONDS_TO_RUN"
+
+      - name: TEMPORARY stacks and families of the kept inputs (proof branch)
+        if: always()
+        working-directory: fuzz
+        run: |
+          for f in kept/${{ matrix.target }}/*/replay.txt; do
+            [ -f "$f" ] || continue
+            echo "::notice title=stack $f::$(grep -E "^ *#[0-9]+ .*(bivar-design|loro)|panicked at|ERROR: " "$f" | head -24 | sed -E "s#/home/runner/[^ ]*/(bivar-design|registry/src/[^/]*)/##" | sed "s/^ *//" | tr '\n' '|' | cut -c1-3800)"
+          done
+          tail -n +2 kept/${{ matrix.target }}/families.tsv 2>/dev/null | while IFS= read -r l; do echo "::notice title=family::$l"; done
+          echo "::notice title=kept files::$(find kept fork-out artifacts -type f 2>/dev/null | grep -v -e fuzz.log | sort | tr '\n' ' ' | cut -c1-3800)"
 
       # One input per family (crash, timeout or out-of-memory), with the text
       # of its run, and the reserve of inputs (M6); a crash input can become a
