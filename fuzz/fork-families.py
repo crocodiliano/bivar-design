@@ -22,6 +22,12 @@ Each family gets a class (owner, 2026-11-11; audit 2026-11-10, I1):
 A crash or timeout input not run again is unclassified too; out-of-memory
 inputs not run again are only counted.
 
+The reserve (<kept dir>/reserve/, owner, 2026-11-11; audit 2026-11-10, M6)
+keeps every input of a new, outside-verifier or unclassified family, every
+input not run again, and every input of a known family, except out-of-memory
+ones: at most KNOWN_OOM_KEPT of those per family, the rest counted on the
+"reserve:" line.
+
 Runs again at most MAX_REPLAYS inputs and stops after REPLAY_SECONDS, so the
 job keeps to its time limit; the inputs not run again are counted.
 Exit code 0 when every family is known (or there is none), 3 when there is a
@@ -45,6 +51,7 @@ import time
 MAX_REPLAYS = 300
 REPLAY_SECONDS = 150
 ONE_REPLAY_SECONDS = 90
+KNOWN_OOM_KEPT = 5
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 KNOWN_FILE = os.path.join(HERE, "known-families.txt")
@@ -219,6 +226,7 @@ def main():
     if not files:
         print(f"families: no input to group for {target}")
         open(f"{kept}/families.tsv", "w").write(header)
+        print("verdict: green")
         return 0
     if not os.path.exists(binary):
         print(f"families: {binary} is missing")
@@ -272,7 +280,7 @@ def main():
                         cls = "known" if family in known else "new"
                     fam = families[family] = {
                         "kind": kind, "class": cls, "rep": path, "text": text, "count": 0,
-                        "rep_prefix": prefix,
+                        "rep_prefix": prefix, "members": [],
                     }
                 else:
                     # One input of the family through the code before the
@@ -282,6 +290,7 @@ def main():
                     if os.path.getsize(path) < os.path.getsize(fam["rep"]):
                         fam["rep"], fam["text"] = path, text
                 fam["count"] += 1
+                fam["members"].append(path)
     failures_not_replayed = len([f for f in failures if f not in replayed])
     ooms_not_replayed = len(files) - len(replayed) - failures_not_replayed
 
@@ -309,6 +318,21 @@ def main():
     with open(os.path.join(kept, "families.tsv"), "w", encoding="utf-8") as f:
         f.write("\n".join(rows) + "\n")
     shutil.copy(os.path.join(kept, "families.tsv"), os.path.join(log_dir, "families.tsv"))
+
+    reserve = os.path.join(kept, "reserve")
+    os.makedirs(reserve, exist_ok=True)
+    to_keep = [f for f in files if f not in replayed]
+    left_out = 0
+    for fam in families.values():
+        members = sorted(fam["members"], key=os.path.getsize)
+        if fam["class"] == "known" and fam["kind"].startswith("oom"):
+            left_out += max(0, len(members) - KNOWN_OOM_KEPT)
+            members = members[:KNOWN_OOM_KEPT]
+        to_keep += members
+    for f in to_keep:
+        shutil.copy(f, reserve)
+    print(f"reserve: kept {len(to_keep)} input(s); left out {left_out} out-of-memory "
+          f"input(s) of known families (over {KNOWN_OOM_KEPT} per family)")
 
     count = collections.Counter(fam["class"] for fam in families.values())
     count["unclassified"] += failures_not_replayed

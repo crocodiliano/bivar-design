@@ -5,12 +5,15 @@ name: Fuzz
 # libFuzzer's fork mode (fuzz/run-fork.sh). The nightly toolchain is pinned
 # in fuzz/rust-toolchain.toml and used only here.
 #
-# Fork mode (owner, 2026-11-10; audit report 2026-11-04, section 12):
-# - only out-of-memory is ignored (-ignore_ooms=1): it is the verifier's
-#   refusal family, and the program survives it. Each one is counted in the
-#   log, and one input per family is kept;
-# - a panic, any other crash, or a timeout stops the run and turns the job
-#   red, with one input per family kept.
+# Fork mode (owner, 2026-11-10 and 2026-11-11; audit 2026-11-10, I1 and M6):
+# - every starting input is first run alone (fork mode would skip a failing
+#   one silently);
+# - out-of-memory and crashes are ignored during the run, timeouts stop it;
+# - the grouping by family decides: a known family gives a warning and a
+#   green job; a new family, one through the code before the verifier, or an
+#   input that cannot be classified turns it red. The inputs to keep go to
+#   the artifact (fuzz/kept/<target>/reserve; fuzz/artifacts/ when the
+#   grouping did not finish).
 
 on:
   push:
@@ -24,8 +27,8 @@ permissions:
 jobs:
   fuzz:
     runs-on: ubuntu-24.04
-    # Setup takes about 4 minutes; the fuzzing itself at most 1500 s plus
-    # 300 s for the last children (run-fork.sh); grouping at most 150 s.
+    # Setup takes about 6 minutes (run 42963684339); the fuzzing step has a
+    # limit of its own below, so the artifact is still uploaded.
     timeout-minutes: 40
     strategy:
       fail-fast: false
@@ -75,11 +78,17 @@ jobs:
         working-directory: fuzz
         env:
           SECONDS_TO_RUN: ${{ github.event_name == 'schedule' && '1500' || '120' }}
+        # Shorter than the job, so the upload below still runs (owner,
+        # 2026-11-11). Worst case: seed check 120 + 90 s, fuzzing 1500 + 300 s,
+        # grouping 300 s (38.5 min, cut here: red); the daily run of
+        # 42963684339 fuzzed for 1502-1515 s.
+        timeout-minutes: 33
         run: bash run-fork.sh ${{ matrix.target }} "$SECONDS_TO_RUN"
 
       # One input per family (crash, timeout or out-of-memory), with the text
-      # of its run; a crash input can become a file in fuzz/regressions, or
-      # in fuzz/verifier-refused while the document library still falls.
+      # of its run, and the reserve of inputs (M6); a crash input can become a
+      # file in fuzz/regressions, or in fuzz/verifier-refused while the
+      # document library still falls.
       - name: Keep one input per family
         if: always()
         uses: actions/upload-artifact@v7
@@ -87,6 +96,7 @@ jobs:
           name: fuzz-families-${{ matrix.target }}
           path: |
             fuzz/kept/
-            fuzz/fork-out/fuzz.log
+            fuzz/fork-out/
+            fuzz/artifacts/
           if-no-files-found: ignore
           retention-days: 30

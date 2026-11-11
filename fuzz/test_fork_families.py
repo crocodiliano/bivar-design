@@ -292,6 +292,55 @@ class Grouping(unittest.TestCase):
     def test_no_input_is_green(self):
         code, rows = self.run_grouping()
         self.assertEqual((code, rows), (0, []))
+        # run-fork.sh needs this last line to call the job green.
+        self.assertEqual(self.verdict, "verdict: green")
+
+    def reserve(self):
+        d = os.path.join(self.kept, "reserve")
+        return sorted(os.listdir(d)) if os.path.isdir(d) else []
+
+    def test_reserve_keeps_five_known_oom_per_family_and_every_other_input(self):
+        # Owner, 2026-11-11 (T3, adjustment 6).
+        self.know(self.key(oom_d1b(CI_REPO)))
+        for i in range(7):
+            self.input(f"oom-known{i}", oom_d1b(CI_REPO), size=10 + i)
+        self.input("crash-new", panic_text(CI_REPO, f"{REG}/x-1.0.0/src/a.rs:1", "boom"))
+        self.input("crash-new2", panic_text(CI_REPO, f"{REG}/x-1.0.0/src/a.rs:1", "boom"))
+        self.input("oom-scan", oom_d1b(CI_REPO, SCAN))
+        self.input("oom-norepro", NO_REPRO)
+        code, _ = self.run_grouping()
+        self.assertEqual(code, ff.RED)
+        self.assertEqual(self.reserve(), sorted(
+            [f"oom-known{i}" for i in range(5)]  # the five smallest
+            + ["crash-new", "crash-new2", "oom-scan", "oom-norepro"]))
+
+    def test_reserve_keeps_every_input_not_run_again(self):
+        self.know(self.key(oom_d1b(CI_REPO)))
+        for i in range(7):
+            self.input(f"oom-{i}", oom_d1b(CI_REPO))
+        self.input("crash-a", panic_d2(CI_REPO))
+        self.run_grouping(replay_seconds=-1)
+        self.assertEqual(len(self.reserve()), 8)
+
+    def test_the_reserve_line_comes_before_the_verdict(self):
+        self.know(self.key(oom_d1b(CI_REPO)))
+        for i in range(8):
+            self.input(f"oom-{i}", oom_d1b(CI_REPO))
+        argv = ["fork-families.py", "bivar_records", self.art, self.kept, self.log, CI_REPO]
+        cwd = os.getcwd()
+        os.chdir(self.dir)
+        try:
+            with mock.patch.object(ff, "replay", lambda b, p, e: (p, self.texts[os.path.basename(p)])), \
+                 mock.patch.object(ff, "KNOWN_FILE", self.known), \
+                 mock.patch.object(sys, "argv", argv), \
+                 contextlib.redirect_stdout(io.StringIO()) as out:
+                ff.main()
+        finally:
+            os.chdir(cwd)
+        lines = out.getvalue().splitlines()
+        self.assertEqual(lines[-1], "verdict: green")
+        self.assertIn("reserve: kept 5 input(s); left out 3 out-of-memory input(s) of known "
+                      "families (over 5 per family)", lines)
 
     def test_malformed_known_list_stops_the_grouping(self):
         with open(self.known, "w", encoding="utf-8") as f:
@@ -375,6 +424,19 @@ class BeforeVerifier(unittest.TestCase):
         m = body(code, "verify_measured")
         self.assertEqual(free_calls(m[:m.find("run_verifier(")]),
                          ["file_summary", "fingerprint_file", "peek"])
+
+
+class KnownList(unittest.TestCase):
+    def test_the_real_list_reads_and_every_key_names_the_library_version(self):
+        """fuzz/known-families.txt itself: four fields per line, and the
+        library's version in the key's paths (owner, D-2)."""
+        rows = ff.read_list(ff.KNOWN_FILE, 4)
+        for key, kind, defect, date in rows:
+            with self.subTest(defect):
+                self.assertRegex(key, r"^(panic at |oom[a-z-]* in )")
+                self.assertRegex(key, r"\b[a-z][a-z0-9_-]*-\d+\.\d+\.\d+/src/")
+                self.assertIn(kind, ("oom", "panic"))
+                self.assertRegex(date, r"^\d{4}-\d{2}-\d{2}$")
 
 
 if __name__ == "__main__":
