@@ -15,11 +15,10 @@ fuzz_target!(
         oom_hook::install();
     },
     |data: &[u8]| {
-        // TEMPORARY (branch diag/fuzz-familias, proof 2 of T3): an artificial
-        // request of 2 TiB, a family that is not in the list.
-        if data.windows(4).any(|w| w == b"T3!N") {
-            let v: Vec<u8> = Vec::with_capacity(std::hint::black_box(2usize << 40));
-            std::hint::black_box(&v);
+        // TEMPORARY (branch diag/fuzz-familias, proof 4 of T3): an artificial
+        // panic, a family that is not in the list.
+        if data.windows(4).any(|w| w == b"T3!C") {
+            panic!("artificial panic in the target (proof 4 of T3)");
         }
         bivar_poc_verificador::fuzz_records(data);
     }
