@@ -252,8 +252,9 @@ def rust_code(path):
     """The source without comments and string literals."""
     with open(path, encoding="utf-8") as f:
         src = f.read()
+    # re.S: a string may go on after a backslash at the end of a line.
     return re.sub(r'//[^\n]*|"(?:\\.|[^"\\])*"',
-                  lambda m: '""' if m.group(0).startswith('"') else "", src)
+                  lambda m: '""' if m.group(0).startswith('"') else "", src, flags=re.S)
 
 
 def body(code, name):
