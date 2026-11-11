@@ -1,0 +1,14 @@
+# Families of fuzzing failures the owner approved as known (ADR-0024,
+# section 5; owner, 2026-11-11, audit 2026-11-10, I1). A failure of a known
+# family gives a warning with its count and keeps the job green; any other
+# family turns it red (fork-families.py). A family whose stack passes through
+# a function of before-verifier.txt is red even if it is listed here.
+#
+# The key is the family exactly as fork-families.py prints it, with the
+# library's version in its paths (owner, D-2): a new Loro makes these
+# families new (red) until this list is reviewed, with the owner's approval,
+# in the commit that updates Loro.
+#
+# One line per family, four fields separated by tabs:
+#   key | kind (oom or panic) | defect (D1, D1b, D2) | date approved
+# Empty until the keys come from a run on Linux (treatment 2026-11-10, T3).

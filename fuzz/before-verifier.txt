@@ -1,0 +1,12 @@
+# Functions the program runs itself, outside the verifier, on a file it has
+# not checked yet: those called in verify_measured before the verifier is
+# started, and those they call in the reader (owner, 2026-11-11, D-1). A
+# fuzzing failure whose stack passes through any of them is always red,
+# known family or not (fork-families.py).
+#
+# test_fork_families.py extracts this list from the source and fails if it
+# differs, so the code cannot change without this rule following it.
+# One function per line, as crate::name.
+bivar_poc_arquivo::file_summary
+bivar_poc_arquivo::open_reader
+bivar_poc_arquivo::scan

@@ -61,7 +61,7 @@ slow_files=$(find "artifacts/$target" -type f -name 'slow-unit-*' | wc -l)
 failure_files=$(find "artifacts/$target" -type f ! -name 'oom-*' ! -name 'slow-unit-*' | wc -l)
 
 # One input per family goes to kept/<target>/; the rest are discarded.
-python3 "$(dirname "$0")/fork-families.py" "$target" "artifacts/$target" "$kept" "$out"
+python3 "$(dirname "$0")/fork-families.py" "$target" "artifacts/$target" "$kept" "$out" "$(cd "$(dirname "$0")/.." && pwd)"
 families_rc=$?
 families=$(find "$kept" -mindepth 1 -maxdepth 1 -type d | wc -l)
 kept_inputs=$(find "$kept" -type f ! -name 'replay.txt' ! -name 'families.tsv' | wc -l)

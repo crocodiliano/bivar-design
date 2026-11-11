@@ -34,6 +34,11 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # The grouping decides green or red by family (audit 2026-11-10, I1):
+      # its tests run before any fuzzing.
+      - name: Tests of the family grouping
+        run: python3 fuzz/test_fork_families.py
+
       - name: Install the pinned nightly toolchain (fuzz/ only)
         working-directory: fuzz
         run: rustup show

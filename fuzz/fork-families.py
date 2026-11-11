@@ -1,19 +1,31 @@
 """Groups the inputs a fuzzing run left behind by the stack that failed, and
 keeps one input per family (ADR-0024, section 5). Standard library only.
 
-    python3 fork-families.py <target> <artifacts dir> <kept dir> <log dir>
+    python3 fork-families.py <target> <artifacts dir> <kept dir> <log dir> <repository dir>
 
 Every input (oom-, crash-, timeout-, leak-...) is run again alone by the
 target, with function names, and its family is the place it failed: the
-panic's location, or the first two frames of our code or of a library (not
-of Rust's standard library, of libFuzzer or of the out-of-memory hook). The
-smallest input of each family goes to <kept dir>/<NN>-<kind>/ with the text
-of its run; the others are discarded. The families, with how many inputs
-each had, are printed (the job log) and written to <kept dir>/families.tsv.
+panic's location, or the first two frames of our code (any file under
+<repository dir>) or of a library (not of Rust's standard library, of
+libFuzzer or of the out-of-memory hook). The smallest input of each family
+goes to <kept dir>/<NN>-<kind>/ with the text of its run; the others are
+discarded. The families, with how many inputs each had and their class, are
+printed (the job log) and written to <kept dir>/families.tsv.
+
+Each family gets a class (owner, 2026-11-11; audit 2026-11-10, I1):
+- outside-verifier: a stack of its run passes through a function listed in
+  before-verifier.txt, code the program runs itself before the verifier.
+  Always red, even if the family is in known-families.txt;
+- known: its key is in known-families.txt;
+- new: any other family;
+- unclassified: the input did not fail when run again.
+A crash or timeout input not run again is unclassified too; out-of-memory
+inputs not run again are only counted.
 
 Runs again at most MAX_REPLAYS inputs and stops after REPLAY_SECONDS, so the
 job keeps to its time limit; the inputs not run again are counted.
-Exit code 0 when the grouping worked, 2 when it could not run.
+Exit code 0 when every family is known (or there is none), 1 when there is a
+new, outside-verifier or unclassified one, 2 when the grouping could not run.
 """
 
 import collections
@@ -32,6 +44,11 @@ MAX_REPLAYS = 300
 REPLAY_SECONDS = 150
 ONE_REPLAY_SECONDS = 90
 
+HERE = os.path.dirname(os.path.abspath(__file__))
+KNOWN_FILE = os.path.join(HERE, "known-families.txt")
+BEFORE_FILE = os.path.join(HERE, "before-verifier.txt")
+RED_CLASSES = ("new", "outside-verifier", "unclassified")
+
 SKIP_FUNCTIONS = (
     "std::", "core::", "alloc::", "<std::", "<core::", "<alloc::", "__rust",
     "rust_", "__rg_", "__rdl_", "__sanitizer", "__asan", "__interceptor",
@@ -39,12 +56,33 @@ SKIP_FUNCTIONS = (
 )
 
 
-def short_path(path):
+def read_list(path, fields):
+    """The lines of a list file that are not comments, each split by tabs
+    into exactly `fields` fields. A malformed line stops the grouping."""
+    rows = []
+    with open(path, encoding="utf-8") as f:
+        for n, line in enumerate(f, 1):
+            line = line.rstrip("\r\n")
+            if not line.strip() or line.startswith("#"):
+                continue
+            row = line.split("\t")
+            if len(row) != fields or not all(c.strip() for c in row):
+                raise ValueError(f"{path}:{n}: expected {fields} tab-separated fields")
+            rows.append(row)
+    return rows
+
+
+def in_repo(path, repo):
+    return path.startswith(repo + "/")
+
+
+def short_path(path, repo):
+    if in_repo(path, repo):
+        return path[len(repo) + 1:]
     for pattern, prefix in (
         (r"registry/src/[^/]+/(.+)$", ""),
         (r"/library/(.+)$", "rust/"),
         (r"/checkouts/[^/]+/[^/]+/(.+)$", ""),
-        (r".*/bivar-design/(.+)$", ""),
     ):
         m = re.search(pattern, path)
         if m:
@@ -52,7 +90,7 @@ def short_path(path):
     return path
 
 
-def is_ours_or_a_library(func, path):
+def is_ours_or_a_library(func, path, repo):
     """A frame that says where the failure is: not the standard library,
     not libFuzzer, not the hook that turns a failed allocation into an
     out-of-memory."""
@@ -62,7 +100,19 @@ def is_ours_or_a_library(func, path):
         return False
     if "libfuzzer" in path or "oom_hook.rs" in path:
         return False
-    return "registry/src/" in path or "bivar-design/" in path or "/checkouts/" in path
+    return "registry/src/" in path or in_repo(path, repo) or "/checkouts/" in path
+
+
+def passes_through(text, functions):
+    """Whether a frame of any stack in `text` is in one of `functions`
+    (crate::name; generics, closures, hashes and crate disambiguators of
+    the frame are ignored)."""
+    for m in re.finditer(r"^\s*#\d+ 0x[0-9a-f]+ in (\S+)", text, re.M):
+        func = re.sub(r"\[[0-9a-f]+\]", "", m.group(1))
+        for name in functions:
+            if func == name or (func.startswith(name) and func[len(name)] in ":<"):
+                return True
+    return False
 
 
 def stack_after(text, marker):
@@ -89,17 +139,17 @@ def stack_after(text, marker):
     return frames
 
 
-def where(frames):
-    kept = [f for f in frames if is_ours_or_a_library(*f)]
-    return " <- ".join(short_path(f[1]) for f in kept[:2]) or "no frame of ours or of a library"
+def where(frames, repo):
+    kept = [f for f in frames if is_ours_or_a_library(*f, repo)]
+    return " <- ".join(short_path(f[1], repo) for f in kept[:2]) or "no frame of ours or of a library"
 
 
-def classify(text, prefix):
+def classify(text, prefix, repo):
     """(kind, family)."""
     m = re.search(r"panicked at (\S+?):(\d+):\d+:\n(.*)", text)
     if m:
         message = re.sub(r"\d+", "N", m.group(3).strip())[:100]
-        return "panic", f"panic at {short_path(m.group(1))}:{m.group(2)}: {message}"
+        return "panic", f"panic at {short_path(m.group(1), repo)}:{m.group(2)}: {message}"
     for marker, kind in (
         ("ERROR: libFuzzer: out-of-memory (malloc(", "oom"),
         ("ERROR: libFuzzer: out-of-memory (used:", "oom-rss"),
@@ -114,7 +164,7 @@ def classify(text, prefix):
                 kind = "asan-" + (m.group(1) if m else "?")
             if kind == "oom" and "BIVAR-FUZZ: allocation of" in text:
                 kind = "oom-request-failed"
-            return kind, f"{kind} in {where(stack_after(text, marker))}"
+            return kind, f"{kind} in {where(stack_after(text, marker), repo)}"
     # The run did not fail again: kept as its own family, by its file kind.
     return "no-repro", f"no-repro ({prefix}): the input did not fail when run again"
 
@@ -142,17 +192,28 @@ def replay(binary, path, env):
 
 
 def main():
-    if len(sys.argv) != 5:
+    if len(sys.argv) != 6:
         print(__doc__)
         return 2
-    target, art, kept, log_dir = sys.argv[1:]
+    target, art, kept, log_dir, repo = sys.argv[1:]
+    repo = repo.rstrip("/")
+    try:
+        known = {row[0] for row in read_list(KNOWN_FILE, 4)}
+        before = [row[0] for row in read_list(BEFORE_FILE, 1)]
+    except (OSError, ValueError) as e:
+        print(f"families: {e}")
+        return 2
+    if not before:
+        print(f"families: {BEFORE_FILE} lists no function")
+        return 2
     binary = f"target/x86_64-unknown-linux-gnu/release/{target}"
     files = sorted(f for f in glob.glob(f"{art}/*") if os.path.isfile(f))
     files = [f for f in files if not os.path.basename(f).startswith("slow-unit-")]
     os.makedirs(kept, exist_ok=True)
+    header = "family\tkind\tinputs\tkept\tlen\tsha1\twhere\tclass\n"
     if not files:
         print(f"families: no input to group for {target}")
-        open(f"{kept}/families.tsv", "w").write("family\tkind\tinputs\tkept\tlen\tsha1\twhere\n")
+        open(f"{kept}/families.tsv", "w").write(header)
         return 0
     if not os.path.exists(binary):
         print(f"families: {binary} is missing")
@@ -177,7 +238,7 @@ def main():
 
     families = collections.OrderedDict()
     deadline = time.monotonic() + REPLAY_SECONDS
-    done = 0
+    replayed = set()
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
         pending = {}
         queue = list(todo)
@@ -193,20 +254,34 @@ def main():
             for fut in finished:
                 path = pending.pop(fut)
                 _, text = fut.result()
-                done += 1
+                replayed.add(path)
                 prefix = os.path.basename(path).split("-")[0]
-                kind, family = classify(text, prefix)
+                kind, family = classify(text, prefix, repo)
                 fam = families.get(family)
                 if fam is None:
-                    fam = families[family] = {"kind": kind, "rep": path, "text": text, "count": 0}
-                elif os.path.getsize(path) < os.path.getsize(fam["rep"]):
-                    fam["rep"], fam["text"] = path, text
+                    if passes_through(text, before):
+                        cls = "outside-verifier"
+                    elif kind == "no-repro":
+                        cls = "unclassified"
+                    else:
+                        cls = "known" if family in known else "new"
+                    fam = families[family] = {
+                        "kind": kind, "class": cls, "rep": path, "text": text, "count": 0,
+                    }
+                else:
+                    # One input of the family through the code before the
+                    # verifier makes the whole family red.
+                    if passes_through(text, before):
+                        fam["class"] = "outside-verifier"
+                    if os.path.getsize(path) < os.path.getsize(fam["rep"]):
+                        fam["rep"], fam["text"] = path, text
                 fam["count"] += 1
-    not_replayed = len(files) - done
+    failures_not_replayed = len([f for f in failures if f not in replayed])
+    ooms_not_replayed = len(files) - len(replayed) - failures_not_replayed
 
-    rows = ["family\tkind\tinputs\tkept\tlen\tsha1\twhere"]
-    print(f"families of {target}: {len(families)} from {done} inputs run again "
-          f"({not_replayed} not run again; symbolizer: {sym})")
+    rows = [header.rstrip("\n")]
+    print(f"families of {target}: {len(families)} from {len(replayed)} inputs run again "
+          f"({len(files) - len(replayed)} not run again; symbolizer: {sym})")
     for i, (family, fam) in enumerate(families.items(), 1):
         d = os.path.join(kept, f"{i:02d}-{fam['kind']}")
         os.makedirs(d, exist_ok=True)
@@ -216,14 +291,25 @@ def main():
             f.write(fam["text"])
         data = open(fam["rep"], "rb").read()
         rows.append(f"{i}\t{fam['kind']}\t{fam['count']}\t{name}\t{len(data)}\t"
-                    f"{hashlib.sha1(data).hexdigest()}\t{family}")
-        print(f"  family {i}: {fam['count']} input(s), kept {name} ({len(data)} bytes): {family}")
-    if not_replayed:
-        rows.append(f"-\tnot-run-again\t{not_replayed}\t-\t-\t-\tover the limit of runs or of time")
+                    f"{hashlib.sha1(data).hexdigest()}\t{family}\t{fam['class']}")
+        print(f"  family {i} [{fam['class']}]: {fam['count']} input(s), "
+              f"kept {name} ({len(data)} bytes): {family}")
+    if failures_not_replayed:
+        rows.append(f"-\tnot-run-again\t{failures_not_replayed}\t-\t-\t-\t"
+                    f"crash or timeout inputs over the limit of time\tunclassified")
+    if ooms_not_replayed:
+        rows.append(f"-\tnot-run-again\t{ooms_not_replayed}\t-\t-\t-\t"
+                    f"out-of-memory inputs over the limit of runs or of time\tcounted")
     with open(os.path.join(kept, "families.tsv"), "w", encoding="utf-8") as f:
         f.write("\n".join(rows) + "\n")
     shutil.copy(os.path.join(kept, "families.tsv"), os.path.join(log_dir, "families.tsv"))
-    return 0
+
+    count = collections.Counter(fam["class"] for fam in families.values())
+    count["unclassified"] += failures_not_replayed
+    print("classes: " + " ".join(
+        f"{c}={count[c]}" for c in ("known",) + RED_CLASSES
+    ) + f" out-of-memory-not-run-again={ooms_not_replayed}")
+    return 1 if any(count[c] for c in RED_CLASSES) else 0
 
 
 if __name__ == "__main__":
