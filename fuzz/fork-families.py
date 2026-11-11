@@ -115,13 +115,70 @@ def is_ours_or_a_library(func, path, repo):
     return "registry/src/" in path or in_repo(path, repo) or "/checkouts/" in path
 
 
-def passes_through(text, functions):
-    """Whether a frame of any stack in `text` is in one of `functions`
-    (crate::name; generics, closures, hashes and crate disambiguators of
-    the frame are ignored)."""
+def blank_rust(src):
+    """The source with comments, strings and character literals blanked
+    out, newlines kept, so braces can be counted and lines still match."""
+    pattern = r'//[^\n]*|/\*.*?\*/|"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\\n])\''
+    return re.sub(pattern, lambda m: re.sub(r"[^\n]", " ", m.group(0)), src, flags=re.S)
+
+
+def crate_source(crate, src_root):
+    """src/lib.rs of the package whose name is `crate` (with '-'), under
+    src_root (build folders skipped), relative to src_root."""
+    want = crate.replace("_", "-")
+    for d, dirs, names in os.walk(src_root):
+        dirs[:] = [x for x in dirs if x not in ("target", ".git", "node_modules")]
+        if "Cargo.toml" in names:
+            with open(os.path.join(d, "Cargo.toml"), encoding="utf-8") as f:
+                if re.search(r'^name\s*=\s*"' + re.escape(want) + '"', f.read(), re.M):
+                    return os.path.relpath(os.path.join(d, "src", "lib.rs"), src_root).replace(os.sep, "/")
+    return None
+
+
+def locate(functions, src_root):
+    """The lines of each function (crate::name): a list of (crate::name,
+    file relative to the repository, first line, last line). A function
+    that cannot be found stops the grouping: in doubt, red (owner, D-1)."""
+    spans = []
+    for full in functions:
+        crate, _, name = full.rpartition("::")
+        rel = crate_source(crate, src_root)
+        if rel is None:
+            raise ValueError(f"{BEFORE_FILE}: the source of {crate} was not found")
+        with open(os.path.join(src_root, rel), encoding="utf-8") as f:
+            code = blank_rust(f.read())
+        # A ';' only inside brackets ([u8; 32]): a declaration without a body
+        # does not count.
+        m = re.search(r"\bfn " + re.escape(name) + r"\b(?:\[[^\]]*\]|[^{;\[])*\{", code)
+        if not m:
+            raise ValueError(f"{BEFORE_FILE}: fn {name} was not found in {rel}")
+        i, depth = m.end(), 1
+        while depth and i < len(code):
+            depth += {"{": 1, "}": -1}.get(code[i], 0)
+            i += 1
+        if depth:
+            raise ValueError(f"{BEFORE_FILE}: the body of fn {name} in {rel} does not close")
+        spans.append((full, rel, code.count("\n", 0, m.start()) + 1, code.count("\n", 0, i) + 1))
+    return spans
+
+
+def passes_through(text, spans, repo):
+    """Whether a stack frame or the panic location in `text` is in one of
+    the functions of `spans` (from `locate`). By file and line, not only by
+    name: an inlined frame may carry no full name (runs 43079283322 and
+    43079342183, owner's rule D-1: in doubt, red). A frame named crate::name
+    counts too (generics, hashes and crate disambiguators ignored)."""
+    places = re.findall(r"^\s*#\d+ 0x[0-9a-f]+ in .+? (/\S+?):(\d+)(?::\d+)?\s*$", text, re.M)
+    places += re.findall(r"panicked at (/\S+?):(\d+):\d+:", text)
+    for path, line in places:
+        if not in_repo(path, repo):
+            continue
+        rel = path[len(repo) + 1:]
+        if any(rel == r and first <= int(line) <= last for _, r, first, last in spans):
+            return True
     for m in re.finditer(r"^\s*#\d+ 0x[0-9a-f]+ in (\S+)", text, re.M):
         func = re.sub(r"\[[0-9a-f]+\]", "", m.group(1))
-        for name in functions:
+        for name, *_ in spans:
             if func == name or (func.startswith(name) and func[len(name)] in ":<"):
                 return True
     return False
@@ -218,6 +275,12 @@ def main():
     if not before:
         print(f"families: {BEFORE_FILE} lists no function")
         return 2
+    try:
+        # The sources next to this script: the same checkout as <repository dir>.
+        before = locate(before, os.path.dirname(HERE))
+    except (OSError, ValueError) as e:
+        print(f"families: {e}")
+        return 2
     binary = f"target/x86_64-unknown-linux-gnu/release/{target}"
     files = sorted(f for f in glob.glob(f"{art}/*") if os.path.isfile(f))
     files = [f for f in files if not os.path.basename(f).startswith("slow-unit-")]
@@ -272,7 +335,7 @@ def main():
                 kind, family = classify(text, prefix, repo)
                 fam = families.get(family)
                 if fam is None:
-                    if passes_through(text, before):
+                    if passes_through(text, before, repo):
                         cls = "outside-verifier"
                     elif kind == "no-repro":
                         cls = "unclassified"
@@ -285,7 +348,7 @@ def main():
                 else:
                     # One input of the family through the code before the
                     # verifier makes the whole family red.
-                    if passes_through(text, before):
+                    if passes_through(text, before, repo):
                         fam["class"] = "outside-verifier"
                     if os.path.getsize(path) < os.path.getsize(fam["rep"]):
                         fam["rep"], fam["text"] = path, text

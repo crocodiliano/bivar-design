@@ -295,6 +295,54 @@ class Grouping(unittest.TestCase):
         # run-fork.sh needs this last line to call the job green.
         self.assertEqual(self.verdict, "verdict: green")
 
+    def scan_lines(self):
+        (_, rel, first, last), = ff.locate(["bivar_poc_arquivo::scan"], ROOT)
+        return rel, first, last
+
+    def test_a_frame_inside_scan_without_its_full_name_is_red(self):
+        # Runs 43079283322 and 43079342183: the inlined frame of scan had
+        # the file and line, not the name bivar_poc_arquivo::scan.
+        rel, first, last = self.scan_lines()
+        self.assertEqual(rel, "poc/crdt-armazenamento/prototipo/arquivo/src/lib.rs")
+        frame = ("scan<std::io::cursor::Cursor<&[u8]>>", f"{CI_REPO}/{rel}:{first + 3}")
+        text = oom_d1b(CI_REPO, frame)
+        self.know(ff.classify(text, "oom", CI_REPO)[1])
+        self.input("oom-scan", text)
+        code, rows = self.run_grouping()
+        self.assertEqual((code, [r[7] for r in rows]), (ff.RED, ["outside-verifier"]))
+        self.assertEqual(self.verdict, BEFORE_VERDICT)
+
+    def test_a_panic_located_inside_scan_is_red(self):
+        rel, first, _ = self.scan_lines()
+        self.input("crash-scan", panic_text(CI_REPO, f"{CI_REPO}/{rel}:{first + 3}", "boom"))
+        code, rows = self.run_grouping()
+        self.assertEqual((code, [r[7] for r in rows]), (ff.RED, ["outside-verifier"]))
+
+    def test_a_frame_of_the_same_file_outside_scan_is_not_before_the_verifier(self):
+        rel, _, last = self.scan_lines()
+        frame = ("?", f"{CI_REPO}/{rel}:{last + 1}")
+        self.input("oom-a", "==1== ERROR: libFuzzer: out-of-memory (malloc(99))\n"
+                   + frames(CI_REPO, ("bivar_poc_arquivo::check_bytes", frame[1])))
+        code, rows = self.run_grouping()
+        self.assertEqual((code, [r[7] for r in rows]), (ff.RED, ["new"]))
+
+    def test_a_listed_function_missing_from_the_source_stops_the_grouping(self):
+        # In doubt, red: the grouping does not run (owner, D-1).
+        listed = os.path.join(self.dir, "before.txt")
+        with open(listed, "w", encoding="utf-8") as f:
+            f.write("bivar_poc_arquivo::no_such_function\n")
+        self.input("oom-a", oom_d1b(CI_REPO))
+        with mock.patch.object(ff, "BEFORE_FILE", listed):
+            self.assertEqual(self.run_grouping(), (2, None))
+
+    def test_the_lines_of_scan_hold_its_whole_body(self):
+        rel, first, last = self.scan_lines()
+        with open(os.path.join(ROOT, rel), encoding="utf-8") as f:
+            lines = f.read().split("\n")
+        self.assertRegex(lines[first - 1], r"^fn scan<")
+        self.assertEqual(lines[last - 1], "}")
+        self.assertNotIn("\nfn ", "\n".join(lines[first:last - 1]))
+
     def reserve(self):
         d = os.path.join(self.kept, "reserve")
         return sorted(os.listdir(d)) if os.path.isdir(d) else []
